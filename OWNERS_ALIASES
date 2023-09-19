@@ -1,0 +1,25 @@
+aliases:
+  ske-ci-infra-reviewers:
+  - dergeberl
+  - einfachnuralex
+  - JuliusSte
+  - Kumm-Kai
+  - maboehm
+  - nschad
+  - rgroemmer
+  - robinschneider
+  - SimonKienzler
+  - timebertt
+  - duciwuci
+  ske-ci-infra-approvers:
+  - dergeberl
+  - einfachnuralex
+  - JuliusSte
+  - Kumm-Kai
+  - maboehm
+  - nschad
+  - rgroemmer
+  - robinschneider
+  - SimonKienzler
+  - timebertt
+  - duciwuci
