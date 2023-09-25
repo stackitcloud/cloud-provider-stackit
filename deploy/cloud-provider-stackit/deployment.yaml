@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: cloud-provider-stackit
+  labels:
+    app: cloud-provider-stackit
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: cloud-provider-stackit
+  template:
+    metadata:
+      labels:
+        app: cloud-provider-stackit
+    spec:
+      serviceAccountName: cloud-provider-stackit
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: cloud-provider-stackit
+        image: reg.infra.ske.eu01.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
+        args:
+        - --allow-untagged-cloud
+        - --cloud-provider=stackit
+        - --route-reconciliation-period=30s
+        - --webhook-secure-port=0
+        - --leader-elect=false
+        ports:
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 500Mi
+          requests:
+            cpu: "0.1"
+            memory: 100Mi

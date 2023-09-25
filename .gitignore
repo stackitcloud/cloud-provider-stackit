@@ -1,0 +1,16 @@
+.vscode
+.idea
+/dev
+/secrets
+/hack/tools/bin
+cover.out
+cover.html
+.envrc
+
+# test binaries and reports
+*.test
+junit.xml
+
+# files related to ondemand plugin
+quotas*
+hmac
