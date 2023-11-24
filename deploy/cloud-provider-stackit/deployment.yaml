@@ -6,12 +6,12 @@ metadata:
   labels:
     app: cloud-provider-stackit
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
-      maxUnavailable: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: cloud-provider-stackit
@@ -30,8 +30,18 @@ spec:
         - --cloud-provider=stackit
         - --route-reconciliation-period=30s
         - --webhook-secure-port=0
-        - --leader-elect=false
+        - --leader-elect=true
+        - --leader-elect-resource-name=stackit-cloud-controller-manager # Must not collide with the lease for OpenStack's cloud controller manager.
+        - --concurrent-service-syncs=3
+        - --controllers=service-lb-controller
+        - --authorization-always-allow-paths=/metrics
+        # - --cloud-config=cloud-config.yaml
+        # - --cluster-name=<cluster-id>
         ports:
+        - containerPort: 10258
+          hostPort: 10258
+          name: https
+          protocol: TCP
         resources:
           limits:
             cpu: "0.5"

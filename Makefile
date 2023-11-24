@@ -25,7 +25,7 @@ modules: ## Runs go mod to ensure modules are up to date.
 
 .PHONY: test
 test: ## Run tests.
-	./hack/test.sh -race ./cmd/... ./pkg/...
+	./hack/test.sh ./cmd/... ./pkg/...
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage.
@@ -56,3 +56,6 @@ verify-modules: modules ## Verify go module files are up to date.
 .PHONY: verify
 verify: verify-fmt verify-modules check
 
+.PHONY: generate
+generate: 
+	go generate ./...

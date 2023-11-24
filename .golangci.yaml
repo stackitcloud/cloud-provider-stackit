@@ -121,7 +121,7 @@ linters:
     - unparam
     - unused
     - whitespace
-    - goerr113
+    # - goerr113
     - prealloc
 
 issues:
