@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -69,6 +70,10 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 		name += service.Name
 	} else {
 		name += service.Name[:avail]
+		// Load balancer names must be DNS-compatible, which disallows trailing dashes.
+		// By cutting the name in the middle, we might have a trailing dash.
+		// By trimming it, we still produce a non-empty valid name.
+		name = strings.TrimRight(name, "-")
 	}
 	return name
 }

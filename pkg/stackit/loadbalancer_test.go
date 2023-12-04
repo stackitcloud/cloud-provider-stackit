@@ -67,6 +67,17 @@ var _ = Describe("LoadBalancer", func() {
 			Expect(name).To(HaveLen(63))
 			Expect(name).To(Equal("k8s-svc-00000000-0000-0000-0000-000000000000-name-exactly-right"))
 		})
+
+		It("should produce DNS-compatible names by removing trailing dashes", func() {
+			name := lb.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:  "00000000-0000-0000-0000-000000000000",
+					Name: "ske-meets-stackit-lb",
+				},
+			})
+			Expect(name).To(HaveLen(62))
+			Expect(name).To(Equal("k8s-svc-00000000-0000-0000-0000-000000000000-ske-meets-stackit"))
+		})
 	})
 
 	Describe("GetLoadBalancer", func() {
