@@ -18,7 +18,7 @@ const (
 	LBStatusError       = "STATUS_ERROR"
 
 	ProtocolTCP      = "PROTOCOL_TCP"
-	ProtocolTCPProxy = "PROTOCOL_TCPPROXY"
+	ProtocolTCPProxy = "PROTOCOL_TCP_PROXY"
 	ProtocolUDP      = "PROTOCOL_UDP"
 
 	ProjectStatusDisabled ProjectStatus = "STATUS_DISABLED"
