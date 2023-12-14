@@ -641,12 +641,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 		want: errorImmutableFieldChanged{field: ".Listeners[0].Port"},
 		lb: &loadbalancer.LoadBalancer{
 			Listeners: &[]loadbalancer.Listener{
-				{Port: utils.Ptr[int32](80)},
+				{Port: utils.Ptr[int64](80)},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Listeners: &[]loadbalancer.Listener{
-				{Port: utils.Ptr[int32](443)},
+				{Port: utils.Ptr[int64](443)},
 			},
 		},
 	}),
@@ -756,14 +756,14 @@ var _ = DescribeTable("lbFulfillsSpec",
 		lb: &loadbalancer.LoadBalancer{
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					TargetPort: utils.Ptr[int32](80),
+					TargetPort: utils.Ptr[int64](80),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					TargetPort: utils.Ptr[int32](443),
+					TargetPort: utils.Ptr[int64](443),
 				},
 			},
 		},
@@ -897,7 +897,7 @@ var _ = DescribeTable("lbFulfillsSpec",
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
-						UnhealthyThreshold: utils.Ptr[int32](3),
+						UnhealthyThreshold: utils.Ptr[int64](3),
 					},
 				},
 			},

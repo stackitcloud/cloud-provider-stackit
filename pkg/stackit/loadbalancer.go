@@ -146,7 +146,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 	spec.Name = &name
 
-	lb, createErr := l.client.CreateLoadBalancer(ctx, l.projectID, *spec)
+	lb, createErr := l.client.CreateLoadBalancer(ctx, l.projectID, spec)
 	if createErr != nil && !lbapi.IsNotFound(createErr) {
 		return nil, createErr
 	}

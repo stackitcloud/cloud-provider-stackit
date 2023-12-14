@@ -209,14 +209,14 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		}
 		listeners = append(listeners, loadbalancer.Listener{
 			DisplayName: &name,
-			Port:        &port.Port,
+			Port:        utils.Ptr(int64(port.Port)),
 			TargetPool:  &port.Name,
 			Protocol:    &protocol,
 		})
 
 		targetPools = append(targetPools, loadbalancer.TargetPool{
 			Name:       &name,
-			TargetPort: &port.NodePort,
+			TargetPort: utils.Ptr(int64(port.NodePort)),
 			Targets:    &targets,
 		})
 	}

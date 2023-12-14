@@ -40,7 +40,7 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // CreateLoadBalancer mocks base method.
-func (m *MockClient) CreateLoadBalancer(arg0 context.Context, arg1 string, arg2 loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+func (m *MockClient) CreateLoadBalancer(arg0 context.Context, arg1 string, arg2 *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateLoadBalancer", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*loadbalancer.LoadBalancer)

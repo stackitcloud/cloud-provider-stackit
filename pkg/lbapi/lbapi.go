@@ -33,7 +33,7 @@ type Client interface {
 	// DeleteLoadBalancer returns no error if the load balancer doesn't exist.
 	DeleteLoadBalancer(ctx context.Context, projectID string, name string) error
 	// CreateLoadBalancer returns ErrorNotFound if the project is not enabled.
-	CreateLoadBalancer(ctx context.Context, projectID string, loadbalancer loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
+	CreateLoadBalancer(ctx context.Context, projectID string, loadbalancer *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	UpdateTargetPool(ctx context.Context, projectID string, name string, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 	EnableService(ctx context.Context, projectID string) error
 	GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error)
@@ -64,8 +64,8 @@ func (cl client) DeleteLoadBalancer(ctx context.Context, projectID, name string)
 }
 
 // CreateLoadBalancer returns ErrorNotFound if the project is not enabled.
-func (cl client) CreateLoadBalancer(ctx context.Context, projectID string, create loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	lb, err := cl.client.CreateLoadBalancer(ctx, projectID).CreateLoadBalancerPayload(create).XRequestID(uuid.NewString()).Execute()
+func (cl client) CreateLoadBalancer(ctx context.Context, projectID string, create *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	lb, err := cl.client.CreateLoadBalancer(ctx, projectID).CreateLoadBalancerPayload(*create).XRequestID(uuid.NewString()).Execute()
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
 	}
