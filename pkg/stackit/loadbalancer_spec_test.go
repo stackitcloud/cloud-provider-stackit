@@ -552,6 +552,11 @@ var _ = Describe("lbSpecFromService", func() {
 			"Role":      PointTo(Equal("ROLE_LISTENERS_AND_TARGETS")),
 		}))))
 	})
+	It("should configure a public service without existing IP as ephemeral", func() {
+		spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*spec.Options.EphemeralAddress).To(BeTrue())
+	})
 })
 
 // haveTargets succeeds if actual is a target pool and the list of targets matches matcher.

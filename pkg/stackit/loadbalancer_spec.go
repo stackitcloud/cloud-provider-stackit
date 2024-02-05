@@ -93,16 +93,14 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 			"incompatible values for annotations %s and %s", yawolExistingFloatingIPAnnotation, externalIPAnnotation,
 		)
 	}
+	lb.Options.EphemeralAddress = utils.Ptr(false)
 	if !found && !yawolFound && !*lb.Options.PrivateNetworkOnly {
-		// TODO: make this optional once the load balancer API supports ephemeral IPs.
-		return nil, fmt.Errorf(
-			"service is missing annotation %s or the deprecated annotation %s", externalIPAnnotation, yawolExternalIP,
-		)
+		lb.Options.EphemeralAddress = utils.Ptr(true)
 	}
 	if !found && yawolFound {
 		externalIP = yawolExternalIP
 	}
-	if !*lb.Options.PrivateNetworkOnly {
+	if !*lb.Options.PrivateNetworkOnly && !*lb.Options.EphemeralAddress {
 		ip, err := netip.ParseAddr(externalIP)
 		if err != nil {
 			return nil, fmt.Errorf("invalid format for external IP: %w", err)
