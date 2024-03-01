@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("LoadBalancer", func() {
@@ -22,11 +23,13 @@ var _ = Describe("LoadBalancer", func() {
 		lb          *LoadBalancer
 		clusterName string
 		projectID   string
+		networkID   string
 	)
 
 	BeforeEach(func() {
 		clusterName = "my-cluster"
 		projectID = "my-project"
+		networkID = "my-network"
 
 		ctrl := gomock.NewController(GinkgoT())
 		client = lbapi.NewMockClient(ctrl)
@@ -129,6 +132,87 @@ var _ = Describe("LoadBalancer", func() {
 			_, err := lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
 			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
 		})
+
+		It("should update the load balancer if the service changed", func() {
+			svc := minimalLoadBalancerService()
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID)
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				Errors:          &[]loadbalancer.LoadBalancerError{},
+				ExternalAddress: spec.ExternalAddress,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				PrivateAddress:  spec.PrivateAddress,
+				Status:          ptr.To(lbapi.LBStatusReady),
+				TargetPools:     spec.TargetPools,
+				Version:         ptr.To("current-version"),
+			}
+
+			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			// For simplicity we return the original load balancer. In reality, the updated load balancer should be returned.
+			client.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, lb.GetLoadBalancerName(context.Background(), clusterName, svc), versionMatcher("current-version")).
+				MinTimes(1).Return(myLb, nil)
+
+			svc = svc.DeepCopy()
+			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+				Name:     "a-port",
+				Protocol: corev1.ProtocolTCP,
+				Port:     80,
+				NodePort: 1234,
+			})
+
+			_, err = lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+			// Expect UpdateLoadBalancer to have been called.
+		})
+
+		// This only happens when nodes have changed while the controller wasn't running.
+		// If the controller is watching, then UpdateLoadBalancer is called instead.
+		It("should update the load balancer if the nodes change", func() {
+			nodeA := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "nodeA"},
+				// Nodes need an internal address, otherwise they will be ignored.
+				Status: corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.1"}}},
+			}
+			nodeB := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "nodeB"},
+				Status:     corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.1"}}},
+			}
+
+			svc := minimalLoadBalancerService()
+			// We need at least one port for nodes to have an effect.
+			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+				Name:     "a-port",
+				Protocol: corev1.ProtocolTCP,
+				Port:     80,
+				NodePort: 1234,
+			})
+			spec, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID)
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				Errors:          &[]loadbalancer.LoadBalancerError{},
+				ExternalAddress: spec.ExternalAddress,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				PrivateAddress:  spec.PrivateAddress,
+				Status:          ptr.To(lbapi.LBStatusReady),
+				TargetPools:     spec.TargetPools,
+				Version:         ptr.To("current-version"),
+			}
+
+			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			// For simplicity we return the original load balancer. In reality, the updated load balancer should be returned.
+			client.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, lb.GetLoadBalancerName(context.Background(), clusterName, svc), versionMatcher("current-version")).
+				MinTimes(1).Return(myLb, nil)
+
+			_, err = lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
+			Expect(err).NotTo(HaveOccurred())
+			// Expect UpdateLoadBalancer to have been called.
+		})
 	})
 
 	Describe("EnsureLoadBalancerDeleted", func() {
@@ -221,6 +305,16 @@ func minimalLoadBalancerService() *corev1.Service {
 			Type: corev1.ServiceTypeLoadBalancer,
 		},
 	}
+}
+
+func versionMatcher(version string) gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		if lb.Version == nil {
+			return false
+		}
+		return *lb.Version == version
+	})
 }
 
 type isImplementedElsewhereTest struct {

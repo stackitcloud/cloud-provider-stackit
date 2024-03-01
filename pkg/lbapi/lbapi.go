@@ -34,6 +34,7 @@ type Client interface {
 	DeleteLoadBalancer(ctx context.Context, projectID string, name string) error
 	// CreateLoadBalancer returns ErrorNotFound if the project is not enabled.
 	CreateLoadBalancer(ctx context.Context, projectID string, loadbalancer *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
+	UpdateLoadBalancer(ctx context.Context, projectID, name string, update *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	UpdateTargetPool(ctx context.Context, projectID string, name string, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 	EnableService(ctx context.Context, projectID string) error
 	GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error)
@@ -70,6 +71,12 @@ func (cl client) CreateLoadBalancer(ctx context.Context, projectID string, creat
 		return lb, ErrorNotFound
 	}
 	return lb, err
+}
+
+func (cl client) UpdateLoadBalancer(ctx context.Context, projectID, name string, update *loadbalancer.UpdateLoadBalancerPayload) (
+	*loadbalancer.LoadBalancer, error,
+) {
+	return cl.client.UpdateLoadBalancer(ctx, projectID, name).UpdateLoadBalancerPayload(*update).Execute()
 }
 
 func (cl client) UpdateTargetPool(ctx context.Context, projectID, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {

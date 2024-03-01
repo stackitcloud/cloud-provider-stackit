@@ -77,7 +77,7 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | Name | Default | Description |
 |---|---|---|
 | lb.stackit.cloud/internal-lb | "false" | If true, the load balancer is not exposed via a floating IP. |
-| lb.stackit.cloud/external-address | *none* | References an OpenStack floating IP that should be used by the load balancer. If set it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. Required if neither the load balancer is not internal nor yawol.stackit.cloud/existingFloatingIP is set. |
+| lb.stackit.cloud/external-address | *none* | References an OpenStack floating IP that should be used by the load balancer. If set it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. If the annotation is set after the creation it must match the ephemeral IP. This will promote the ephemeral IP to a static IP. |
 | lb.stackit.cloud/tcp-proxy-protocol | "false" | Enables the TCP proxy protocol for TCP ports. |
 | lb.stackit.cloud/tcp-proxy-protocol-ports-filter | *none* | Defines which port use the TCP proxy protocol. Only takes effect if TCP proxy protocol is enabled. If the annotation is not present then all TCP ports use the TCP proxy protocol. Has no effect on UDP ports. |
 

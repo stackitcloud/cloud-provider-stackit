@@ -2,7 +2,6 @@ package stackit
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -111,18 +110,19 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
 
-	err = lbFulfillsSpec(lb, spec)
-	// TODO: Update load balancer, once supported in the load balancer API.
-	if errors.As(err, &errorImmutableFieldChanged{}) {
-		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support this change: %w", err)
+	fulfills, immutableChanged := compareLBwithSpec(lb, spec)
+	if immutableChanged != nil {
+		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %q", immutableChanged.field)
 	}
-	if errors.Is(err, errorTargetPoolChanged) {
-		if err := l.UpdateLoadBalancer(ctx, clusterName, service, nodes); err != nil {
-			return nil, fmt.Errorf("failed to update target pools: %w", err)
+	if !fulfills {
+		// We create the update payload from a new spec.
+		// However, we need to copy over the version because it is required on every update.
+		spec.Version = lb.Version
+		spec.Name = &name
+		lb, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, (*loadbalancer.UpdateLoadBalancerPayload)(spec))
+		if err != nil {
+			return nil, fmt.Errorf("failed to update load balancer: %w", err)
 		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error from lbFulfillsSpec: %w", err)
 	}
 
 	if *lb.Status == lbapi.LBStatusError {

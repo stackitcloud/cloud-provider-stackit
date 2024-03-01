@@ -1,7 +1,6 @@
 package stackit
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"strconv"
@@ -247,74 +246,84 @@ func checkUnsupportedAnnotations(service *corev1.Service) error {
 	return nil
 }
 
-var errorTargetPoolChanged = errors.New("one or multiple target pools have changed")
-
-type errorImmutableFieldChanged struct {
+// resultImmutableChanged denotes that at least one property that cannot be changed did change.
+// Attempting an update will fail.
+type resultImmutableChanged struct {
 	field string
 }
 
-var _ error = errorImmutableFieldChanged{}
+// compareLBwithSpec checks whether the load balancer fulfills the specification.
+// If immutableChanged is not nil then spec differs from lb such that an update will fail.
+// Otherwise fulfills will indicate whether an update is necessary.
+func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
+	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
+	fulfills = true
 
-func (err errorImmutableFieldChanged) Error() string {
-	return fmt.Sprintf("%q has changed", err.field)
-}
+	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly) {
+		return false, &resultImmutableChanged{field: ".options.privateNetworkOnly"}
+	}
 
-// lbFulfillsSpec checks whether the load balancer fulfills the specification.
-// If error is nil, then the load balancer fulfills the specification and no update in necessary.
-// Otherwise error is either errorTargetPoolChanged or errorImmutableFieldChanged.
-// When both errorTargetPoolChanged and errorImmutableFieldChanged could be returned, either of the two is returned.
-func lbFulfillsSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) error { //nolint:gocyclo // It is long but not complex.
-	if !cmp.PtrValEqual(lb.ExternalAddress, spec.ExternalAddress) {
-		return errorImmutableFieldChanged{field: ".ExternalAddress"}
+	if cmp.UnpackPtr(spec.ExternalAddress) != "" {
+		// lb.ExternalAddress is set to the ephemeral IP if the load balancer is ephemeral, while spec will never contain an ephemeral IP.
+		// So we only compare them if the spec has a static IP.
+		if !cmp.PtrValEqual(lb.ExternalAddress, spec.ExternalAddress) {
+			return false, &resultImmutableChanged{field: ".externalAddress"}
+		}
+		if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
+			// Promote an ephemeral IP to a static IP.
+			fulfills = false
+		}
+	} else if !cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) &&
+		!cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
+		// Demotion is not allowed by the load balancer API.
+		return false, &resultImmutableChanged{field: ".options.ephemeralAddress"}
 	}
 
 	if cmp.LenSlicePtr(lb.Listeners) != cmp.LenSlicePtr(spec.Listeners) {
-		return errorImmutableFieldChanged{field: "len(.Listeners)"}
-	}
-	if cmp.LenSlicePtr(lb.Listeners) > 0 {
+		fulfills = false
+	} else if lb.Listeners != nil && spec.Listeners != nil {
 		for i, x := range *lb.Listeners {
 			y := (*spec.Listeners)[i]
 			if !cmp.PtrValEqual(x.DisplayName, y.DisplayName) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Listeners[%d].DisplayName", i)}
+				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.Port, y.Port) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Listeners[%d].Port", i)}
+				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.Protocol, y.Protocol) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Listeners[%d].Protocol", i)}
+				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.TargetPool, y.TargetPool) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Listeners[%d].TargetPool", i)}
+				fulfills = false
 			}
 		}
 	}
 
 	if cmp.LenSlicePtr(lb.Networks) != cmp.LenSlicePtr(spec.Networks) {
-		return errorImmutableFieldChanged{field: "len(.Networks)"}
+		return false, &resultImmutableChanged{field: "len(.networks)"}
 	}
 	if cmp.LenSlicePtr(lb.Networks) > 0 {
 		for i, x := range *lb.Networks {
 			y := (*spec.Networks)[i]
 			if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Networks[%d].NetworkId", i)}
+				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i)}
 			}
 			if !cmp.PtrValEqual(x.Role, y.Role) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".Networks[%d].Role", i)}
+				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i)}
 			}
 		}
 	}
 
 	if cmp.LenSlicePtr(lb.TargetPools) != cmp.LenSlicePtr(spec.TargetPools) {
-		return errorImmutableFieldChanged{field: "len(.TargetPools)"}
-	}
-	if cmp.LenSlicePtr(lb.TargetPools) > 0 {
+		fulfills = false
+	} else if lb.TargetPools != nil && spec.TargetPools != nil {
 		for i, x := range *lb.TargetPools {
 			y := (*spec.TargetPools)[i]
 			if !cmp.PtrValEqual(x.Name, y.Name) {
-				return errorImmutableFieldChanged{field: fmt.Sprintf(".TargetPools[%d].Name", i)}
+				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.TargetPort, y.TargetPort) {
-				return errorTargetPoolChanged
+				fulfills = false
 			}
 			if !cmp.PtrValEqualFn(x.ActiveHealthCheck, y.ActiveHealthCheck, func(a, b loadbalancer.ActiveHealthCheck) bool {
 				if !cmp.PtrValEqual(a.HealthyThreshold, b.HealthyThreshold) {
@@ -334,9 +343,15 @@ func lbFulfillsSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoad
 				}
 				return true
 			}) {
-				return errorTargetPoolChanged
+				fulfills = false
 			}
-			if !cmp.SliceEqualUnordered(*x.Targets, *y.Targets, func(a, b loadbalancer.Target) bool {
+			if x.Targets == nil || y.Targets == nil {
+				// At this point one pointer is nil.
+				// We consider nil pointer to be equal to a nil slice and an empty slice.
+				if cmp.LenSlicePtr(x.Targets) != cmp.LenSlicePtr(y.Targets) {
+					fulfills = false
+				}
+			} else if !cmp.SliceEqualUnordered(*x.Targets, *y.Targets, func(a, b loadbalancer.Target) bool {
 				if !cmp.PtrValEqual(a.DisplayName, b.DisplayName) {
 					return false
 				}
@@ -345,21 +360,17 @@ func lbFulfillsSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoad
 				}
 				return true
 			}) {
-				return errorTargetPoolChanged
+				fulfills = false
 			}
 		}
-	}
-
-	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly) {
-		return errorImmutableFieldChanged{field: ".Options.PrivateNetworkOnly"}
 	}
 
 	if !cmp.SliceEqual(
 		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessControl).AllowedSourceRanges),
 		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessControl).AllowedSourceRanges),
 	) {
-		return errorImmutableFieldChanged{field: ".Options.AccessControl"}
+		return false, &resultImmutableChanged{field: ".options.accessControl"}
 	}
 
-	return nil
+	return fulfills, immutableChanged
 }

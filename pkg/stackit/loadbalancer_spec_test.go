@@ -569,37 +569,37 @@ func havePortName(name string) types.GomegaMatcher {
 	return WithTransform(func(l loadbalancer.Listener) *string { return l.DisplayName }, PointTo(Equal(name)))
 }
 
-type lbFulfillsSpecTest struct {
-	want error
-	lb   *loadbalancer.LoadBalancer
-	spec *loadbalancer.CreateLoadBalancerPayload
+type compareLBwithSpecTest struct {
+	wantFulfilled         bool
+	wantImmutabledChanged *resultImmutableChanged
+	lb                    *loadbalancer.LoadBalancer
+	spec                  *loadbalancer.CreateLoadBalancerPayload
 }
 
-var _ = DescribeTable("lbFulfillsSpec",
-	func(t *lbFulfillsSpecTest) {
-		err := lbFulfillsSpec(t.lb, t.spec)
-		if t.want == nil {
-			Expect(err).NotTo(HaveOccurred())
-		} else {
-			Expect(err).To(MatchError(t.want))
-		}
+var _ = DescribeTable("compareLBwithSpec",
+	func(t *compareLBwithSpecTest) {
+		fulfills, immutableChanged := compareLBwithSpec(t.lb, t.spec)
+		Expect(immutableChanged).To(Equal(t.wantImmutabledChanged))
+		Expect(fulfills).To(Equal(fulfills))
 	},
-	Entry("zero values", &lbFulfillsSpecTest{
-		want: nil,
-		lb:   &loadbalancer.LoadBalancer{},
-		spec: &loadbalancer.CreateLoadBalancerPayload{},
-	}),
-	Entry("When LB has external address that is not specified", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".ExternalAddress"},
+	Entry("When LB has an external address and the specification is ephemeral", &compareLBwithSpecTest{
+		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
+		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			ExternalAddress: utils.Ptr("123.124.88.99"),
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			ExternalAddress: nil,
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
 		},
 	}),
-	Entry("When LB has no external IP but one is specified", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".ExternalAddress"},
+	Entry("When LB has no external IP but one is specified", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress"},
 		lb: &loadbalancer.LoadBalancer{
 			ExternalAddress: nil,
 		},
@@ -607,8 +607,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			ExternalAddress: utils.Ptr("123.124.88.99"),
 		},
 	}),
-	Entry("When specified and actual IP don't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".ExternalAddress"},
+	Entry("When specified and actual IP don't match", &compareLBwithSpecTest{
+		// The IP can never be changed. Not even with promotion or demotion.
+		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress"},
 		lb: &loadbalancer.LoadBalancer{
 			ExternalAddress: utils.Ptr("123.124.88.01"),
 		},
@@ -616,85 +617,153 @@ var _ = DescribeTable("lbFulfillsSpec",
 			ExternalAddress: utils.Ptr("123.124.88.99"),
 		},
 	}),
-	Entry("When number of listeners doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: "len(.Listeners)"},
+	Entry("When IP is to be promoted", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: utils.Ptr("123.124.88.99"),
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: utils.Ptr("123.124.88.99"),
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(false),
+			},
+		},
+	}),
+	Entry("When IP is to be demoted", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.ephemeralAddress"},
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(false),
+			},
+			ExternalAddress: utils.Ptr("123.124.88.99"),
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
+		},
+	}),
+	Entry("When number of listeners doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{}, {},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{},
 			},
 		},
 	}),
-	Entry("When listener name doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Listeners[0].DisplayName"},
+	Entry("When listener name doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{DisplayName: utils.Ptr("port-a")},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{DisplayName: utils.Ptr("port-b")},
 			},
 		},
 	}),
-	Entry("When port name doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Listeners[0].Port"},
+	Entry("When port name doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{Port: utils.Ptr[int64](80)},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{Port: utils.Ptr[int64](443)},
 			},
 		},
 	}),
-	Entry("When protocol name doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Listeners[0].Protocol"},
+	Entry("When protocol name doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{Protocol: utils.Ptr(lbapi.ProtocolTCP)},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{Protocol: utils.Ptr(lbapi.ProtocolTCPProxy)},
 			},
 		},
 	}),
-	Entry("When target pool name doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Listeners[0].TargetPool"},
+	Entry("When target pool name doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{TargetPool: utils.Ptr("target-pool-a")},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Listeners: &[]loadbalancer.Listener{
 				{TargetPool: utils.Ptr("target-pool-b")},
 			},
 		},
 	}),
-	Entry("When LB has no networks but one is specified", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: "len(.Networks)"},
+	Entry("When LB has no networks but one is specified", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: "len(.networks)"},
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: nil,
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: &[]loadbalancer.Network{
 				{},
 			},
 		},
 	}),
-	Entry("When network id doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Networks[0].NetworkId"},
+	Entry("When network id doesn't match", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].networkId"},
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: &[]loadbalancer.Network{
 				{
 					NetworkId: utils.Ptr("my-network"),
@@ -702,6 +771,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: &[]loadbalancer.Network{
 				{
 					NetworkId: utils.Ptr("other-network"),
@@ -709,9 +781,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When network role doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Networks[0].Role"},
+	Entry("When network role doesn't match", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].role"},
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: &[]loadbalancer.Network{
 				{
 					Role: utils.Ptr("listeners"),
@@ -719,6 +794,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			Networks: &[]loadbalancer.Network{
 				{
 					Role: utils.Ptr("targets"),
@@ -726,22 +804,31 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When number of target pools don't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: "len(.TargetPools)"},
+	Entry("When number of target pools don't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{}, {},
 			},
 		},
 	}),
-	Entry("When target pool name doesn't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".TargetPools[0].Name"},
+	Entry("When target pool name doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Name: utils.Ptr("target-pool-a"),
@@ -749,6 +836,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Name: utils.Ptr("target-pool-b"),
@@ -756,9 +846,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When target pool port doesn't match", &lbFulfillsSpecTest{
-		want: errorTargetPoolChanged,
+	Entry("When target pool port doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					TargetPort: utils.Ptr[int64](80),
@@ -766,6 +859,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					TargetPort: utils.Ptr[int64](443),
@@ -773,9 +869,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When target order does not match", &lbFulfillsSpecTest{
-		want: nil,
+	Entry("When target order does not match", &compareLBwithSpecTest{
+		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -792,6 +891,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -808,9 +910,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When target node-b is added", &lbFulfillsSpecTest{
-		want: errorTargetPoolChanged,
+	Entry("When target node-b is added", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -823,6 +928,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -839,9 +947,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When target IP changes", &lbFulfillsSpecTest{
-		want: errorTargetPoolChanged,
+	Entry("When target IP changes", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -854,6 +965,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
@@ -866,9 +980,35 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When health check interval doesn't match", &lbFulfillsSpecTest{
-		want: errorTargetPoolChanged,
+	Entry("When targets in spec are empty and targets in lb is nil", &compareLBwithSpecTest{
+		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{
+				{
+					Targets: nil,
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{
+				{
+					Targets: &[]loadbalancer.Target{},
+				},
+			},
+		},
+	}),
+	Entry("When health check interval doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
@@ -878,6 +1018,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
@@ -887,9 +1030,12 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When unhealthy threshold is unset but specified", &lbFulfillsSpecTest{
-		want: errorTargetPoolChanged,
+	Entry("When unhealthy threshold is unset but specified", &compareLBwithSpecTest{
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
@@ -899,6 +1045,9 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
@@ -908,8 +1057,8 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When private network is disabled but specified", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Options.PrivateNetworkOnly"},
+	Entry("When private network is disabled but specified", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.privateNetworkOnly"},
 		lb: &loadbalancer.LoadBalancer{
 			Options: nil,
 		},
@@ -919,23 +1068,41 @@ var _ = DescribeTable("lbFulfillsSpec",
 			},
 		},
 	}),
-	Entry("When source ranges are set but not specified", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Options.AccessControl"},
+	Entry("When private IP is reported back from API", &compareLBwithSpecTest{
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			PrivateAddress: utils.Ptr("10.1.1.3"),
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+		},
+	}),
+	Entry("When source ranges are set but not specified", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.accessControl"},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
 					AllowedSourceRanges: utils.Ptr([]string{"10.0.0.0/24"}),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: nil,
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
 		},
 	}),
-	Entry("When source ranges don't match", &lbFulfillsSpecTest{
-		want: errorImmutableFieldChanged{field: ".Options.AccessControl"},
+	Entry("When source ranges don't match", &compareLBwithSpecTest{
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.accessControl"},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
 					AllowedSourceRanges: utils.Ptr([]string{"10.5.0.0/24"}),
 				},
@@ -943,6 +1110,7 @@ var _ = DescribeTable("lbFulfillsSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
 					AllowedSourceRanges: utils.Ptr([]string{"10.0.0.0/24"}),
 				},

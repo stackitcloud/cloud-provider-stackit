@@ -112,6 +112,21 @@ func (mr *MockClientMockRecorder) GetServiceStatus(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceStatus", reflect.TypeOf((*MockClient)(nil).GetServiceStatus), arg0, arg1)
 }
 
+// UpdateLoadBalancer mocks base method.
+func (m *MockClient) UpdateLoadBalancer(arg0 context.Context, arg1, arg2 string, arg3 *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateLoadBalancer", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*loadbalancer.LoadBalancer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateLoadBalancer indicates an expected call of UpdateLoadBalancer.
+func (mr *MockClientMockRecorder) UpdateLoadBalancer(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateLoadBalancer", reflect.TypeOf((*MockClient)(nil).UpdateLoadBalancer), arg0, arg1, arg2, arg3)
+}
+
 // UpdateTargetPool mocks base method.
 func (m *MockClient) UpdateTargetPool(arg0 context.Context, arg1, arg2, arg3 string, arg4 loadbalancer.UpdateTargetPoolPayload) error {
 	m.ctrl.T.Helper()

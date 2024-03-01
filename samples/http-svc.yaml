@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: demo-with-a-very-long-long-name
   annotations:
-    lb.stackit.cloud/external-address: 45.135.245.121
+    lb.stackit.cloud/external-address: 45.129.40.120
     # lb.stackit.cloud/internal-lb: "true"
     yawol.stackit.cloud/className: stackit
     # yawol.stackit.cloud/className: stackit.cloud/yawol
