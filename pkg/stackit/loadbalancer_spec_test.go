@@ -1,6 +1,8 @@
 package stackit
 
 import (
+	"slices"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -11,6 +13,7 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("lbSpecFromService", func() {
@@ -209,6 +212,7 @@ var _ = Describe("lbSpecFromService", func() {
 					}),
 				)),
 			})))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 
 		It("should only set TCP proxy protocol if covered by filter", func() {
@@ -243,6 +247,7 @@ var _ = Describe("lbSpecFromService", func() {
 					}),
 				)),
 			})))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 
 		It("should not set TCP proxy protocol on empty filter", func() {
@@ -267,6 +272,7 @@ var _ = Describe("lbSpecFromService", func() {
 					}),
 				)),
 			})))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 
 		It("should error on incompatible values for TCP proxy", func() {
@@ -353,6 +359,7 @@ var _ = Describe("lbSpecFromService", func() {
 					"TargetPool":  PointTo(Equal("dns")),
 				}),
 			)))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 
 		It("should error on invalid port protocol", func() {
@@ -395,6 +402,7 @@ var _ = Describe("lbSpecFromService", func() {
 			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-0"))))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 	})
 
@@ -506,6 +514,7 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				)),
 			)))
+			Expect(spec).To(haveConsistentTargetPool())
 		})
 	})
 
@@ -567,6 +576,21 @@ func haveTargets(matcher types.GomegaMatcher) types.GomegaMatcher {
 // havePortName succeeds if actual is a listener whose display name matches name.
 func havePortName(name string) types.GomegaMatcher {
 	return WithTransform(func(l loadbalancer.Listener) *string { return l.DisplayName }, PointTo(Equal(name)))
+}
+
+// haveConsistentTargetPool succeeds if the target pools of each listener exist.
+func haveConsistentTargetPool() types.GomegaMatcher {
+	return WithTransform(func(l *loadbalancer.CreateLoadBalancerPayload) bool {
+		for _, lb := range *l.Listeners {
+			contains := slices.ContainsFunc(*l.TargetPools, func(t loadbalancer.TargetPool) bool {
+				return ptr.Equal(lb.TargetPool, t.Name)
+			})
+			if !contains {
+				return false
+			}
+		}
+		return true
+	}, BeTrue())
 }
 
 type compareLBwithSpecTest struct {
