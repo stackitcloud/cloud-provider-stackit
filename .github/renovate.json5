@@ -15,7 +15,7 @@
         "minor",
         "patch"
       ],
-      "labels": ["skip-review"]
+      "addLabels": ["skip-review"]
     }
   ]
 }
