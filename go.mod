@@ -7,8 +7,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stackitcloud/stackit-sdk-go/core v0.7.5
-	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.7.0
+	github.com/stackitcloud/stackit-sdk-go/core v0.10.1
+	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.10.0
 	go.uber.org/mock v0.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.3
@@ -21,7 +21,6 @@ require (
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect

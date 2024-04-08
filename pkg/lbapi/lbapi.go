@@ -85,12 +85,12 @@ func (cl client) UpdateTargetPool(ctx context.Context, projectID, name, targetPo
 }
 
 func (cl client) EnableService(ctx context.Context, projectID string) error {
-	_, err := cl.client.EnableLoadBalancing(ctx, projectID).XRequestID(uuid.NewString()).Execute()
+	_, err := cl.client.EnableService(ctx, projectID).XRequestID(uuid.NewString()).Execute()
 	return err
 }
 
 func (cl client) GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error) {
-	res, err := cl.client.GetStatusExecute(ctx, projectID)
+	res, err := cl.client.GetServiceStatusExecute(ctx, projectID)
 	if res.Status == nil {
 		return "", errors.New("server response is missing project status")
 	}
