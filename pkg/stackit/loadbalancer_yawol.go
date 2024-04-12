@@ -25,6 +25,12 @@ const (
 	// yawolTCPProxyProtocolPortFilterAnnotation defines which ports should use the TCP proxy protocol.
 	// Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol-ports-filter instead.
 	yawolTCPProxyProtocolPortFilterAnnotation = "yawol.stackit.cloud/tcpProxyProtocolPortsFilter"
+	// yawolTCPIdleTimeoutAnnotation defines the idle timeout for all TCP ports.
+	// Deprecated: Use lb.stackit.cloud/tcp-idle-timeout instead.
+	yawolTCPIdleTimeoutAnnotation = "yawol.stackit.cloud/tcpIdleTimeout"
+	// yawolUDPIdleTimeoutAnnotation defines the idle timeout for all UDP ports.
+	// Deprecated: Use lb.stackit.cloud/udp-idle-timeout instead.
+	yawolUDPIdleTimeoutAnnotation = "yawol.stackit.cloud/udpIdleTimeout"
 )
 
 // Unsupported yawol annotations.
@@ -62,10 +68,6 @@ const (
 	yawolServerGroupPolicyAnnotation = "yawol.stackit.cloud/serverGroupPolicy"
 	// yawolAdditionalNetworksAnnotation is not supported.
 	yawolAdditionalNetworksAnnotation = "yawol.stackit.cloud/additionalNetworks"
-	// yawolTCPIdleTimeoutAnnotation is not yet supported by the load balancer API.
-	yawolTCPIdleTimeoutAnnotation = "yawol.stackit.cloud/tcpIdleTimeout"
-	// yawolUDPIdleTimeoutAnnotation is not yet supported by the load balancer API.
-	yawolUDPIdleTimeoutAnnotation = "yawol.stackit.cloud/udpIdleTimeout"
 )
 
 var yawolUnsupportedAnnotations = []string{
@@ -84,6 +86,4 @@ var yawolUnsupportedAnnotations = []string{
 	yawolLogForwardURLAnnotation,
 	yawolServerGroupPolicyAnnotation,
 	yawolAdditionalNetworksAnnotation,
-	yawolTCPIdleTimeoutAnnotation,
-	yawolUDPIdleTimeoutAnnotation,
 }

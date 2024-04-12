@@ -3,18 +3,22 @@ kind: Service
 metadata:
   name: echo
   annotations:
-    lb.stackit.cloud/external-address: 45.129.40.120
+    # lb.stackit.cloud/external-address: 45.129.40.120
     # lb.stackit.cloud/internal-lb: "true"
     yawol.stackit.cloud/className: stackit
     # yawol.stackit.cloud/className: stackit.cloud/yawol
+    # yawol.stackit.cloud/tcpIdleTimeout: "20s"
+    # yawol.stackit.cloud/udpIdleTimeout: "45s"
+    # lb.stackit.cloud/tcp-proxy-protocol: "true"
+    # lb.stackit.cloud/tcp-proxy-protocol-ports-filter: "9001"
 spec:
   selector:
     app: echo
   ports:
-    - name: echo2
-      port: 9001
-      targetPort: 9000
     - name: echo
       port: 9000
+      targetPort: 9000
+    - name: echo2
+      port: 9001
       targetPort: 9000
   type: LoadBalancer

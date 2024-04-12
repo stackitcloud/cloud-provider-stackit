@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
@@ -31,6 +32,21 @@ const (
 	// If the annotation is not present then all TCP ports use the TCP proxy protocol.
 	// Has no effect on UDP ports.
 	tcpProxyProtocolPortFilterAnnotation = "lb.stackit.cloud/tcp-proxy-protocol-ports-filter"
+	// tcpIdleTimeoutAnnotation defines the idle timeout for all TCP ports (including ports with the PROXY protocol).
+	tcpIdleTimeoutAnnotation = "lb.stackit.cloud/tcp-idle-timeout"
+	// udpIdleTimeoutAnnotation defines the idle timeout for all UDP ports.
+	udpIdleTimeoutAnnotation = "lb.stackit.cloud/udp-idle-timeout"
+)
+
+const (
+	// defaultTCPIdleTimeout is used if the service has no annotation to set the timeout explicitly.
+	// This is defined by the CCM and might differ from the default of STACKIT load balancers.
+	// For backwards compatibility this is the same as in SKE yawol.
+	defaultTCPIdleTimeout = 60 * time.Minute
+	// defaultUDPIdleTimeout is used if the service has no annotation to set the timeout explicitly.
+	// This is defined by the CCM and might differ from the default of STACKIT load balancers.
+	// For backwards compatibility this is the same as in SKE yawol.
+	defaultUDPIdleTimeout = 2 * time.Minute
 )
 
 // proxyProtocolEnableForPort determines whether portNumber should use the TCP proxy protocol (instead of TCP).
@@ -65,6 +81,8 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		},
 	}
 
+	// Parse private network from annotations.
+	// TODO: Split into separate function.
 	lb.Options.PrivateNetworkOnly = utils.Ptr(false)
 	var internal *bool
 	var yawolInternal *bool
@@ -85,6 +103,8 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		return nil, fmt.Errorf("incompatible values for annotations %s and %s", yawolInternalLBAnnotation, internalLBAnnotation)
 	}
 
+	// Parse external from annotations.
+	// TODO: Split into separate function.
 	externalIP, found := service.Annotations[externalIPAnnotation]
 	yawolExternalIP, yawolFound := service.Annotations[yawolExistingFloatingIPAnnotation]
 	if found && yawolFound && externalIP != yawolExternalIP {
@@ -110,6 +130,58 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		lb.ExternalAddress = &externalIP
 	}
 
+	// Parse TCP idle timeout from annotations.
+	// TODO: Split into separate function.
+	tcpIdleTimeout := defaultTCPIdleTimeout
+	var yawolTCPIdleTimeout time.Duration
+	_, found = service.Annotations[tcpIdleTimeoutAnnotation]
+	_, yawolFound = service.Annotations[yawolTCPIdleTimeoutAnnotation]
+	if found {
+		var err error
+		tcpIdleTimeout, err = time.ParseDuration(service.Annotations[tcpIdleTimeoutAnnotation])
+		if err != nil {
+			return nil, fmt.Errorf("invalid format for annotation %s: %w", tcpIdleTimeoutAnnotation, err)
+		}
+	}
+	if yawolFound {
+		var err error
+		yawolTCPIdleTimeout, err = time.ParseDuration(service.Annotations[yawolTCPIdleTimeoutAnnotation])
+		// Ignore error for backwards-compatibility with the yawol cloud controller.
+		if err == nil && !found {
+			tcpIdleTimeout = yawolTCPIdleTimeout
+		}
+	}
+	if found && yawolFound && tcpIdleTimeout != yawolTCPIdleTimeout {
+		return nil, fmt.Errorf("incompatible values for annotations %s and %s", tcpIdleTimeoutAnnotation, yawolTCPIdleTimeoutAnnotation)
+	}
+
+	// Parse UDP idle timeout from annotations.
+	// TODO: Split into separate function.
+	udpIdleTimeout := defaultUDPIdleTimeout
+	var yawolUDPIdleTimeout time.Duration
+	_, found = service.Annotations[udpIdleTimeoutAnnotation]
+	_, yawolFound = service.Annotations[yawolUDPIdleTimeoutAnnotation]
+	if found {
+		var err error
+		udpIdleTimeout, err = time.ParseDuration(service.Annotations[udpIdleTimeoutAnnotation])
+		if err != nil {
+			return nil, fmt.Errorf("invalid format for annotation %s: %w", udpIdleTimeoutAnnotation, err)
+		}
+	}
+	if yawolFound {
+		var err error
+		yawolUDPIdleTimeout, err = time.ParseDuration(service.Annotations[yawolUDPIdleTimeoutAnnotation])
+		// Ignore error for backwards-compatibility with the yawol cloud controller.
+		if err == nil && !found {
+			udpIdleTimeout = yawolUDPIdleTimeout
+		}
+	}
+	if found && yawolFound && udpIdleTimeout != yawolUDPIdleTimeout {
+		return nil, fmt.Errorf("incompatible values for annotations %s and %s", udpIdleTimeoutAnnotation, yawolUDPIdleTimeoutAnnotation)
+	}
+
+	// Parse PROXY protocol from annotations.
+	// TODO: Split into separate function.
 	tcpProxyProtocolEnabled := false
 	yawolTCPProxyProtocolEnabled := false
 	// tcpProxyProtocolPortFilter allows all ports if nil.
@@ -193,6 +265,9 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		}
 
 		protocol := ""
+		var tcpOptions *loadbalancer.OptionsTCP
+		var udpOptions *loadbalancer.OptionsUDP
+
 		switch port.Protocol { //nolint:exhaustive // There are protocols that we do not support.
 		case corev1.ProtocolTCP:
 			if proxyProtocolEnableForPort(tcpProxyProtocolEnabled, tcpProxyProtocolPortFilter, port.Port) {
@@ -200,16 +275,25 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 			} else {
 				protocol = lbapi.ProtocolTCP
 			}
+			tcpOptions = &loadbalancer.OptionsTCP{
+				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
+			}
 		case corev1.ProtocolUDP:
 			protocol = lbapi.ProtocolUDP
+			udpOptions = &loadbalancer.OptionsUDP{
+				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
+			}
 		default:
 			return nil, fmt.Errorf("unsupported protocol %q for port %q", port.Protocol, port.Name)
 		}
+
 		listeners = append(listeners, loadbalancer.Listener{
 			DisplayName: &name,
 			Port:        utils.Ptr(int64(port.Port)),
 			TargetPool:  &name,
 			Protocol:    &protocol,
+			Tcp:         tcpOptions,
+			Udp:         udpOptions,
 		})
 
 		targetPools = append(targetPools, loadbalancer.TargetPool{
@@ -295,6 +379,17 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.TargetPool, y.TargetPool) {
+				fulfills = false
+			}
+			if (cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolTCP || cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolTCPProxy) &&
+				!cmp.PtrValEqualFn(x.Tcp, y.Tcp, func(a, b loadbalancer.OptionsTCP) bool {
+					return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
+				}) {
+				fulfills = false
+			}
+			if cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolUDP && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
+				return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
+			}) {
 				fulfills = false
 			}
 		}

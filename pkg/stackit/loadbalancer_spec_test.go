@@ -543,9 +543,381 @@ var _ = Describe("lbSpecFromService", func() {
 		Entry("yawol.stackit.cloud/logForwardLokiURL", "yawol.stackit.cloud/logForwardLokiURL"),
 		Entry("yawol.stackit.cloud/serverGroupPolicy", "yawol.stackit.cloud/serverGroupPolicy"),
 		Entry("yawol.stackit.cloud/additionalNetworks", "yawol.stackit.cloud/additionalNetworks"),
-		Entry("yawol.stackit.cloud/tcpIdleTimeout", "yawol.stackit.cloud/tcpIdleTimeout"),
-		Entry("yawol.stackit.cloud/udpIdleTimeout", "yawol.stackit.cloud/udpIdleTimeout"),
 	)
+
+	Context("TCP idle timeout", func() {
+		It("should set timeout on all TCP and TCProxy listeners", func() {
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":                     "true",
+						"lb.stackit.cloud/tcp-idle-timeout":                "15m",
+						"lb.stackit.cloud/tcp-proxy-protocol":              "true",
+						"lb.stackit.cloud/tcp-proxy-protocol-ports-filter": "443",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+						{
+							Name:     "my-second-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     8080,
+						},
+						{
+							Name:     "my-tcp-proxy-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     443,
+						},
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     53,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-port")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("900s")),
+					})),
+				}),
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-second-tcp-port")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("900s")),
+					})),
+				}),
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-proxy-port")),
+					"Protocol":    PointTo(Equal("PROTOCOL_TCP_PROXY")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("900s")),
+					})),
+				}),
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-udp-port")),
+					"Tcp":         BeNil(),
+				}),
+			)))
+		})
+
+		It("should set timeout to 60 minutes if no annotation is specified", func() {
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-port")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("3600s")),
+					})),
+				}),
+			)))
+		})
+
+		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"yawol.stackit.cloud/tcpIdleTimeout": "3m",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-port")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("180s")),
+					})),
+				}),
+			)))
+		})
+
+		It("should error on non-compatible timeouts", func() {
+			_, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"lb.stackit.cloud/tcp-idle-timeout":  "15m",
+						"yawol.stackit.cloud/tcpIdleTimeout": "3m",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should error on invalid TCP idle timeout format", func() {
+			_, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":      "true",
+						"lb.stackit.cloud/tcp-idle-timeout": "15x",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"yawol.stackit.cloud/tcpIdleTimeout": "3x",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-port")),
+					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("3600s")),
+					})),
+				}),
+			)))
+		})
+	})
+
+	Context("UDP idle timeout", func() {
+		It("should set timeout on all and only on UDP listeners", func() {
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":      "true",
+						"lb.stackit.cloud/udp-idle-timeout": "15m",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     53,
+						},
+						{
+							Name:     "my-second-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     1000,
+						},
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-tcp-port")),
+					"Udp":         BeNil(),
+				}),
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-udp-port")),
+					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("900s")),
+					})),
+				}),
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-second-udp-port")),
+					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("900s")),
+					})),
+				}),
+			)))
+		})
+
+		It("should set timeout to 2 minutes if no annotation is specified", func() {
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     53,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-udp-port")),
+					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("120s")),
+					})),
+				}),
+			)))
+		})
+
+		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"yawol.stackit.cloud/udpIdleTimeout": "3m",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     53,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-udp-port")),
+					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("180s")),
+					})),
+				}),
+			)))
+		})
+
+		It("should error on non-compatible timeouts", func() {
+			_, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"lb.stackit.cloud/udp-idle-timeout":  "15m",
+						"yawol.stackit.cloud/udpIdleTimeout": "3m",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should error on invalid timeout format", func() {
+			_, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":      "true",
+						"lb.stackit.cloud/udp-idle-timeout": "15x",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/internal-lb":       "true",
+						"yawol.stackit.cloud/udpIdleTimeout": "3x",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-udp-port",
+							Protocol: corev1.ProtocolUDP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Listeners).To(PointTo(ConsistOf(
+				MatchFields(IgnoreExtras, Fields{
+					"DisplayName": PointTo(Equal("my-udp-port")),
+					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
+						"IdleTimeout": PointTo(Equal("120s")),
+					})),
+				}),
+			)))
+		})
+	})
 
 	It("should attach the load balancer to the specified network", func() {
 		spec, err := lbSpecFromService(&corev1.Service{
@@ -561,6 +933,7 @@ var _ = Describe("lbSpecFromService", func() {
 			"Role":      PointTo(Equal("ROLE_LISTENERS_AND_TARGETS")),
 		}))))
 	})
+
 	It("should configure a public service without existing IP as ephemeral", func() {
 		spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network")
 		Expect(err).NotTo(HaveOccurred())
@@ -604,7 +977,7 @@ var _ = DescribeTable("compareLBwithSpec",
 	func(t *compareLBwithSpecTest) {
 		fulfills, immutableChanged := compareLBwithSpec(t.lb, t.spec)
 		Expect(immutableChanged).To(Equal(t.wantImmutabledChanged))
-		Expect(fulfills).To(Equal(fulfills))
+		Expect(fulfills).To(Equal(t.wantFulfilled))
 	},
 	Entry("When LB has an external address and the specification is ephemeral", &compareLBwithSpecTest{
 		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
@@ -743,6 +1116,93 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{Protocol: utils.Ptr(lbapi.ProtocolTCPProxy)},
+			},
+		},
+	}),
+	Entry("When TCP idle timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolTCP),
+					Tcp: &loadbalancer.OptionsTCP{
+						IdleTimeout: utils.Ptr("60s"),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolTCP),
+					Tcp: &loadbalancer.OptionsTCP{
+						IdleTimeout: utils.Ptr("120s"),
+					},
+				},
+			},
+		},
+	}),
+	Entry("When UDP idle timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolUDP),
+					Udp: &loadbalancer.OptionsUDP{
+						IdleTimeout: utils.Ptr("60s"),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolUDP),
+					Udp: &loadbalancer.OptionsUDP{
+						IdleTimeout: utils.Ptr("120s"),
+					},
+				},
+			},
+		},
+	}),
+	Entry("When TCP proxy timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolTCPProxy),
+					Tcp: &loadbalancer.OptionsTCP{
+						IdleTimeout: utils.Ptr("60s"),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			Listeners: &[]loadbalancer.Listener{
+				{
+					Protocol: utils.Ptr(lbapi.ProtocolTCPProxy),
+					Tcp: &loadbalancer.OptionsTCP{
+						IdleTimeout: utils.Ptr("120s"),
+					},
+				},
 			},
 		},
 	}),

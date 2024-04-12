@@ -59,7 +59,7 @@ This annotation is immutable. It must not be changed on existing load balancers.
 - Health checks are not implemented. If a node becomes unhealthy then it is removed from the targets via the CCM.
 - The load balancer service currently adds security rules to each target. 
   In the case of the CCM the targets are the Kubernetes nodes.
-  Expiremts have shown that SKE will leave the assignment untouched, even during a maintenance.
+  Experiments have shown that SKE will leave the assignment untouched, even during a maintenance.
 
 
 ### Load balancer service enablement
@@ -80,6 +80,9 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/external-address | *none* | References an OpenStack floating IP that should be used by the load balancer. If set it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. If the annotation is set after the creation it must match the ephemeral IP. This will promote the ephemeral IP to a static IP. |
 | lb.stackit.cloud/tcp-proxy-protocol | "false" | Enables the TCP proxy protocol for TCP ports. |
 | lb.stackit.cloud/tcp-proxy-protocol-ports-filter | *none* | Defines which port use the TCP proxy protocol. Only takes effect if TCP proxy protocol is enabled. If the annotation is not present then all TCP ports use the TCP proxy protocol. Has no effect on UDP ports. |
+| lb.stackit.cloud/tcp-idle-timeout | Defines the idle timeout for all TCP ports (including ports with the PROXY protocol). If unset, the default is 60 minutes. |
+| lb.stackit.cloud/udp-idle-timeout | Defines the idle timeout for all UDP ports. If unset, the default is 2 minutes. |
+
 
 #### Supported yawol annotations
 
@@ -94,6 +97,8 @@ A load balancer contain both annotations as long as their values are compatible.
 | yawol.stackit.cloud/loadBalancerSourceRanges | Specify the loadBalancerSourceRanges for the LoadBalancer like service.spec.loadBalancerSourceRanges (comma separated list). Deprecated: Use service.spec.loadBalancerSourceRanges instead. |
 | yawol.stackit.cloud/tcpProxyProtocol | Enables the TCP proxy protocol. Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol instead. |
 | yawol.stackit.cloud/tcpProxyProtocolPortsFilter | Defines which ports should use the TCP proxy protocol. Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol-ports-filter instead. |
+| yawol.stackit.cloud/tcpIdleTimeout | Defines the idle timeout for all TCP ports (including ports with the PROXY protocol). Deprecated: Use lb.stackit.cloud/tcp-idle-timeout instead. |
+| yawol.stackit.cloud/udpIdleTimeout | Defines the idle timeout for all UDP ports. Deprecated: Use lb.stackit.cloud/udp-idle-timeout instead. |
 
 #### Unsopported yawol annotations
 
@@ -115,8 +120,6 @@ If any of those annotations are present then the load balancer provision will fa
 | yawol.stackit.cloud/logForwardLokiURL |  |
 | yawol.stackit.cloud/serverGroupPolicy |  |
 | yawol.stackit.cloud/additionalNetworks |  |
-| yawol.stackit.cloud/tcpIdleTimeout | Support is planned. |
-| yawol.stackit.cloud/udpIdleTimeout | Support is planned. |
 
 #### Node labels
 
