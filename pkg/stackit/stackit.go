@@ -66,9 +66,14 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 	if config.NetworkID == "" {
 		return Config{}, errors.New("networkId must be set")
 	}
-	if !(config.NonStackitClassNames == nonStackitClassNameModeIgnore ||
-		config.NonStackitClassNames == nonStackitClassNameModeUpdate ||
-		config.NonStackitClassNames == nonStackitClassNameModeUpdateAndCreate) {
+	switch config.NonStackitClassNames {
+	case nonStackitClassNameModeIgnore, nonStackitClassNameModeUpdate, nonStackitClassNameModeUpdateAndCreate:
+		// NonStackitClassNames is valid input
+	case "":
+		// Apply default
+		config.NonStackitClassNames = nonStackitClassNameModeUpdateAndCreate
+	default:
+		// return error if invalid input
 		return Config{}, fmt.Errorf(
 			"nonStackitClassNames %q must be set to %s, %s or %s",
 			config.NonStackitClassNames,
@@ -77,6 +82,7 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 			nonStackitClassNameModeUpdateAndCreate,
 		)
 	}
+
 	if config.LoadBalancerAPI.URL == "" {
 		config.LoadBalancerAPI.URL = "https://load-balancer.api.eu01.stackit.cloud"
 	}
