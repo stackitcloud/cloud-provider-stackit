@@ -30,6 +30,7 @@ TODOs:
 # cloud-config.yaml
 projectId: 
 networkId: 
+nonStackitClassNames: # If not set, defaults to "updateAndCreate" (see: Non-STACKIT class names).
 loadBalancerApi:
   # If not set, defaults to production.
   url: https://load-balancer-dev.api.eu01.stg.stackit.cloud
@@ -48,9 +49,22 @@ In order to avoid collisions with other load balancer implementations, the follo
 annotations:
     yawol.stackit.cloud/className: stackit
 ```
-This annotation is immutable. It must not be changed on existing load balancers.
+This annotation is immutable. It must not be changed on existing load balancers.  
+The controller will always manage all services whose class name annotation is `stackit`.
 
 > :warning: The CCM adds a finalizer to the service regardless of whether it has a matching class name annotation or not.
+
+### Non-STACKIT class names
+For load balancers with not `stackit` as class name (identified via the `yawol.stackit.cloud/className` annotation) the controller manages them in different ways.
+The controller modes are configured via `nonStackitClassNames` in the cloud-config.yaml:
+- `ignore`: Return "implemented elsewhere" for all services whose class name
+  annotation is not `stackit`.
+- `update`: Update load balancers whose class name annotation is not `stackit`.
+  If the load balancer is not found, no error is returned.
+- `updateAndCreate` (default): The CCM treats every service the same, i.e.
+  ignores the class name annotation.
+
+If no `nonStackitClassNames` mode is set in the config file, the mode will automatically be set to `updateAndCreate`.
 
 ### Limitations
 

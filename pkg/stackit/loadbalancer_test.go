@@ -17,13 +17,21 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const (
+	// stackitClassName defines the class name that deploys a STACKIT load balancer using the cloud controller manager.
+	// Other classes are ignored by the cloud controller manager.
+	classNameYawol = "yawol"
+)
+
 var _ = Describe("LoadBalancer", func() {
 	var (
-		client      *lbapi.MockClient
-		lb          *LoadBalancer
-		clusterName string
-		projectID   string
-		networkID   string
+		mockClient              *lbapi.MockClient
+		lbInModeIgnore          *LoadBalancer
+		lbInModeUpdate          *LoadBalancer
+		lbInModeCreateAndUpdate *LoadBalancer
+		clusterName             string
+		projectID               string
+		networkID               string
 	)
 
 	BeforeEach(func() {
@@ -32,15 +40,19 @@ var _ = Describe("LoadBalancer", func() {
 		networkID = "my-network"
 
 		ctrl := gomock.NewController(GinkgoT())
-		client = lbapi.NewMockClient(ctrl)
+		mockClient = lbapi.NewMockClient(ctrl)
 		var err error
-		lb, err = NewLoadBalancer(client, projectID, "my-network")
+		lbInModeIgnore, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore)
+		Expect(err).NotTo(HaveOccurred())
+		lbInModeUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdate)
+		Expect(err).NotTo(HaveOccurred())
+		lbInModeCreateAndUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdateAndCreate)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("GetLoadBalancerName", func() {
 		It("should generate the name based on the UID and name", func() {
-			name := lb.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
+			name := lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "00000000-0000-0000-0000-000000000000",
 					Name: "my-load-balancer",
@@ -50,7 +62,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should truncate names that are too long", func() {
-			name := lb.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
+			name := lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "00000000-0000-0000-0000-000000000000",
 					Name: "lb-tooooo-long-name",
@@ -61,7 +73,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should not truncate names that are exactly 63 chars long", func() {
-			name := lb.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
+			name := lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "00000000-0000-0000-0000-000000000000",
 					Name: "name-exactly-right",
@@ -72,7 +84,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should produce DNS-compatible names by removing trailing dashes", func() {
-			name := lb.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
+			name := lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "00000000-0000-0000-0000-000000000000",
 					Name: "ske-meets-stackit-lb",
@@ -84,53 +96,161 @@ var _ = Describe("LoadBalancer", func() {
 	})
 
 	Describe("GetLoadBalancer", func() {
-		It("should report implemented elsewhere for services outside of the CCM", func() {
+		It("should report lb does not exist for non-STACKIT class name mode \"ignore\"", func() {
 			svc := minimalLoadBalancerService()
-			svc.Annotations["yawol.stackit.cloud/className"] = "yawol"
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
 
-			_, exists, err := lb.GetLoadBalancer(context.Background(), clusterName, svc)
+			_, exists, err := lbInModeIgnore.GetLoadBalancer(context.Background(), clusterName, svc)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(exists).To(BeFalse())
 			// Expect no API call to have occurred. Gomock panics on non-declared calls.
 		})
+
+		It("should report lb does not exist for empty class name in mode \"ignore\"", func() {
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, exists, err := lbInModeIgnore.GetLoadBalancer(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+			// Expect no API call to have occurred. Gomock panics on non-declared calls.
+		})
+
+		It("should report LB does not exist for non-STACKIT class name mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			_, exists, err := lbInModeUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should report LB does not exist for empty class name in mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, exists, err := lbInModeUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should report LB does not exist for non-STACKIT class name mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			_, exists, err := lbInModeCreateAndUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
+
+		It("should report LB does not exist for empty class name in mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, exists, err := lbInModeCreateAndUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
 	})
 
 	Describe("EnsureLoadBalancer", func() {
-		It("ensure load balancer should trigger load balancer creation if LB doesn't exist", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-			client.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+		It("should report implemented elsewhere for non-STACKIT class name mode \"ignore\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
 
-			_, err := lb.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report implemented elsewhere for empty class name in mode \"ignore\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report implemented elsewhere for non-STACKIT class name mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			_, err := lbInModeUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report implemented elsewhere for empty class name in mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, err := lbInModeUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("ensure load balancer should trigger load balancer creation if LB doesn't exist", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+
+			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
 			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
 			// Expected CreateLoadBalancer to have been called.
 		})
 
-		It("should enable the project if creating load balancer returns not found", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-			client.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
-			client.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatusDisabled, nil)
-			client.EXPECT().EnableService(gomock.Any(), projectID).MinTimes(1).Return(nil)
+		It("ensure load balancer should trigger load balancer creation if LB doesn't exist for non-STACKIT class name mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
 
-			_, err := lb.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			_, err := lbInModeCreateAndUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+		})
+
+		It("ensure load balancer should trigger load balancer creation if LB doesn't exist for empty class name in mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			_, err := lbInModeCreateAndUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+		})
+
+		It("should enable the project if creating load balancer returns not found", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatusDisabled, nil)
+			mockClient.EXPECT().EnableService(gomock.Any(), projectID).MinTimes(1).Return(nil)
+
+			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
 			Expect(err).To(MatchError(api.NewRetryError("waiting for project to become ready after enabling", 10*time.Second)))
 			// Expect EnableService to have been called.
 		})
 
 		It("should return error if project is not deactivated but load balancer creation returns not found", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-			client.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
-			client.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatus("undefined project status"), nil)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatus("undefined project status"), nil)
 
-			_, err := lb.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
+			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
 			Expect(err).To(HaveOccurred())
-		})
-
-		It("should report implemented elsewhere for services outside of the CCM", func() {
-			svc := minimalLoadBalancerService()
-			svc.Annotations["yawol.stackit.cloud/className"] = "yawol"
-
-			_, err := lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
-			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
 		})
 
 		It("should update the load balancer if the service changed", func() {
@@ -150,10 +270,14 @@ var _ = Describe("LoadBalancer", func() {
 				Version:         ptr.To("current-version"),
 			}
 
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
-			// For simplicity we return the original load balancer. In reality, the updated load balancer should be returned.
-			client.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, lb.GetLoadBalancerName(context.Background(), clusterName, svc), versionMatcher("current-version")).
-				MinTimes(1).Return(myLb, nil)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			// For simplicity, we return the original load balancer. In reality, the updated load balancer should be returned.
+			mockClient.EXPECT().UpdateLoadBalancer(
+				gomock.Any(),
+				projectID,
+				lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, svc),
+				versionMatcher("current-version"),
+			).MinTimes(1).Return(myLb, nil)
 
 			svc = svc.DeepCopy()
 			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
@@ -163,7 +287,7 @@ var _ = Describe("LoadBalancer", func() {
 				NodePort: 1234,
 			})
 
-			_, err = lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			_, err = lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
 			Expect(err).NotTo(HaveOccurred())
 			// Expect UpdateLoadBalancer to have been called.
 		})
@@ -204,12 +328,16 @@ var _ = Describe("LoadBalancer", func() {
 				Version:         ptr.To("current-version"),
 			}
 
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
-			// For simplicity we return the original load balancer. In reality, the updated load balancer should be returned.
-			client.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, lb.GetLoadBalancerName(context.Background(), clusterName, svc), versionMatcher("current-version")).
-				MinTimes(1).Return(myLb, nil)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			// For simplicity, we return the original load balancer. In reality, the updated load balancer should be returned.
+			mockClient.EXPECT().UpdateLoadBalancer(
+				gomock.Any(),
+				projectID,
+				lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, svc),
+				versionMatcher("current-version"),
+			).MinTimes(1).Return(myLb, nil)
 
-			_, err = lb.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
+			_, err = lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
 			Expect(err).NotTo(HaveOccurred())
 			// Expect UpdateLoadBalancer to have been called.
 		})
@@ -217,50 +345,102 @@ var _ = Describe("LoadBalancer", func() {
 
 	Describe("EnsureLoadBalancerDeleted", func() {
 		It("should trigger load balancer deletion", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
-			client.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
-			err := lb.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
+			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
 			Expect(err).NotTo(HaveOccurred())
 			// Expect DeleteLoadBalancer to have been called.
 		})
 
 		It("should finalize deletion if LB API returns not found", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
 
-			err := lb.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
+			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
 			Expect(err).NotTo(HaveOccurred())
 			// Expect DeleteLoadBalancer not to have been called.
 		})
 
 		It("should finalize deletion if load balancer is state terminating", func() {
-			client.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
 				Status: utils.Ptr(lbapi.LBStatusTerminating),
 			}, nil)
 
-			err := lb.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
+			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
 			Expect(err).NotTo(HaveOccurred())
 			// Expect DeleteLoadBalancer not to have been called.
 		})
 
-		It("should report implemented elsewhere for services outside of the CCM", func() {
+		It("should report implemented elsewhere for non-STACKIT class name mode \"ignore\"", func() {
 			svc := minimalLoadBalancerService()
-			svc.Annotations["yawol.stackit.cloud/className"] = "yawol"
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
 
-			err := lb.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
 			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report implemented elsewhere for empty class name in mode \"ignore\"", func() {
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report no error if LB not found for non-STACKIT class name mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			err := lbInModeUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should report no error if LB not found for empty class name in mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			err := lbInModeUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should trigger load balancer deletion for non-STACKIT class name mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			err := lbInModeCreateAndUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			// Expect DeleteLoadBalancer to have been called.
+		})
+
+		It("should trigger load balancer deletion for empty class name in mode \"create & update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			err := lbInModeCreateAndUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+			// Expect DeleteLoadBalancer to have been called.
 		})
 	})
 
 	Describe("UpdateLoadBalancer", func() {
-		It("should update targets", func() {
-			client.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
+		It("should update targets", func() { //nolint:dupl // the class name is stackit
+			mockClient.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
 
 			svc := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": "123.124.88.99",
-						"yawol.stackit.cloud/className":     "stackit",
+						"yawol.stackit.cloud/className":     classNameStackit,
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -274,18 +454,99 @@ var _ = Describe("LoadBalancer", func() {
 					},
 				},
 			}
-			err := lb.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			err := lbInModeIgnore.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
 
 			Expect(err).NotTo(HaveOccurred())
 			// Expect UpdateTargetPool to have been called.
 		})
 
-		It("should report implemented elsewhere for services outside of the CCM", func() {
+		It("should report implemented elsewhere for non-STACKIT class name mode \"ignore\"", func() {
 			svc := minimalLoadBalancerService()
-			svc.Annotations["yawol.stackit.cloud/className"] = "yawol"
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
 
-			err := lb.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			err := lbInModeIgnore.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
 			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should report implemented elsewhere for empty class name in mode \"ignore\"", func() {
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			err := lbInModeIgnore.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should return no error if LB not found for non-STACKIT class name mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
+
+			err := lbInModeUpdate.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should return no error if LB not found for empty class name in mode \"update\"", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, "yawol.stackit.cloud/className")
+
+			err := lbInModeUpdate.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+		})
+
+		It("should update targets for non-STACKIT class name mode \"create & update\"", func() { //nolint:dupl // the class name is yawol
+			mockClient.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
+
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": "123.124.88.99",
+						"yawol.stackit.cloud/className":     classNameYawol,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+							NodePort: 8080,
+						},
+					},
+				},
+			}
+			err := lbInModeCreateAndUpdate.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+
+			Expect(err).NotTo(HaveOccurred())
+			// Expect UpdateTargetPool to have been called.
+		})
+
+		It("should update targets for empty class name in mode \"create & update\"", func() {
+			mockClient.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
+
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": "123.124.88.99",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+							NodePort: 8080,
+						},
+					},
+				},
+			}
+			err := lbInModeCreateAndUpdate.UpdateLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+
+			Expect(err).NotTo(HaveOccurred())
+			// Expect UpdateTargetPool to have been called.
 		})
 	})
 })
@@ -298,7 +559,7 @@ func minimalLoadBalancerService() *corev1.Service {
 			UID: "00000000-0000-0000-0000-000000000000",
 			Annotations: map[string]string{
 				"lb.stackit.cloud/external-address": "123.124.88.99",
-				"yawol.stackit.cloud/className":     "stackit",
+				"yawol.stackit.cloud/className":     classNameStackit,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -316,30 +577,3 @@ func versionMatcher(version string) gomock.Matcher {
 		return *lb.Version == version
 	})
 }
-
-type isImplementedElsewhereTest struct {
-	want bool
-	svc  *corev1.Service
-}
-
-var _ = DescribeTable("isImplementedElsewhere",
-	func(t *isImplementedElsewhereTest) {
-		Expect(isImplementedElsewhere(t.svc)).To(Equal(t.want))
-	},
-	Entry("no annotation", &isImplementedElsewhereTest{
-		want: true,
-		svc:  &corev1.Service{},
-	}),
-	Entry("non-STACKIT value", &isImplementedElsewhereTest{
-		want: true,
-		svc: &corev1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-			"yawol.stackit.cloud/className": "yawol",
-		}}},
-	}),
-	Entry("non-STACKIT value", &isImplementedElsewhereTest{
-		want: false,
-		svc: &corev1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-			"yawol.stackit.cloud/className": "stackit",
-		}}},
-	}),
-)

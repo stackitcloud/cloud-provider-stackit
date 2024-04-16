@@ -2,6 +2,7 @@ package stackit
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
@@ -23,9 +24,10 @@ type Stackit struct {
 
 // Config is used to read and store information from the cloud configuration file
 type Config struct {
-	ProjectID       string `yaml:"projectId"`
-	NetworkID       string `yaml:"networkId"`
-	LoadBalancerAPI struct {
+	ProjectID            string `yaml:"projectId"`
+	NetworkID            string `yaml:"networkId"`
+	NonStackitClassNames string `yaml:"nonStackitClassNames"`
+	LoadBalancerAPI      struct {
 		URL string `yaml:"url"`
 	} `yaml:"loadBalancerApi"`
 }
@@ -64,6 +66,17 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 	if config.NetworkID == "" {
 		return Config{}, errors.New("networkId must be set")
 	}
+	if !(config.NonStackitClassNames == nonStackitClassNameModeIgnore ||
+		config.NonStackitClassNames == nonStackitClassNameModeUpdate ||
+		config.NonStackitClassNames == nonStackitClassNameModeUpdateAndCreate) {
+		return Config{}, fmt.Errorf(
+			"nonStackitClassNames %q must be set to %s, %s or %s",
+			config.NonStackitClassNames,
+			nonStackitClassNameModeIgnore,
+			nonStackitClassNameModeUpdate,
+			nonStackitClassNameModeUpdateAndCreate,
+		)
+	}
 	if config.LoadBalancerAPI.URL == "" {
 		config.LoadBalancerAPI.URL = "https://load-balancer.api.eu01.stackit.cloud"
 	}
@@ -83,7 +96,7 @@ func NewStackit(cfg Config) (*Stackit, error) {
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID)
+	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.NonStackitClassNames)
 	if err != nil {
 		return nil, err
 	}

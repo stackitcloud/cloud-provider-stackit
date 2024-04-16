@@ -20,22 +20,28 @@ const (
 	// stackitClassName defines the class name that deploys a STACKIT load balancer using the cloud controller manager.
 	// Other classes are ignored by the cloud controller manager.
 	classNameStackit = "stackit"
+
+	nonStackitClassNameModeIgnore          = "ignore"
+	nonStackitClassNameModeUpdate          = "update"
+	nonStackitClassNameModeUpdateAndCreate = "updateAndCreate"
 )
 
 // LoadBalancer is used for creating and maintaining load balancers.
 type LoadBalancer struct {
-	client    lbapi.Client
-	projectID string
-	networkID string
+	client                  lbapi.Client
+	projectID               string
+	networkID               string
+	nonStackitClassNameMode string
 }
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client lbapi.Client, projectID, networkID string) (*LoadBalancer, error) {
+func NewLoadBalancer(client lbapi.Client, projectID, networkID, nonStackitClassNameMode string) (*LoadBalancer, error) {
 	return &LoadBalancer{
-		client:    client,
-		projectID: projectID,
-		networkID: networkID,
+		client:                  client,
+		projectID:               projectID,
+		networkID:               networkID,
+		nonStackitClassNameMode: nonStackitClassNameMode,
 	}, nil
 }
 
@@ -45,7 +51,8 @@ func NewLoadBalancer(client lbapi.Client, projectID, networkID string) (*LoadBal
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager.
 func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service) (
 	status *corev1.LoadBalancerStatus, exists bool, err error) {
-	if isImplementedElsewhere(service) {
+	if getClassName(service) != classNameStackit && l.nonStackitClassNameMode == nonStackitClassNameModeIgnore {
+		// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
 		// If the load balancer is implemented elsewhere we report it as not found, so that the finalizer can be removed.
 		return nil, false, nil
 	}
@@ -53,6 +60,7 @@ func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, 
 	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, l.GetLoadBalancerName(ctx, clusterName, service))
 	switch {
 	case lbapi.IsNotFound(err):
+		// Also for non-STACKIT load balancers in "update" & "updateAndCreate" mode return with no error if not found.
 		return nil, false, nil
 	case err != nil:
 		return nil, false, err
@@ -90,10 +98,6 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) (
 	*corev1.LoadBalancerStatus, error,
 ) {
-	if isImplementedElsewhere(service) {
-		return nil, cloudprovider.ImplementedElsewhere
-	}
-
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 
 	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
@@ -101,6 +105,23 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 	if err != nil && !lbapi.IsNotFound(err) {
 		return nil, err
 	}
+
+	if getClassName(service) != classNameStackit {
+		switch l.nonStackitClassNameMode {
+		case nonStackitClassNameModeIgnore:
+			// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
+			return nil, cloudprovider.ImplementedElsewhere
+		case nonStackitClassNameModeUpdate:
+			// In "update" mode only update and return implemented by another controller if not found.
+			if lbapi.IsNotFound(err) {
+				return nil, cloudprovider.ImplementedElsewhere
+			}
+		default:
+			// Default mode is "updateAndCreate" (see SKE ADR 36).
+			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
+		}
+	}
+
 	if lbapi.IsNotFound(err) {
 		return l.createLoadBalancer(ctx, clusterName, service, nodes)
 	}
@@ -181,8 +202,24 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 //
 // It is not called on controller start-up. EnsureLoadBalancer must also ensure to update targets.
 func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) error {
-	if isImplementedElsewhere(service) {
-		return cloudprovider.ImplementedElsewhere
+	if getClassName(service) != classNameStackit {
+		switch l.nonStackitClassNameMode {
+		case nonStackitClassNameModeIgnore:
+			// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
+			return cloudprovider.ImplementedElsewhere
+		case nonStackitClassNameModeUpdate:
+			// In "update" mode only update and if not found we don't do anything until the YCC has created the LB.
+			_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
+			if err != nil {
+				return fmt.Errorf("update get load balancer: %w", err)
+			}
+			if !exists {
+				return cloudprovider.ImplementedElsewhere
+			}
+		default:
+			// Default mode is "updateAndCreate" (see SKE ADR 36).
+			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
+		}
 	}
 
 	spec, err := lbSpecFromService(service, nodes, l.networkID)
@@ -205,12 +242,29 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 // was successfully deleted.
 // This construction is useful because many cloud providers' load balancers
 // have multiple underlying components, meaning a Get could say that the LB
-// doesn't exist even if some part of it is still laying around.
+// doesn't exist even if some part of it is still lying around.
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (l *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *corev1.Service) error {
-	if isImplementedElsewhere(service) {
-		return cloudprovider.ImplementedElsewhere
+	if getClassName(service) != classNameStackit {
+		switch l.nonStackitClassNameMode {
+		case nonStackitClassNameModeIgnore:
+			// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
+			return cloudprovider.ImplementedElsewhere
+		case nonStackitClassNameModeUpdate:
+			// In "update" mode only update and return with no error if not found.
+			_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
+			if err != nil {
+				return fmt.Errorf("get load balancer: %w", err)
+			}
+			if !exists {
+				return nil
+			}
+			return cloudprovider.ImplementedElsewhere
+		default:
+			// Default mode is "updateAndCreate" (see SKE ADR 36).
+			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
+		}
 	}
 
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
@@ -250,6 +304,6 @@ func loadBalancerStatus(lb *loadbalancer.LoadBalancer) *corev1.LoadBalancerStatu
 	}
 }
 
-func isImplementedElsewhere(service *corev1.Service) bool {
-	return service.Annotations[yawolClassNameAnnotation] != classNameStackit
+func getClassName(service *corev1.Service) string {
+	return service.Annotations[yawolClassNameAnnotation]
 }
