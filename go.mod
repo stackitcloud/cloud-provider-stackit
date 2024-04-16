@@ -7,7 +7,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stackitcloud/stackit-sdk-go/core v0.10.1
+	github.com/stackitcloud/stackit-sdk-go/core v0.12.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.10.0
 	go.uber.org/mock v0.4.0
 	gopkg.in/yaml.v3 v3.0.1
