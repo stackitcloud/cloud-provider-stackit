@@ -261,7 +261,7 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 			// Use a descriptive name for a port without name. This only applies for
 			// services with a single port. A service with more than one port must
 			// have names set for all ports.
-			name = fmt.Sprintf("port-%s-%d", port.Protocol, port.Port)
+			name = fmt.Sprintf("port-%s-%d", strings.ToLower(string(port.Protocol)), port.Port)
 		}
 
 		protocol := ""

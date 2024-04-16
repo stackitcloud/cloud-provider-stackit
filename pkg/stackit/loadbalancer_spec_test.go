@@ -401,7 +401,7 @@ var _ = Describe("lbSpecFromService", func() {
 			}
 			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-TCP-80"))))
+			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-tcp-80"))))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
 	})
