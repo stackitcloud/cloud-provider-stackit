@@ -163,8 +163,6 @@ var _ = Describe("LoadBalancer", func() {
 
 	Describe("EnsureLoadBalancer", func() {
 		It("should report implemented elsewhere for non-STACKIT class name mode \"ignore\"", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-
 			svc := minimalLoadBalancerService()
 			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
 
@@ -173,8 +171,6 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should report implemented elsewhere for empty class name in mode \"ignore\"", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-
 			svc := minimalLoadBalancerService()
 			delete(svc.Annotations, "yawol.stackit.cloud/className")
 

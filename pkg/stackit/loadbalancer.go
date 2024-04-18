@@ -98,6 +98,12 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) (
 	*corev1.LoadBalancerStatus, error,
 ) {
+	isNonStackitClassName := getClassName(service) != classNameStackit
+	if isNonStackitClassName && l.nonStackitClassNameMode == nonStackitClassNameModeIgnore {
+		// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 
 	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
@@ -106,21 +112,15 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 		return nil, err
 	}
 
-	if getClassName(service) != classNameStackit {
-		switch l.nonStackitClassNameMode {
-		case nonStackitClassNameModeIgnore:
-			// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
+	if isNonStackitClassName && l.nonStackitClassNameMode == nonStackitClassNameModeUpdate {
+		// In "update" mode only update and return implemented by another controller if not found.
+		if lbapi.IsNotFound(err) {
 			return nil, cloudprovider.ImplementedElsewhere
-		case nonStackitClassNameModeUpdate:
-			// In "update" mode only update and return implemented by another controller if not found.
-			if lbapi.IsNotFound(err) {
-				return nil, cloudprovider.ImplementedElsewhere
-			}
-		default:
-			// Default mode is "updateAndCreate" (see SKE ADR 36).
-			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
 		}
 	}
+
+	// Default mode is "updateAndCreate" (see SKE ADR 36).
+	// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
 
 	if lbapi.IsNotFound(err) {
 		return l.createLoadBalancer(ctx, clusterName, service, nodes)
