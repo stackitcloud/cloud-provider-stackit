@@ -58,7 +58,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"lb.stackit.cloud/internal-lb": "true",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
@@ -74,7 +74,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"yawol.stackit.cloud/internalLB": "true",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
@@ -90,7 +90,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"lb.stackit.cloud/internal-lb": "maybe",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("invalid bool")))
 		})
 
@@ -102,7 +102,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"yawol.stackit.cloud/internalLB": "false",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("incompatible values")))
 		})
 
@@ -115,7 +115,7 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				},
 			}
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network")
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Options.PrivateNetworkOnly).To(PointTo(BeTrue()))
 			Expect(spec.ExternalAddress).To(BeNil())
@@ -130,7 +130,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"lb.stackit.cloud/external-address": externalAddress,
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.ExternalAddress).To(PointTo(Equal(externalAddress)))
 		})
@@ -142,7 +142,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"yawol.stackit.cloud/existingFloatingIP": externalAddress,
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.ExternalAddress).To(PointTo(Equal(externalAddress)))
 		})
@@ -155,7 +155,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"yawol.stackit.cloud/existingFloatingIP": "55.66.77.88",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("incompatible values")))
 		})
 
@@ -166,7 +166,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"lb.stackit.cloud/external-address": "I'm not an IP",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -177,8 +177,31 @@ var _ = Describe("lbSpecFromService", func() {
 						"lb.stackit.cloud/external-address": "2001:db8::",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("Metric metricsRemoteWrite", func() {
+		It("should set metrics in load balancer spec", func() {
+			pushURL := "test-endpoint"
+			spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", &loadbalancer.LoadbalancerOptionObservability{
+				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+					CredentialsRef: ptr.To(sampleCredentialsRef),
+					PushUrl:        &pushURL,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
+				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
+					"Observability": PointTo(MatchFields(IgnoreExtras, Fields{
+						"Metrics": PointTo(MatchFields(IgnoreExtras, Fields{
+							"CredentialsRef": PointTo(Equal(sampleCredentialsRef)),
+							"PushUrl":        PointTo(Equal(pushURL)),
+						})),
+					})),
+				})),
+			})))
 		})
 	})
 
@@ -194,7 +217,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http, dns, httpAlt},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Listeners": PointTo(ConsistOf(
@@ -229,7 +252,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http, httpAlt, https},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Listeners": PointTo(ConsistOf(
@@ -262,7 +285,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Listeners": PointTo(ConsistOf(
@@ -287,7 +310,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("incompatible values")))
 		})
 
@@ -303,7 +326,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("invalid port")))
 		})
 
@@ -320,7 +343,7 @@ var _ = Describe("lbSpecFromService", func() {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{http},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("incompatible values")))
 		})
 	})
@@ -343,7 +366,7 @@ var _ = Describe("lbSpecFromService", func() {
 						Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.2.3.4"}},
 					},
 				},
-			}, "my-network")
+			}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -378,7 +401,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("unsupported protocol")))
 		})
 
@@ -399,7 +422,7 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				},
 			}
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network")
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-tcp-80"))))
 			Expect(spec).To(haveConsistentTargetPool())
@@ -422,7 +445,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"16.0.0.0/8",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
@@ -441,7 +464,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"yawol.stackit.cloud/loadBalancerSourceRanges": "2.0.0.0/8,3.0.0.0/8",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
@@ -471,7 +494,7 @@ var _ = Describe("lbSpecFromService", func() {
 						Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.2.3.4"}},
 					},
 				},
-			}, "my-network")
+			}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.TargetPools).To(PointTo(HaveLen(2)))
 			Expect(spec.TargetPools).To(PointTo(HaveEach(
@@ -504,7 +527,7 @@ var _ = Describe("lbSpecFromService", func() {
 						Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "4.5.6.7"}},
 					},
 				},
-			}, "my-network")
+			}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.TargetPools).To(PointTo(ConsistOf(
 				haveTargets(ConsistOf( // node-2 is missing
@@ -527,7 +550,7 @@ var _ = Describe("lbSpecFromService", func() {
 						annotation:                          "some value",
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(MatchError(ContainSubstring("unsupported annotation")))
 		},
 		Entry("yawol.stackit.cloud/imageId", "yawol.stackit.cloud/imageId"),
@@ -580,7 +603,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -625,7 +648,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -654,7 +677,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -684,7 +707,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -705,7 +728,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -726,7 +749,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -767,7 +790,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -805,7 +828,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -834,7 +857,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -864,7 +887,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -885,7 +908,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -906,7 +929,7 @@ var _ = Describe("lbSpecFromService", func() {
 						},
 					},
 				},
-			}, []*corev1.Node{}, "my-network")
+			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
@@ -926,7 +949,7 @@ var _ = Describe("lbSpecFromService", func() {
 					"lb.stackit.cloud/internal-lb": "true",
 				},
 			},
-		}, []*corev1.Node{}, "my-network")
+		}, []*corev1.Node{}, "my-network", nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(spec.Networks).To(PointTo(ConsistOf(MatchFields(IgnoreExtras, Fields{
 			"NetworkId": PointTo(Equal("my-network")),
@@ -935,7 +958,7 @@ var _ = Describe("lbSpecFromService", func() {
 	})
 
 	It("should configure a public service without existing IP as ephemeral", func() {
-		spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network")
+		spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*spec.Options.EphemeralAddress).To(BeTrue())
 	})
@@ -979,6 +1002,60 @@ var _ = DescribeTable("compareLBwithSpec",
 		Expect(immutableChanged).To(Equal(t.wantImmutabledChanged))
 		Expect(fulfills).To(Equal(t.wantFulfilled))
 	},
+	Entry("When LB has Observability set", &compareLBwithSpecTest{
+		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+				Observability: &loadbalancer.LoadbalancerOptionObservability{
+					Logs: &loadbalancer.LoadbalancerOptionLogs{
+						CredentialsRef: ptr.To("credentials-12345"),
+						PushUrl:        ptr.To("https://logs.example.org"),
+					},
+					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+						CredentialsRef: ptr.To("credentials-12345"),
+						PushUrl:        ptr.To("https://metrics.example.org"),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+				Observability: &loadbalancer.LoadbalancerOptionObservability{
+					Logs: &loadbalancer.LoadbalancerOptionLogs{
+						CredentialsRef: ptr.To("credentials-12345"),
+						PushUrl:        ptr.To("https://logs.example.org"),
+					},
+					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+						CredentialsRef: ptr.To("credentials-12345"),
+						PushUrl:        ptr.To("https://metrics.example.org"),
+					},
+				},
+			},
+		},
+	}),
+	Entry("When LB has different Observability set", &compareLBwithSpecTest{
+		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+				Observability: &loadbalancer.LoadbalancerOptionObservability{
+					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+						CredentialsRef: ptr.To("credentials-12345"),
+						PushUrl:        ptr.To("https://metrics.example.org"),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+		},
+	}),
 	Entry("When LB has an external address and the specification is ephemeral", &compareLBwithSpecTest{
 		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
 		wantFulfilled: true,

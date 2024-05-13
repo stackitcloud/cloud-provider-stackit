@@ -26,22 +26,31 @@ const (
 	nonStackitClassNameModeUpdateAndCreate = "updateAndCreate"
 )
 
+type MetricsRemoteWrite struct {
+	endpoint string
+	username string
+	password string
+}
+
 // LoadBalancer is used for creating and maintaining load balancers.
 type LoadBalancer struct {
 	client                  lbapi.Client
 	projectID               string
 	networkID               string
 	nonStackitClassNameMode string
+	// metricsRemoteWrite setting this enables remote writing of metrics and nil means it is disabled
+	metricsRemoteWrite *MetricsRemoteWrite
 }
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client lbapi.Client, projectID, networkID, nonStackitClassNameMode string) (*LoadBalancer, error) {
+func NewLoadBalancer(client lbapi.Client, projectID, networkID, nonStackitClassNameMode string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) {
 	return &LoadBalancer{
 		client:                  client,
 		projectID:               projectID,
 		networkID:               networkID,
 		nonStackitClassNameMode: nonStackitClassNameMode,
+		metricsRemoteWrite:      metricsRemoteWrite,
 	}, nil
 }
 
@@ -95,9 +104,12 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 // load balancer is not ready yet (e.g., it is still being provisioned) and
 // polling at a fixed rate is preferred over backing off exponentially in
 // order to minimize latency.
-func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) (
-	*corev1.LoadBalancerStatus, error,
-) {
+func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but not complex.
+	ctx context.Context,
+	clusterName string,
+	service *corev1.Service,
+	nodes []*corev1.Node,
+) (*corev1.LoadBalancerStatus, error) {
 	isNonStackitClassName := getClassName(service) != classNameStackit
 	if isNonStackitClassName && l.nonStackitClassNameMode == nonStackitClassNameModeIgnore {
 		// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
@@ -126,7 +138,12 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 		return l.createLoadBalancer(ctx, clusterName, service, nodes)
 	}
 
-	spec, err := lbSpecFromService(service, nodes, l.networkID)
+	observabilityOptions, err := l.reconcileObservabilityCredentials(ctx, lb, name)
+	if err != nil {
+		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
+	}
+
+	spec, err := lbSpecFromService(service, nodes, l.networkID, observabilityOptions)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
@@ -136,6 +153,7 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %q", immutableChanged.field)
 	}
 	if !fulfills {
+		credentialsRef := getMetricsRemoteWriteRef(lb)
 		// We create the update payload from a new spec.
 		// However, we need to copy over the version because it is required on every update.
 		spec.Version = lb.Version
@@ -143,6 +161,13 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 		lb, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, (*loadbalancer.UpdateLoadBalancerPayload)(spec))
 		if err != nil {
 			return nil, fmt.Errorf("failed to update load balancer: %w", err)
+		}
+		// clean up old metricsRemoteWrite credentials
+		if l.metricsRemoteWrite == nil && credentialsRef != nil {
+			err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRef)
+			if err != nil {
+				return nil, fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRef, err)
+			}
 		}
 	}
 
@@ -156,15 +181,26 @@ func (l *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName strin
 	return loadBalancerStatus(lb), nil
 }
 
+func getMetricsRemoteWriteRef(lb *loadbalancer.LoadBalancer) *string {
+	if lb.Options != nil && lb.Options.Observability != nil && lb.Options.Observability.Metrics != nil && lb.Options.Observability.Metrics.CredentialsRef != nil {
+		return lb.Options.Observability.Metrics.CredentialsRef
+	}
+	return nil
+}
+
 func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) (
 	*corev1.LoadBalancerStatus, error,
 ) {
-	spec, err := lbSpecFromService(service, nodes, l.networkID)
+	name := l.GetLoadBalancerName(ctx, clusterName, service)
+	metricsRemoteWrite, err := l.reconcileObservabilityCredentials(ctx, nil, name)
+	if err != nil {
+		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
+	}
+
+	spec, err := lbSpecFromService(service, nodes, l.networkID, metricsRemoteWrite)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
-
-	name := l.GetLoadBalancerName(ctx, clusterName, service)
 	spec.Name = &name
 
 	lb, createErr := l.client.CreateLoadBalancer(ctx, l.projectID, spec)
@@ -222,7 +258,8 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 		}
 	}
 
-	spec, err := lbSpecFromService(service, nodes, l.networkID)
+	// only TargetPools are used from spec
+	spec, err := lbSpecFromService(service, nodes, l.networkID, nil)
 	if err != nil {
 		return fmt.Errorf("invalid service: %w", err)
 	}
@@ -279,6 +316,35 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterNam
 		return nil
 	}
 
+	credentialsRef := getMetricsRemoteWriteRef(lb)
+	if credentialsRef != nil {
+		// The load balancer is updated to not contain the credentials reference anymore and hence enable their deletion
+		for i := range *lb.Listeners {
+			(*lb.Listeners)[i].Name = nil
+		}
+		payload := &loadbalancer.UpdateLoadBalancerPayload{
+			ExternalAddress: lb.ExternalAddress,
+			Listeners:       lb.Listeners,
+			Name:            &name,
+			Networks:        lb.Networks,
+			Options: &loadbalancer.LoadBalancerOptions{
+				AccessControl:      lb.Options.AccessControl,
+				EphemeralAddress:   lb.Options.EphemeralAddress,
+				Observability:      nil,
+				PrivateNetworkOnly: lb.Options.PrivateNetworkOnly,
+			},
+			TargetPools: lb.TargetPools,
+			Version:     lb.Version,
+		}
+		_, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, payload)
+		if err != nil {
+			return fmt.Errorf("failed to update load balancer: %w", err)
+		}
+		if err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRef); err != nil {
+			return fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRef, err)
+		}
+	}
+
 	err = l.client.DeleteLoadBalancer(ctx, l.projectID, name)
 	// Deleting a load balancer doesn't return an error if the load balancer cannot be found.
 	if err != nil {
@@ -286,6 +352,59 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterNam
 	}
 
 	return nil
+}
+
+// reconcileObservabilityCredentials update observability credentials if lb has metrics shipping enabled.
+// Otherwise it creates new credentials and returns the observability options that must be injected into the load balancer by the caller.
+//
+// lb can be nil to signal that the load balancer does not exist yet.
+func (l *LoadBalancer) reconcileObservabilityCredentials(
+	ctx context.Context,
+	lb *loadbalancer.LoadBalancer,
+	lbName string,
+) (*loadbalancer.LoadbalancerOptionObservability, error) {
+	if l.metricsRemoteWrite == nil {
+		return nil, nil
+	}
+	var credentialsRef *string
+	if lb != nil && lb.Options != nil && lb.Options.Observability != nil && lb.Options.Observability.Metrics != nil {
+		credentialsRef = lb.Options.Observability.Metrics.CredentialsRef
+	}
+
+	if credentialsRef == nil {
+		// create
+		payload := loadbalancer.CreateCredentialsPayload{
+			DisplayName: &lbName,
+			Username:    &l.metricsRemoteWrite.username,
+			Password:    &l.metricsRemoteWrite.password,
+		}
+		c, err := l.client.CreateCredentials(ctx, l.projectID, payload)
+		if err != nil {
+			return nil, fmt.Errorf("create credentials: %w", err)
+		}
+		return &loadbalancer.LoadbalancerOptionObservability{
+			Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+				CredentialsRef: c.Credential.CredentialsRef,
+				PushUrl:        &l.metricsRemoteWrite.endpoint,
+			},
+		}, nil
+	}
+
+	// update
+	payload := loadbalancer.UpdateCredentialsPayload{
+		DisplayName: lb.Name,
+		Username:    &l.metricsRemoteWrite.username,
+		Password:    &l.metricsRemoteWrite.password,
+	}
+	if err := l.client.UpdateCredentials(ctx, l.projectID, *credentialsRef, payload); err != nil {
+		return nil, fmt.Errorf("update credentials %q: %w", *credentialsRef, err)
+	}
+	return &loadbalancer.LoadbalancerOptionObservability{
+		Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+			CredentialsRef: credentialsRef,
+			PushUrl:        &l.metricsRemoteWrite.endpoint,
+		},
+	}, nil
 }
 
 func loadBalancerStatus(lb *loadbalancer.LoadBalancer) *corev1.LoadBalancerStatus {

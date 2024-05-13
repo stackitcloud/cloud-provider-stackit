@@ -38,7 +38,12 @@ loadBalancerApi:
 
 - Required: STACKIT authentication for SDK
     - To authenticate against the STACKIT API follow [STACKIT SDK authentication](https://github.com/stackitcloud/stackit-sdk-go#authentication). The cloud controller manager supports all authentication methods that are supported by the SDK.
-- Metrics are available at `https://:10258/metrics`. To allow unauthorized access add `--authorization-always-allow-paths=/metrics`.
+- Service metrics are available at `https://:10258/metrics`. To allow unauthorized access add `--authorization-always-allow-paths=/metrics`.
+- Load Balancer metrics can be sent to ARGUS. To use this feature all the following environment variables need to be set:
+  - `STACKIT_REMOTEWRITE_ENDPOINT` the remote write push URL to send the metrics to
+  - `STACKIT_REMOTEWRITE_USER` the basic auth username
+  - `STACKIT_REMOTEWRITE_PASSWORD` the basic auth password
+  - >If none of these environment variables are set, this feature is ignored and no Load Balancer metrics are sent.
 
 ## Load balancers user documentation
 

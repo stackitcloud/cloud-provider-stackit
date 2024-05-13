@@ -140,3 +140,76 @@ func (mr *MockClientMockRecorder) UpdateTargetPool(arg0, arg1, arg2, arg3, arg4 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTargetPool", reflect.TypeOf((*MockClient)(nil).UpdateTargetPool), arg0, arg1, arg2, arg3, arg4)
 }
+
+// CreateCredentials mocks base method.
+func (m *MockClient) CreateCredentials(arg0 context.Context, arg1 string, arg2 loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCredentials", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*loadbalancer.CreateCredentialsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCredentials indicates an expected call of GetCredentials.
+func (mr *MockClientMockRecorder) CreateCredentials(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCredentials", reflect.TypeOf((*MockClient)(nil).CreateCredentials), arg0, arg1, arg2)
+}
+
+// ListCredentials mocks base method.
+func (m *MockClient) ListCredentials(arg0 context.Context, arg1 string) (*loadbalancer.ListCredentialsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCredentials", arg0, arg1)
+	ret0, _ := ret[0].(*loadbalancer.ListCredentialsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCredentials indicates an expected call of GetCredentials.
+func (mr *MockClientMockRecorder) ListCredentials(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCredentials", reflect.TypeOf((*MockClient)(nil).ListCredentials), arg0, arg1)
+}
+
+// GetCredentials mocks base method.
+func (m *MockClient) GetCredentials(arg0 context.Context, arg1, arg2 string) (*loadbalancer.GetCredentialsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCredentials", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*loadbalancer.GetCredentialsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCredentials indicates an expected call of GetCredentials.
+func (mr *MockClientMockRecorder) GetCredentials(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCredentials", reflect.TypeOf((*MockClient)(nil).GetCredentials), arg0, arg1, arg2)
+}
+
+// UpdateCredentials mocks base method.
+func (m *MockClient) UpdateCredentials(arg0 context.Context, arg1, arg2 string, arg3 loadbalancer.UpdateCredentialsPayload) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCredentials", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCredentials indicates an expected call of GetCredentials.
+func (mr *MockClientMockRecorder) UpdateCredentials(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCredentials", reflect.TypeOf((*MockClient)(nil).UpdateCredentials), arg0, arg1, arg2, arg3)
+}
+
+// DeleteCredentials mocks base method.
+func (m *MockClient) DeleteCredentials(arg0 context.Context, arg1, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCredentials", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCredentials indicates an expected call of GetCredentials.
+func (mr *MockClientMockRecorder) DeleteCredentials(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCredentials", reflect.TypeOf((*MockClient)(nil).DeleteCredentials), arg0, arg1, arg2)
+}

@@ -38,6 +38,11 @@ type Client interface {
 	UpdateTargetPool(ctx context.Context, projectID string, name string, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 	EnableService(ctx context.Context, projectID string) error
 	GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error)
+	CreateCredentials(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error)
+	ListCredentials(ctx context.Context, projectID string) (*loadbalancer.ListCredentialsResponse, error)
+	GetCredentials(ctx context.Context, projectID string, credentialRef string) (*loadbalancer.GetCredentialsResponse, error)
+	UpdateCredentials(ctx context.Context, projectID, credentialRef string, payload loadbalancer.UpdateCredentialsPayload) error
+	DeleteCredentials(ctx context.Context, projectID string, credentialRef string) error
 }
 
 type client struct {
@@ -95,6 +100,38 @@ func (cl client) GetServiceStatus(ctx context.Context, projectID string) (Projec
 		return "", errors.New("server response is missing project status")
 	}
 	return ProjectStatus(*res.Status), err
+}
+
+func (cl client) CreateCredentials(
+	ctx context.Context,
+	projectID string,
+	payload loadbalancer.CreateCredentialsPayload,
+) (*loadbalancer.CreateCredentialsResponse, error) {
+	return cl.client.CreateCredentials(ctx, projectID).CreateCredentialsPayload(payload).XRequestID(uuid.NewString()).Execute()
+}
+
+func (cl client) ListCredentials(ctx context.Context, projectID string) (*loadbalancer.ListCredentialsResponse, error) {
+	return cl.client.ListCredentialsExecute(ctx, projectID)
+}
+
+func (cl client) GetCredentials(ctx context.Context, projectID, credentialsRef string) (*loadbalancer.GetCredentialsResponse, error) {
+	return cl.client.GetCredentialsExecute(ctx, projectID, credentialsRef)
+}
+
+func (cl client) UpdateCredentials(ctx context.Context, projectID, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
+	_, err := cl.client.UpdateCredentials(ctx, projectID, credentialsRef).UpdateCredentialsPayload(payload).Execute()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cl client) DeleteCredentials(ctx context.Context, projectID, credentialsRef string) error {
+	_, err := cl.client.DeleteCredentials(ctx, projectID, credentialsRef).Execute()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func isOpenAPINotFound(err error) bool {

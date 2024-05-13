@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
@@ -16,6 +17,11 @@ import (
 const (
 	// ProviderName is the name of the stackit provider
 	ProviderName = "stackit"
+
+	// metricsRemoteWrite ENVs for metrics shipping to argus using basic auth
+	stackitRemoteWriteEndpointKey = "STACKIT_REMOTEWRITE_ENDPOINT"
+	stackitRemoteWriteUserKey     = "STACKIT_REMOTEWRITE_USER"
+	stackitRemoteWritePasswordKey = "STACKIT_REMOTEWRITE_PASSWORD"
 )
 
 type Stackit struct {
@@ -39,7 +45,12 @@ func init() {
 			klog.Warningf("failed to read config: %v", err)
 			return nil, err
 		}
-		cloud, err := NewStackit(cfg)
+		obs, err := BuildObservability()
+		if err != nil {
+			klog.Warningf("failed to build metricsRemoteWrite: %v", err)
+			return nil, err
+		}
+		cloud, err := NewStackit(cfg, obs)
 		if err != nil {
 			klog.Warningf("failed to create STACKIT cloud provider: %v", err)
 		}
@@ -89,8 +100,35 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 	return config, nil
 }
 
+func BuildObservability() (*MetricsRemoteWrite, error) {
+	e := os.Getenv(stackitRemoteWriteEndpointKey)
+	u := os.Getenv(stackitRemoteWriteUserKey)
+	p := os.Getenv(stackitRemoteWritePasswordKey)
+	if e == "" && u == "" && p == "" {
+		return nil, nil
+	}
+	if e != "" && u != "" && p != "" {
+		return &MetricsRemoteWrite{
+			endpoint: e,
+			username: u,
+			password: p,
+		}, nil
+	}
+	missingKeys := []string{}
+	if e == "" {
+		missingKeys = append(missingKeys, stackitRemoteWriteEndpointKey)
+	}
+	if u == "" {
+		missingKeys = append(missingKeys, stackitRemoteWriteUserKey)
+	}
+	if p == "" {
+		missingKeys = append(missingKeys, stackitRemoteWritePasswordKey)
+	}
+	return nil, fmt.Errorf("missing from env: %q", missingKeys)
+}
+
 // NewStackit creates a new instance of the stackit struct from a config struct
-func NewStackit(cfg Config) (*Stackit, error) {
+func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 	innerClient, err := loadbalancer.NewAPIClient(
 		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
 	)
@@ -102,7 +140,7 @@ func NewStackit(cfg Config) (*Stackit, error) {
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.NonStackitClassNames)
+	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.NonStackitClassNames, obs)
 	if err != nil {
 		return nil, err
 	}

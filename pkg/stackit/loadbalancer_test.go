@@ -2,6 +2,7 @@ package stackit
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -21,11 +22,15 @@ const (
 	// stackitClassName defines the class name that deploys a STACKIT load balancer using the cloud controller manager.
 	// Other classes are ignored by the cloud controller manager.
 	classNameYawol = "yawol"
+
+	sampleLBName         = "k8s-svc-89ec9a0e-6b00-4e2f-b57b-02e89193093d-echo"
+	sampleCredentialsRef = "credentials-12345"
 )
 
 var _ = Describe("LoadBalancer", func() {
 	var (
 		mockClient              *lbapi.MockClient
+		lbInModeIgnoreAndObs    *LoadBalancer
 		lbInModeIgnore          *LoadBalancer
 		lbInModeUpdate          *LoadBalancer
 		lbInModeCreateAndUpdate *LoadBalancer
@@ -42,11 +47,17 @@ var _ = Describe("LoadBalancer", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		mockClient = lbapi.NewMockClient(ctrl)
 		var err error
-		lbInModeIgnore, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore)
+		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore, &MetricsRemoteWrite{
+			endpoint: "test-endpoint",
+			username: "test-username",
+			password: "test-password",
+		})
 		Expect(err).NotTo(HaveOccurred())
-		lbInModeUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdate)
+		lbInModeIgnore, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore, nil)
 		Expect(err).NotTo(HaveOccurred())
-		lbInModeCreateAndUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdateAndCreate)
+		lbInModeUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdate, nil)
+		Expect(err).NotTo(HaveOccurred())
+		lbInModeCreateAndUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdateAndCreate, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -207,6 +218,57 @@ var _ = Describe("LoadBalancer", func() {
 			// Expected CreateLoadBalancer to have been called.
 		})
 
+		It("should create a load balancer with observability configured", func() {
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			// TODO: match payload
+			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).
+				DoAndReturn(func(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+					return &loadbalancer.CreateCredentialsResponse{
+						Credential: &loadbalancer.CredentialsResponse{
+							CredentialsRef: utils.Ptr("my-credential-ref"),
+							DisplayName:    utils.Ptr(*payload.DisplayName),
+							Username:       utils.Ptr(*payload.Username),
+						},
+					}, nil
+				})
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+
+			_, err := lbInModeIgnoreAndObs.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+			// Expected CreateCredentials to have been called.
+			// Expected CreateLoadBalancer to have been called.
+		})
+
+		It("should update observability credential if credentials are specified in load balancer", func() {
+			svc := minimalLoadBalancerService()
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
+				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+					CredentialsRef: utils.Ptr(sampleCredentialsRef),
+					PushUrl:        &lbInModeIgnoreAndObs.metricsRemoteWrite.endpoint,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				Errors:          &[]loadbalancer.LoadBalancerError{},
+				ExternalAddress: spec.ExternalAddress,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				PrivateAddress:  spec.PrivateAddress,
+				Status:          ptr.To(lbapi.LBStatusReady),
+				TargetPools:     spec.TargetPools,
+				Version:         ptr.To("current-version"),
+			}
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			mockClient.EXPECT().UpdateCredentials(gomock.Any(), projectID, sampleCredentialsRef, gomock.Any()).MinTimes(1).Return(nil)
+
+			_, err = lbInModeIgnoreAndObs.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+			// Expected UpdateCredentials to have been called.
+		})
+
 		It("ensure load balancer should trigger load balancer creation if LB doesn't exist for non-STACKIT class name mode \"create & update\"", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
 			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
@@ -251,7 +313,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should update the load balancer if the service changed", func() {
 			svc := minimalLoadBalancerService()
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID)
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -309,7 +371,7 @@ var _ = Describe("LoadBalancer", func() {
 				Port:     80,
 				NodePort: 1234,
 			})
-			spec, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID)
+			spec, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -336,6 +398,51 @@ var _ = Describe("LoadBalancer", func() {
 			_, err = lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
 			Expect(err).NotTo(HaveOccurred())
 			// Expect UpdateLoadBalancer to have been called.
+		})
+
+		It("should delete observability credentials and delete reference from load balancer if controller is not configured (monitoring extension disabled)", func() {
+			svc := minimalLoadBalancerService()
+			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
+				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+					CredentialsRef: ptr.To(sampleCredentialsRef),
+					PushUrl:        ptr.To("test-endpoint"),
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				Errors:          &[]loadbalancer.LoadBalancerError{},
+				ExternalAddress: spec.ExternalAddress,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				PrivateAddress:  spec.PrivateAddress,
+				Status:          ptr.To(lbapi.LBStatusReady),
+				TargetPools:     spec.TargetPools,
+				Version:         ptr.To("current-version"),
+			}
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			// Check order to ensure that the reference is removed before the credentials are removed.
+			// The API rejects deletions of used credentials.
+			gomock.InOrder(
+				// For simplicity, we return the original load balancer. In reality, the updated load balancer should be returned.
+				mockClient.EXPECT().UpdateLoadBalancer(
+					gomock.Any(),
+					projectID,
+					lbInModeIgnore.GetLoadBalancerName(context.Background(), clusterName, svc),
+					gomock.All(
+						versionMatcher("current-version"),
+						hasNoObservabilityConfigured(),
+					),
+				).MinTimes(1).Return(myLb, nil),
+				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil),
+			)
+
+			_, err = lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+			// Expect UpdateLoadBalancer to have been called.
+			// Expect DeleteCredentials to have been called.
 		})
 	})
 
@@ -425,6 +532,31 @@ var _ = Describe("LoadBalancer", func() {
 			err := lbInModeCreateAndUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
 			Expect(err).NotTo(HaveOccurred())
 			// Expect DeleteLoadBalancer to have been called.
+		})
+
+		It("should delete observability credentials", func() {
+			svc := minimalLoadBalancerService()
+			name := lbInModeCreateAndUpdate.GetLoadBalancerName(context.Background(), "", svc)
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
+				Options: &loadbalancer.LoadBalancerOptions{
+					Observability: &loadbalancer.LoadbalancerOptionObservability{
+						Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+							CredentialsRef: ptr.To(sampleCredentialsRef),
+							PushUrl:        ptr.To("http://localhost"),
+						},
+					},
+				},
+				Listeners: &[]loadbalancer.Listener{},
+			}, nil)
+			gomock.InOrder(
+				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, hasNoObservabilityConfigured()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
+				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
+				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
+			)
+
+			err := lbInModeCreateAndUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
@@ -545,6 +677,84 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect UpdateTargetPool to have been called.
 		})
 	})
+
+	Describe("reconcileObservabilityCredentials", func() {
+		It("should do nothing if no credentials are in the environment", func() {
+			credentialRef, err := lbInModeIgnore.reconcileObservabilityCredentials(context.Background(), nil, "my-loadbalancer")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(credentialRef).To(BeNil())
+		})
+
+		It("should update credentials if they exist", func() {
+			pushURL := "test-endpoint"
+			mockClient.EXPECT().UpdateCredentials(gomock.Any(), projectID, sampleCredentialsRef, gomock.Any()).MinTimes(1).Return(nil)
+			credentialRef, err := lbInModeIgnoreAndObs.reconcileObservabilityCredentials(context.Background(), &loadbalancer.LoadBalancer{
+				Name: ptr.To(sampleLBName),
+				Options: &loadbalancer.LoadBalancerOptions{
+					Observability: &loadbalancer.LoadbalancerOptionObservability{
+						Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+							CredentialsRef: ptr.To(sampleCredentialsRef),
+						},
+					},
+				},
+			}, sampleLBName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*credentialRef).To(Equal(loadbalancer.LoadbalancerOptionObservability{
+				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+					CredentialsRef: ptr.To(sampleCredentialsRef),
+					PushUrl:        &pushURL,
+				},
+			}))
+		})
+
+		It("should try to update credentials if they exist", func() {
+			errTest := errors.New("update credentials test error")
+			mockClient.EXPECT().UpdateCredentials(gomock.Any(), projectID, sampleCredentialsRef, gomock.Any()).MinTimes(1).Return(errTest)
+			credentialRef, err := lbInModeIgnoreAndObs.reconcileObservabilityCredentials(context.Background(), &loadbalancer.LoadBalancer{
+				Name: ptr.To(sampleLBName),
+				Options: &loadbalancer.LoadBalancerOptions{
+					Observability: &loadbalancer.LoadbalancerOptionObservability{
+						Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+							CredentialsRef: ptr.To(sampleCredentialsRef),
+						},
+					},
+				},
+			}, sampleLBName)
+			Expect(err).To(MatchError(errTest))
+			Expect(credentialRef).To(BeNil())
+		})
+
+		It("should create credentials if they do not exist", func() {
+			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.CreateCredentialsResponse{
+				Credential: &loadbalancer.CredentialsResponse{
+					CredentialsRef: ptr.To(sampleCredentialsRef),
+					DisplayName:    ptr.To(sampleLBName),
+					Username:       ptr.To("test-username"),
+				},
+			}, nil)
+			credentialRef, err := lbInModeIgnoreAndObs.reconcileObservabilityCredentials(context.Background(), &loadbalancer.LoadBalancer{
+				Name: ptr.To(sampleLBName),
+			}, sampleLBName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*credentialRef).To(Equal(loadbalancer.LoadbalancerOptionObservability{
+				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+					CredentialsRef: ptr.To(sampleCredentialsRef),
+					PushUrl:        ptr.To("test-endpoint"),
+				},
+			}))
+		})
+
+		It("should try to create credentials if they do not exist", func() {
+			errTest := errors.New("delete credentials test error")
+			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, errTest)
+			credentialRef, err := lbInModeIgnoreAndObs.reconcileObservabilityCredentials(context.Background(), &loadbalancer.LoadBalancer{
+				Name: ptr.To(sampleLBName),
+			}, sampleLBName)
+			Expect(err).To(MatchError(errTest))
+			Expect(credentialRef).To(BeNil())
+		})
+
+	})
 })
 
 // minimalLoadBalancerService returns a service that is valid for provisioning a load balancer by the CCM.
@@ -564,6 +774,7 @@ func minimalLoadBalancerService() *corev1.Service {
 	}
 }
 
+// versionMatcher ensures that the given UpdateLoadBalancerPayload has version specified.
 func versionMatcher(version string) gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
@@ -571,5 +782,13 @@ func versionMatcher(version string) gomock.Matcher {
 			return false
 		}
 		return *lb.Version == version
+	})
+}
+
+// hasNoObservabilityConfigured ensures that the given UpdateLoadBalancerPayload has no observability specified.
+func hasNoObservabilityConfigured() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Options == nil || lb.Options.Observability == nil
 	})
 }

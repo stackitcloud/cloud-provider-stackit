@@ -68,9 +68,12 @@ func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPo
 // lbSpecFromService returns a load balancer specification in the form of a create payload matching the specification of the service, nodes and network.
 // The property name will be empty and must be set by the caller to produce a valid payload for the API.
 // An error is returned if the service has invalid options.
-func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID string) ( //nolint:funlen,gocyclo // It is long but not complex.
-	*loadbalancer.CreateLoadBalancerPayload, error,
-) {
+func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
+	service *corev1.Service,
+	nodes []*corev1.Node,
+	networkID string,
+	observability *loadbalancer.LoadbalancerOptionObservability,
+) (*loadbalancer.CreateLoadBalancerPayload, error) {
 	lb := &loadbalancer.CreateLoadBalancerPayload{
 		Options: &loadbalancer.LoadBalancerOptions{},
 		Networks: &[]loadbalancer.Network{
@@ -129,6 +132,9 @@ func lbSpecFromService(service *corev1.Service, nodes []*corev1.Node, networkID 
 		}
 		lb.ExternalAddress = &externalIP
 	}
+
+	// Add metric metricsRemoteWrite settings
+	lb.Options.Observability = observability
 
 	// Parse TCP idle timeout from annotations.
 	// TODO: Split into separate function.
@@ -339,13 +345,39 @@ type resultImmutableChanged struct {
 
 // compareLBwithSpec checks whether the load balancer fulfills the specification.
 // If immutableChanged is not nil then spec differs from lb such that an update will fail.
-// Otherwise fulfills will indicate whether an update is necessary.
+// Otherwise, fulfills will indicate whether an update is necessary.
 func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
 	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
 	fulfills = true
 
 	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly) {
 		return false, &resultImmutableChanged{field: ".options.privateNetworkOnly"}
+	}
+
+	if !cmp.PtrValEqualFn(
+		cmp.UnpackPtr(lb.Options).Observability,
+		cmp.UnpackPtr(spec.Options).Observability,
+		func(a, b loadbalancer.LoadbalancerOptionObservability) bool {
+			sameMetrics := cmp.PtrValEqualFn(
+				a.Metrics,
+				b.Metrics,
+				func(c, d loadbalancer.LoadbalancerOptionMetrics) bool {
+					return cmp.UnpackPtr(c.PushUrl) == cmp.UnpackPtr(d.PushUrl) &&
+						cmp.UnpackPtr(c.CredentialsRef) == cmp.UnpackPtr(d.CredentialsRef)
+				},
+			)
+			sameLogs := cmp.PtrValEqualFn(
+				a.Logs,
+				b.Logs,
+				func(c, d loadbalancer.LoadbalancerOptionLogs) bool {
+					return cmp.UnpackPtr(c.PushUrl) == cmp.UnpackPtr(d.PushUrl) &&
+						cmp.UnpackPtr(c.CredentialsRef) == cmp.UnpackPtr(d.CredentialsRef)
+				},
+			)
+			return sameMetrics && sameLogs
+		},
+	) {
+		fulfills = false
 	}
 
 	if cmp.UnpackPtr(spec.ExternalAddress) != "" {
