@@ -497,7 +497,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessControl).AllowedSourceRanges),
 		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessControl).AllowedSourceRanges),
 	) {
-		return false, &resultImmutableChanged{field: ".options.accessControl"}
+		fulfills = false
 	}
 
 	return fulfills, immutableChanged

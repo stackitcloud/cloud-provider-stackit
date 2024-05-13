@@ -430,7 +430,7 @@ var _ = Describe("lbSpecFromService", func() {
 	})
 
 	Context("source IP ranges", func() {
-		It("should take source IP ranges from spec with precende over yawol annotation", func() {
+		It("should take source IP ranges from spec with precedence over yawol annotation", func() {
 			spec, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -1644,7 +1644,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When source ranges are set but not specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.accessControl"},
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: utils.Ptr(true),
@@ -1660,7 +1660,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When source ranges don't match", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.accessControl"},
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: utils.Ptr(true),
