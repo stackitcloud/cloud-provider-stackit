@@ -16,3 +16,4 @@ quotas*
 hmac
 
 cloud-config.yaml
+__debug_*

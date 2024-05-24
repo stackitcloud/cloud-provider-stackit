@@ -10,6 +10,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 )
@@ -282,7 +283,9 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 // doesn't exist even if some part of it is still lying around.
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (l *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *corev1.Service) error {
+func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long but not complex.
+	ctx context.Context, clusterName string, service *corev1.Service,
+) error {
 	if getClassName(service) != classNameStackit {
 		switch l.nonStackitClassNameMode {
 		case nonStackitClassNameModeIgnore:
@@ -320,10 +323,18 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterNam
 	if credentialsRef != nil {
 		// The load balancer is updated to not contain the credentials reference anymore and hence enable their deletion
 		for i := range *lb.Listeners {
+			// Name is an output only field.
 			(*lb.Listeners)[i].Name = nil
 		}
+		externalAddress := lb.ExternalAddress
+		if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
+			// An ephemeral external addresses cannot be set during an update (although it is returned by the API).
+			externalAddress = nil
+		}
+		// We can't use lbSpecFromService here because we are lacking the list of nodes.
+		// Therefore, we create the update payload "by hand".
 		payload := &loadbalancer.UpdateLoadBalancerPayload{
-			ExternalAddress: lb.ExternalAddress,
+			ExternalAddress: externalAddress,
 			Listeners:       lb.Listeners,
 			Name:            &name,
 			Networks:        lb.Networks,

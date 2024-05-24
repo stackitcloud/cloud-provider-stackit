@@ -534,7 +534,7 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect DeleteLoadBalancer to have been called.
 		})
 
-		It("should delete observability credentials", func() {
+		It("should delete observability credentials of load balancer with static IP", func() {
 			svc := minimalLoadBalancerService()
 			name := lbInModeCreateAndUpdate.GetLoadBalancerName(context.Background(), "", svc)
 
@@ -546,11 +546,46 @@ var _ = Describe("LoadBalancer", func() {
 							PushUrl:        ptr.To("http://localhost"),
 						},
 					},
+					EphemeralAddress: ptr.To(false),
 				},
-				Listeners: &[]loadbalancer.Listener{},
+				ExternalAddress: ptr.To("8.8.4.4"),
+				Listeners:       &[]loadbalancer.Listener{},
 			}, nil)
 			gomock.InOrder(
-				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, hasNoObservabilityConfigured()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
+				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, gomock.All(
+					hasNoObservabilityConfigured(), externalAddressSet("8.8.4.4"),
+				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
+				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
+				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
+			)
+
+			err := lbInModeCreateAndUpdate.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should delete observability credentials of load balancer with ephemeral IP", func() {
+			svc := minimalLoadBalancerService()
+			// Ensure load balancer is ephemeral.
+			delete(svc.Annotations, externalIPAnnotation)
+			name := lbInModeCreateAndUpdate.GetLoadBalancerName(context.Background(), "", svc)
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
+				Options: &loadbalancer.LoadBalancerOptions{
+					Observability: &loadbalancer.LoadbalancerOptionObservability{
+						Metrics: &loadbalancer.LoadbalancerOptionMetrics{
+							CredentialsRef: ptr.To(sampleCredentialsRef),
+							PushUrl:        ptr.To("http://localhost"),
+						},
+					},
+					EphemeralAddress: ptr.To(true),
+				},
+				ExternalAddress: ptr.To("0.0.0.0 (ephemeral)"),
+				Listeners:       &[]loadbalancer.Listener{},
+			}, nil)
+			gomock.InOrder(
+				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, gomock.All(
+					hasNoObservabilityConfigured(), externalAddressNotSet(), ephemeralAddress(),
+				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
 			)
@@ -790,5 +825,29 @@ func hasNoObservabilityConfigured() gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		return lb.Options == nil || lb.Options.Observability == nil
+	})
+}
+
+// externalAddressSet ensures that the given UpdateLoadBalancerPayload has external address set to address.
+func externalAddressSet(address string) gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.ExternalAddress != nil && *lb.ExternalAddress == address
+	})
+}
+
+// externalAddressNotSet ensures that the given UpdateLoadBalancerPayload has no external address set.
+func externalAddressNotSet() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.ExternalAddress == nil
+	})
+}
+
+// ephemeralAddress ensures that the given UpdateLoadBalancerPayload has an ephemeral address enabled.
+func ephemeralAddress() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Options != nil && lb.Options.EphemeralAddress != nil && *lb.Options.EphemeralAddress
 	})
 }
