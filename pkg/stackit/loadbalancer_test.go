@@ -214,7 +214,7 @@ var _ = Describe("LoadBalancer", func() {
 			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
 
 			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
-			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second)))
 			// Expected CreateLoadBalancer to have been called.
 		})
 
@@ -234,7 +234,7 @@ var _ = Describe("LoadBalancer", func() {
 			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
 
 			_, err := lbInModeIgnoreAndObs.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
-			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second)))
 			// Expected CreateCredentials to have been called.
 			// Expected CreateLoadBalancer to have been called.
 		})
@@ -277,7 +277,7 @@ var _ = Describe("LoadBalancer", func() {
 			svc.Annotations["yawol.stackit.cloud/className"] = classNameYawol
 
 			_, err := lbInModeCreateAndUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
-			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second)))
 		})
 
 		It("ensure load balancer should trigger load balancer creation if LB doesn't exist for empty class name in mode \"create & update\"", func() {
@@ -288,7 +288,7 @@ var _ = Describe("LoadBalancer", func() {
 			delete(svc.Annotations, "yawol.stackit.cloud/className")
 
 			_, err := lbInModeCreateAndUpdate.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
-			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready", 10*time.Second)))
+			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second)))
 		})
 
 		It("should enable the project if creating load balancer returns not found", func() {

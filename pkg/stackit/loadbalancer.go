@@ -176,7 +176,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		return nil, fmt.Errorf("the load balancer is in an error state")
 	}
 	if *lb.Status != lbapi.LBStatusReady {
-		return nil, api.NewRetryError("waiting for load balancer to become ready", retryDuration)
+		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
 	return loadBalancerStatus(lb), nil
@@ -226,7 +226,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	}
 
 	if lb.Status == nil || *lb.Status != lbapi.LBStatusReady {
-		return nil, api.NewRetryError("waiting for load balancer to become ready", retryDuration)
+		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
 	return loadBalancerStatus(lb), nil
