@@ -8,7 +8,6 @@ aliases:
   - nschad
   - rgroemmer
   - robinschneider
-  - SimonKienzler
   - timebertt
   - duciwuci
   ske-ci-infra-approvers:
@@ -20,5 +19,4 @@ aliases:
   - nschad
   - rgroemmer
   - robinschneider
-  - SimonKienzler
   - timebertt
