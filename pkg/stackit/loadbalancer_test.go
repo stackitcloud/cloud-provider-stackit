@@ -170,6 +170,85 @@ var _ = Describe("LoadBalancer", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(exists).To(BeFalse())
 		})
+
+		convertToLB := func(spec *loadbalancer.CreateLoadBalancerPayload) *loadbalancer.LoadBalancer {
+			return &loadbalancer.LoadBalancer{
+				Errors:          &[]loadbalancer.LoadBalancerError{},
+				ExternalAddress: spec.ExternalAddress,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				Status:          ptr.To(lbapi.LBStatusReady),
+				TargetPools:     spec.TargetPools,
+				Version:         ptr.To("current-version"),
+			}
+		}
+
+		DescribeTable("should report status for external LB",
+			func(hasExternalAddress bool) {
+				svc := minimalLoadBalancerService()
+				spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
+				Expect(err).NotTo(HaveOccurred())
+				myLb := convertToLB(spec)
+				if !hasExternalAddress {
+					// LB has no external address yet
+					myLb.ExternalAddress = nil
+				}
+				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+
+				status, found, err := lbInModeCreateAndUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+				if hasExternalAddress {
+					Expect(status.Ingress).To(Equal([]corev1.LoadBalancerIngress{
+						{IP: *spec.ExternalAddress},
+					}))
+				} else {
+					Expect(status.Ingress).To(BeNil())
+				}
+			},
+			Entry("when externalAddress is set", true),
+			Entry("when externalAddress is not set", false),
+		)
+
+		DescribeTable("should report status for internal LB",
+			func(hasPrivateAddress bool) {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: "00000000-0000-0000-0000-000000000000",
+						Annotations: map[string]string{
+							"lb.stackit.cloud/internal-lb":  "true",
+							"yawol.stackit.cloud/className": classNameStackit,
+						},
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeLoadBalancer,
+					},
+				}
+				spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
+				Expect(err).NotTo(HaveOccurred())
+				myLb := convertToLB(spec)
+				Expect(myLb.ExternalAddress).To(BeNil())
+				if hasPrivateAddress {
+					myLb.PrivateAddress = ptr.To("10.20.30.40")
+				}
+				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+
+				status, found, err := lbInModeCreateAndUpdate.GetLoadBalancer(context.Background(), clusterName, svc)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeTrue())
+				if hasPrivateAddress {
+					Expect(status.Ingress).To(Equal([]corev1.LoadBalancerIngress{
+						{IP: *myLb.PrivateAddress},
+					}))
+				} else {
+					Expect(status.Ingress).To(BeNil())
+				}
+			},
+			Entry("when PrivateAddress is set", true),
+			Entry("when PrivateAddress is not set", false),
+		)
 	})
 
 	Describe("EnsureLoadBalancer", func() {

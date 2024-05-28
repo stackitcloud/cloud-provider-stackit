@@ -419,18 +419,18 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 }
 
 func loadBalancerStatus(lb *loadbalancer.LoadBalancer) *corev1.LoadBalancerStatus {
-	var ip string
+	var ip *string
 	if lb.Options != nil && lb.Options.PrivateNetworkOnly != nil && *lb.Options.PrivateNetworkOnly {
-		ip = *lb.PrivateAddress
+		ip = lb.PrivateAddress
 	} else {
-		ip = *lb.ExternalAddress
+		ip = lb.ExternalAddress
+	}
+	var ingress []corev1.LoadBalancerIngress
+	if ip != nil {
+		ingress = []corev1.LoadBalancerIngress{{IP: *ip}}
 	}
 	return &corev1.LoadBalancerStatus{
-		Ingress: []corev1.LoadBalancerIngress{
-			{
-				IP: ip,
-			},
-		},
+		Ingress: ingress,
 	}
 }
 
