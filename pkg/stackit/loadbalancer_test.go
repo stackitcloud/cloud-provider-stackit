@@ -299,6 +299,9 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should create a load balancer with observability configured", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			// TODO: match payload
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).
 				DoAndReturn(func(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
@@ -528,6 +531,9 @@ var _ = Describe("LoadBalancer", func() {
 	Describe("EnsureLoadBalancerDeleted", func() {
 		It("should trigger load balancer deletion", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
 			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
@@ -591,6 +597,9 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should trigger load balancer deletion for non-STACKIT class name mode \"create & update\"", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
 			svc := minimalLoadBalancerService()
@@ -603,6 +612,9 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should trigger load balancer deletion for empty class name in mode \"create & update\"", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
 			svc := minimalLoadBalancerService()
@@ -635,6 +647,9 @@ var _ = Describe("LoadBalancer", func() {
 					hasNoObservabilityConfigured(), externalAddressSet("8.8.4.4"),
 				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
+				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+					Credentials: &[]loadbalancer.CredentialsResponse{},
+				}, nil),
 				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
 			)
 
@@ -666,6 +681,9 @@ var _ = Describe("LoadBalancer", func() {
 					hasNoObservabilityConfigured(), externalAddressNotSet(), ephemeralAddress(),
 				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
+				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+					Credentials: &[]loadbalancer.CredentialsResponse{},
+				}, nil),
 				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
 			)
 
@@ -839,6 +857,9 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should create credentials if they do not exist", func() {
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.CreateCredentialsResponse{
 				Credential: &loadbalancer.CredentialsResponse{
 					CredentialsRef: ptr.To(sampleCredentialsRef),
@@ -858,7 +879,10 @@ var _ = Describe("LoadBalancer", func() {
 			}))
 		})
 
-		It("should try to create credentials if they do not exist", func() {
+		It("should return error if creating new credentials fails", func() {
+			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+				Credentials: &[]loadbalancer.CredentialsResponse{},
+			}, nil)
 			errTest := errors.New("delete credentials test error")
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, errTest)
 			credentialRef, err := lbInModeIgnoreAndObs.reconcileObservabilityCredentials(context.Background(), &loadbalancer.LoadBalancer{
@@ -866,6 +890,41 @@ var _ = Describe("LoadBalancer", func() {
 			}, sampleLBName)
 			Expect(err).To(MatchError(errTest))
 			Expect(credentialRef).To(BeNil())
+		})
+
+	})
+
+	Describe("cleanUpCredentials", func() {
+		It("should delete matching and only matching observability credentials", func() {
+			gomock.InOrder(
+				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
+					Credentials: &[]loadbalancer.CredentialsResponse{
+						{
+							CredentialsRef: ptr.To("matching-1"),
+							DisplayName:    ptr.To("my-loadbalancer"),
+							Username:       ptr.To("luke"),
+						},
+						{
+							CredentialsRef: ptr.To("display-name-not-match"),
+							DisplayName:    ptr.To("other-loadbalancer"),
+							Username:       ptr.To("leia"),
+						},
+						{
+							CredentialsRef: ptr.To("matching-2"),
+							DisplayName:    ptr.To("my-loadbalancer"),
+							Username:       ptr.To("chewie"),
+						},
+						{
+							CredentialsRef: ptr.To("no-display-name"),
+							DisplayName:    nil,
+							Username:       ptr.To("han"),
+						},
+					},
+				}, nil).MinTimes(1),
+				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, "matching-1").MinTimes(1),
+				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, "matching-2").MinTimes(1),
+			)
+			Expect(lbInModeIgnoreAndObs.cleanUpCredentials(context.Background(), "my-loadbalancer")).To(Succeed())
 		})
 
 	})

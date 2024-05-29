@@ -154,7 +154,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %q", immutableChanged.field)
 	}
 	if !fulfills {
-		credentialsRef := getMetricsRemoteWriteRef(lb)
+		credentialsRefBeforeUpdate := getMetricsRemoteWriteRef(lb)
 		// We create the update payload from a new spec.
 		// However, we need to copy over the version because it is required on every update.
 		spec.Version = lb.Version
@@ -163,11 +163,14 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		if err != nil {
 			return nil, fmt.Errorf("failed to update load balancer: %w", err)
 		}
-		// clean up old metricsRemoteWrite credentials
-		if l.metricsRemoteWrite == nil && credentialsRef != nil {
-			err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRef)
+		// Clean up observability credentials if Argus extension is enabled.
+		// If the update to the load balancer succeeds but an error is returned (e.g. timeout) we miss our chance to clean up the credentials.
+		// At the latest, they will be removed when the service is deleted or Argus is enabled again.
+		// This is preferred over listing all credentials in the project on each reconciliation.
+		if l.metricsRemoteWrite == nil && credentialsRefBeforeUpdate != nil {
+			err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRefBeforeUpdate)
 			if err != nil {
-				return nil, fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRef, err)
+				return nil, fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRefBeforeUpdate, err)
 			}
 		}
 	}
@@ -321,7 +324,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 
 	credentialsRef := getMetricsRemoteWriteRef(lb)
 	if credentialsRef != nil {
-		// The load balancer is updated to not contain the credentials reference anymore and hence enable their deletion
+		// The load balancer is updated to remove the credentials reference and hence enable their deletion.
 		for i := range *lb.Listeners {
 			// Name is an output only field.
 			(*lb.Listeners)[i].Name = nil
@@ -356,6 +359,17 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 		}
 	}
 
+	// Delete any observability credentials that are associated with this load balancer but are orphaned.
+	// If the load balancer was never created then EnsureLoadBalancerDeleted is never called,
+	// in which case we miss the chance to clean up.
+	// This is preferred over listing observability credentials in GetLoadBalancer.
+	// We perform this list after removing the credentials that are referenced by the load balancer,
+	// because they cannot be deleted until they are unreferenced.
+	err = l.cleanUpCredentials(ctx, name)
+	if err != nil {
+		return fmt.Errorf("failed to clean up orphaned observability credentials: %w", err)
+	}
+
 	err = l.client.DeleteLoadBalancer(ctx, l.projectID, name)
 	// Deleting a load balancer doesn't return an error if the load balancer cannot be found.
 	if err != nil {
@@ -381,8 +395,13 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 	if lb != nil && lb.Options != nil && lb.Options.Observability != nil && lb.Options.Observability.Metrics != nil {
 		credentialsRef = lb.Options.Observability.Metrics.CredentialsRef
 	}
-
 	if credentialsRef == nil {
+		// If previous reconciliation left credentials behind that are not referenced, we delete them and start fresh.
+		err := l.cleanUpCredentials(ctx, lbName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clean up orphaned observability credentials: %w", err)
+		}
+
 		// create
 		payload := loadbalancer.CreateCredentialsPayload{
 			DisplayName: &lbName,
@@ -416,6 +435,27 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 			PushUrl:        &l.metricsRemoteWrite.endpoint,
 		},
 	}, nil
+}
+
+// cleanUpCredentials removes all credentials from then API whose displayName matches name.
+// This call is expensive.
+// Make sure that no credentials are referenced, otherwise the deletion fails.
+func (l *LoadBalancer) cleanUpCredentials(ctx context.Context, name string) error {
+	res, err := l.client.ListCredentials(ctx, l.projectID)
+	if err != nil {
+		return fmt.Errorf("failed to list credentials: %w", err)
+	}
+	if res.Credentials != nil {
+		for _, credentials := range *res.Credentials {
+			if credentials.DisplayName != nil && *credentials.DisplayName == name {
+				err = l.client.DeleteCredentials(ctx, l.projectID, *credentials.CredentialsRef)
+				if err != nil {
+					return fmt.Errorf("failed to delete credentials %q: %w", *credentials.CredentialsRef, err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func loadBalancerStatus(lb *loadbalancer.LoadBalancer) *corev1.LoadBalancerStatus {
