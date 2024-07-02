@@ -96,10 +96,13 @@ func (cl client) EnableService(ctx context.Context, projectID string) error {
 
 func (cl client) GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error) {
 	res, err := cl.client.GetServiceStatusExecute(ctx, projectID)
+	if err != nil {
+		return "", err
+	}
 	if res.Status == nil {
 		return "", errors.New("server response is missing project status")
 	}
-	return ProjectStatus(*res.Status), err
+	return ProjectStatus(*res.Status), nil
 }
 
 func (cl client) CreateCredentials(
