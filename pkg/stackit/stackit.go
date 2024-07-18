@@ -152,7 +152,7 @@ func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 }
 
 //nolint:golint,all // should be implemented
-func (stackit *Stackit) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (stackit *Stackit) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, _ <-chan struct{}) {
 }
 
 func (stackit *Stackit) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

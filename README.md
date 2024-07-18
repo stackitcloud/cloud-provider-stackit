@@ -28,8 +28,8 @@ TODOs:
 
 ```yaml
 # cloud-config.yaml
-projectId: 
-networkId: 
+projectId:
+networkId:
 nonStackitClassNames: # If not set, defaults to "updateAndCreate" (see: Non-STACKIT class names).
 loadBalancerApi:
   # If not set, defaults to production.
@@ -54,7 +54,7 @@ In order to avoid collisions with other load balancer implementations, the follo
 annotations:
     yawol.stackit.cloud/className: stackit
 ```
-This annotation is immutable. It must not be changed on existing load balancers.  
+This annotation is immutable. It must not be changed on existing load balancers.
 The controller will always manage all services whose class name annotation is `stackit`.
 
 > :warning: The CCM adds a finalizer to the service regardless of whether it has a matching class name annotation or not.
@@ -76,20 +76,20 @@ If no `nonStackitClassNames` mode is set in the config file, the mode will autom
 - `externalTrafficPolicy=local` is not supported.
 - `sessionAffinity` is not supported.
 - Health checks are not implemented. If a node becomes unhealthy then it is removed from the targets via the CCM.
-- The load balancer service currently adds security rules to each target. 
+- The load balancer service currently adds security rules to each target.
   In the case of the CCM the targets are the Kubernetes nodes.
   Experiments have shown that SKE will leave the assignment untouched, even during a maintenance.
 
 
 ### Load balancer service enablement
 
-To create load balancers, the STACKIT load balancer service must be enabled. 
+To create load balancers, the STACKIT load balancer service must be enabled.
 The cloud controller manager automatically enables the service when the first load balancer is created.
 The cloud controller manager does not disable the services when it no longer needs it, because other load balancers might have been created in the meantime.
 
 ### Configuring the load balancer
 
-The cloud controller manager provisions a load balancer based on the specification of the service. 
+The cloud controller manager provisions a load balancer based on the specification of the service.
 STACKIT-specific options can be configured via annotations.
 Values for boolean annotations are parsed according to [ParseBool](https://pkg.go.dev/strconv#ParseBool).
 
@@ -99,8 +99,9 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/external-address | *none* | References an OpenStack floating IP that should be used by the load balancer. If set it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. If the annotation is set after the creation it must match the ephemeral IP. This will promote the ephemeral IP to a static IP. |
 | lb.stackit.cloud/tcp-proxy-protocol | "false" | Enables the TCP proxy protocol for TCP ports. |
 | lb.stackit.cloud/tcp-proxy-protocol-ports-filter | *none* | Defines which port use the TCP proxy protocol. Only takes effect if TCP proxy protocol is enabled. If the annotation is not present then all TCP ports use the TCP proxy protocol. Has no effect on UDP ports. |
-| lb.stackit.cloud/tcp-idle-timeout | Defines the idle timeout for all TCP ports (including ports with the PROXY protocol). If unset, the default is 60 minutes. |
-| lb.stackit.cloud/udp-idle-timeout | Defines the idle timeout for all UDP ports. If unset, the default is 2 minutes. |
+| lb.stackit.cloud/tcp-idle-timeout | 60 minutes | Defines the idle timeout for all TCP ports (including ports with the PROXY protocol). |
+| lb.stackit.cloud/udp-idle-timeout | 2 minutes | Defines the idle timeout for all UDP ports. |
+| lb.stackit.cloud/service-plan-id | p10 | Defines the [plan ID](https://docs.api.eu01.stackit.cloud/documentation/load-balancer/version/v1#tag/Load-Balancer/operation/APIService_CreateLoadBalancer) when creating a load balancer. Allowed values are: p10, p50, p250 and p750 |
 
 
 #### Supported yawol annotations
@@ -121,7 +122,7 @@ A load balancer contain both annotations as long as their values are compatible.
 
 #### Unsopported yawol annotations
 
-These annotations are no longer supported. 
+These annotations are no longer supported.
 If any of those annotations are present then the load balancer provision will fail.
 
 | Name | Notes |

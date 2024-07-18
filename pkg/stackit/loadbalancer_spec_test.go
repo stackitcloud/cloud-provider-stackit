@@ -762,6 +762,47 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 	})
 
+	Context("Custom service plan", func() {
+		It("should create an LB with a custom plan when service-plan-id annotation is set to a valid value", func() {
+			spec, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/service-plan-id": "p250",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.PlanId).To(HaveValue(Equal("p250")))
+		})
+		It("should not create an LB with a custom plan when service-plan-id annotation is set to an invalid value", func() {
+			_, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/service-plan-id": "p35",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 	Context("UDP idle timeout", func() {
 		It("should set timeout on all and only on UDP listeners", func() {
 			spec, err := lbSpecFromService(&corev1.Service{
@@ -1067,6 +1108,22 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			ExternalAddress: nil,
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
+		},
+	}),
+	Entry("When specified and actual plan ID don't match", &compareLBwithSpecTest{
+		wantFulfilled:         false,
+		wantImmutabledChanged: nil,
+		lb: &loadbalancer.LoadBalancer{
+			PlanId: loadbalancer.PtrString("p10"),
+			Options: &loadbalancer.LoadBalancerOptions{
+				EphemeralAddress: utils.Ptr(true),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			PlanId: loadbalancer.PtrString("p250"),
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: utils.Ptr(true),
 			},

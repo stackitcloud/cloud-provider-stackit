@@ -36,6 +36,8 @@ const (
 	tcpIdleTimeoutAnnotation = "lb.stackit.cloud/tcp-idle-timeout"
 	// udpIdleTimeoutAnnotation defines the idle timeout for all UDP ports.
 	udpIdleTimeoutAnnotation = "lb.stackit.cloud/udp-idle-timeout"
+	// servicePlanAnnotation defines the service plan to be used when creating an LB
+	servicePlanAnnotation = "lb.stackit.cloud/service-plan-id"
 )
 
 const (
@@ -48,6 +50,11 @@ const (
 	// For backwards compatibility this is the same as in SKE yawol.
 	defaultUDPIdleTimeout = 2 * time.Minute
 )
+
+var availablePlanIDs = []string{"p10", "p50", "p250", "p750"}
+
+// the default plan ID when no plan ID annotation is found
+var defaultServicePlan = "p10"
 
 // proxyProtocolEnableForPort determines whether portNumber should use the TCP proxy protocol (instead of TCP).
 func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPortFilter []uint16, portNumber int32) bool {
@@ -63,6 +70,20 @@ func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPo
 		return false
 	}
 	return true
+}
+
+// getPlanId returns the plan ID from the service annotations
+// if no plan id annotation is found then default p10 plan is used
+func getPlanID(service *corev1.Service) (*string, error) {
+	if planID, found := service.Annotations[servicePlanAnnotation]; found {
+		for _, availablePlan := range availablePlanIDs {
+			if planID == availablePlan {
+				return &planID, nil
+			}
+		}
+		return nil, fmt.Errorf("unsupported plan ID value %q, supported values are %v", planID, availablePlanIDs)
+	}
+	return &defaultServicePlan, nil
 }
 
 // lbSpecFromService returns a load balancer specification in the form of a create payload matching the specification of the service, nodes and network.
@@ -105,6 +126,13 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	if yawolInternal != nil && internal != nil && *yawolInternal == *internal {
 		return nil, fmt.Errorf("incompatible values for annotations %s and %s", yawolInternalLBAnnotation, internalLBAnnotation)
 	}
+
+	// process service-plan-id annotation
+	planID, err := getPlanID(service)
+	if err != nil {
+		return nil, fmt.Errorf("getPlanId: %w", err)
+	}
+	lb.PlanId = planID
 
 	// Parse external from annotations.
 	// TODO: Split into separate function.
@@ -491,6 +519,13 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 				fulfills = false
 			}
 		}
+	}
+
+	if !cmp.PtrValEqual(lb.PlanId, spec.PlanId) {
+		// In this comparison, an empty service plan is not equal to a default service plan.
+		// The API might return a default value if no value is specified.
+		// To avoid problems in the change detection, the CCM should also explicitly set a value.
+		fulfills = false
 	}
 
 	if !cmp.SliceEqual(

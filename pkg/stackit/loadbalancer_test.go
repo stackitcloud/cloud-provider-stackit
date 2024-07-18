@@ -341,6 +341,7 @@ var _ = Describe("LoadBalancer", func() {
 				Status:          ptr.To(lbapi.LBStatusReady),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
+				PlanId:          ptr.To("p10"),
 			}
 
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
