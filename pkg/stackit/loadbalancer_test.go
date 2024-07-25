@@ -188,7 +188,7 @@ var _ = Describe("LoadBalancer", func() {
 		DescribeTable("should report status for external LB",
 			func(hasExternalAddress bool) {
 				svc := minimalLoadBalancerService()
-				spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
 				Expect(err).NotTo(HaveOccurred())
 				myLb := convertToLB(spec)
 				if !hasExternalAddress {
@@ -226,7 +226,7 @@ var _ = Describe("LoadBalancer", func() {
 						Type: corev1.ServiceTypeLoadBalancer,
 					},
 				}
-				spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
 				Expect(err).NotTo(HaveOccurred())
 				myLb := convertToLB(spec)
 				Expect(myLb.ExternalAddress).To(BeNil())
@@ -323,7 +323,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should update observability credential if credentials are specified in load balancer", func() {
 			svc := minimalLoadBalancerService()
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 					CredentialsRef: utils.Ptr(sampleCredentialsRef),
 					PushUrl:        &lbInModeIgnoreAndObs.metricsRemoteWrite.endpoint,
@@ -396,7 +396,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should update the load balancer if the service changed", func() {
 			svc := minimalLoadBalancerService()
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -454,7 +454,7 @@ var _ = Describe("LoadBalancer", func() {
 				Port:     80,
 				NodePort: 1234,
 			})
-			spec, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID, nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -485,7 +485,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should delete observability credentials and delete reference from load balancer if controller is not configured (monitoring extension disabled)", func() {
 			svc := minimalLoadBalancerService()
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 					CredentialsRef: ptr.To(sampleCredentialsRef),
 					PushUrl:        ptr.To("test-endpoint"),
@@ -892,7 +892,6 @@ var _ = Describe("LoadBalancer", func() {
 			Expect(err).To(MatchError(errTest))
 			Expect(credentialRef).To(BeNil())
 		})
-
 	})
 
 	Describe("cleanUpCredentials", func() {
@@ -927,7 +926,6 @@ var _ = Describe("LoadBalancer", func() {
 			)
 			Expect(lbInModeIgnoreAndObs.cleanUpCredentials(context.Background(), "my-loadbalancer")).To(Succeed())
 		})
-
 	})
 })
 

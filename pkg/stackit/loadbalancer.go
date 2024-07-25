@@ -7,6 +7,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 
@@ -25,7 +26,15 @@ const (
 	nonStackitClassNameModeIgnore          = "ignore"
 	nonStackitClassNameModeUpdate          = "update"
 	nonStackitClassNameModeUpdateAndCreate = "updateAndCreate"
+	// EventReasonSelectedPlanID is a reason for sending an event when plan ID is selected via a flavor
+	EventReasonSelectedPlanID = "SelectedPlanID"
 )
+
+type Event struct {
+	Type    string
+	Message string
+	Reason  string
+}
 
 type MetricsRemoteWrite struct {
 	endpoint string
@@ -36,6 +45,7 @@ type MetricsRemoteWrite struct {
 // LoadBalancer is used for creating and maintaining load balancers.
 type LoadBalancer struct {
 	client                  lbapi.Client
+	recorder                record.EventRecorder // set in Stackit.Initialize
 	projectID               string
 	networkID               string
 	nonStackitClassNameMode string
@@ -46,6 +56,7 @@ type LoadBalancer struct {
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
 func NewLoadBalancer(client lbapi.Client, projectID, networkID, nonStackitClassNameMode string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) {
+	// LoadBalancer.recorder is set in Stackit.Initialize
 	return &LoadBalancer{
 		client:                  client,
 		projectID:               projectID,
@@ -60,7 +71,8 @@ func NewLoadBalancer(client lbapi.Client, projectID, networkID, nonStackitClassN
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager.
 func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service) (
-	status *corev1.LoadBalancerStatus, exists bool, err error) {
+	status *corev1.LoadBalancerStatus, exists bool, err error,
+) {
 	if getClassName(service) != classNameStackit && l.nonStackitClassNameMode == nonStackitClassNameModeIgnore {
 		// In "ignore" mode non-STACKIT load balancers are implemented by another controller.
 		// If the load balancer is implemented elsewhere we report it as not found, so that the finalizer can be removed.
@@ -144,9 +156,13 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, err := lbSpecFromService(service, nodes, l.networkID, observabilityOptions)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, observabilityOptions)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
+	}
+
+	for _, event := range events {
+		l.recorder.Event(service, event.Type, event.Reason, event.Message)
 	}
 
 	fulfills, immutableChanged := compareLBwithSpec(lb, spec)
@@ -201,9 +217,12 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, err := lbSpecFromService(service, nodes, l.networkID, metricsRemoteWrite)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, metricsRemoteWrite)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
+	}
+	for _, event := range events {
+		l.recorder.Event(service, event.Type, event.Reason, event.Message)
 	}
 	spec.Name = &name
 
@@ -263,9 +282,13 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 	}
 
 	// only TargetPools are used from spec
-	spec, err := lbSpecFromService(service, nodes, l.networkID, nil)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, nil)
 	if err != nil {
 		return fmt.Errorf("invalid service: %w", err)
+	}
+
+	for _, event := range events {
+		l.recorder.Event(service, event.Type, event.Reason, event.Message)
 	}
 
 	for _, pool := range *spec.TargetPools {
@@ -349,6 +372,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 			},
 			TargetPools: lb.TargetPools,
 			Version:     lb.Version,
+			PlanId:      lb.PlanId,
 		}
 		_, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, payload)
 		if err != nil {

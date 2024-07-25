@@ -52,7 +52,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("internal load balancer", func() {
 		It("should return internal load balancer spec", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb": "true",
@@ -68,7 +68,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should return internal load balancer spec with yawol annotation", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"yawol.stackit.cloud/internalLB": "true",
@@ -84,7 +84,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error if value for internal network doesn't parse as bool", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb": "maybe",
@@ -95,7 +95,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error if values for internal network are incompatible", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":   "true",
@@ -115,7 +115,7 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				},
 			}
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Options.PrivateNetworkOnly).To(PointTo(BeTrue()))
 			Expect(spec.ExternalAddress).To(BeNil())
@@ -124,7 +124,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("external IP", func() {
 		It("should take external IP from annotation", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -136,7 +136,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should take external IP from yawol annotation", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"yawol.stackit.cloud/existingFloatingIP": externalAddress,
@@ -148,7 +148,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on incompatible values for external IP", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address":      "123.124.88.99",
@@ -160,7 +160,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error if external IP is not a valid IP", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": "I'm not an IP",
@@ -171,7 +171,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error if external IP is an IPv6 address", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": "2001:db8::",
@@ -185,7 +185,7 @@ var _ = Describe("lbSpecFromService", func() {
 	Context("Metric metricsRemoteWrite", func() {
 		It("should set metrics in load balancer spec", func() {
 			pushURL := "test-endpoint"
-			spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", &loadbalancer.LoadbalancerOptionObservability{
+			spec, _, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 					CredentialsRef: ptr.To(sampleCredentialsRef),
 					PushUrl:        &pushURL,
@@ -207,7 +207,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("TCP proxy protocol ", func() {
 		It("should set all TCP ports to TCP protocol protocol", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":        "true",
@@ -239,7 +239,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should only set TCP proxy protocol if covered by filter", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":                     "true",
@@ -274,7 +274,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should not set TCP proxy protocol on empty filter", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":                     "true",
@@ -299,7 +299,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on incompatible values for TCP proxy", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":         "true",
@@ -315,7 +315,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on out range port", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":                     "true",
@@ -331,7 +331,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on incompatible values for TCP proxy port filter", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":                     "true",
@@ -350,7 +350,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("ports", func() {
 		It("should create one listener per port", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -386,7 +386,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on invalid port protocol", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -422,7 +422,7 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				},
 			}
-			spec, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, "my-network", nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-tcp-80"))))
 			Expect(spec).To(haveConsistentTargetPool())
@@ -431,7 +431,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("source IP ranges", func() {
 		It("should take source IP ranges from spec with precedence over yawol annotation", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address":            externalAddress,
@@ -457,7 +457,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should take source IP ranges from annotation", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address":            externalAddress,
@@ -478,7 +478,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("target pools", func() {
 		It("should set targets on all targets pools", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -505,7 +505,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("node without internal IP", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -543,7 +543,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	DescribeTable("unsupported annotations",
 		func(annotation string) {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -554,7 +554,6 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(err).To(MatchError(ContainSubstring("unsupported annotation")))
 		},
 		Entry("yawol.stackit.cloud/imageId", "yawol.stackit.cloud/imageId"),
-		Entry("yawol.stackit.cloud/flavorId", "yawol.stackit.cloud/flavorId"),
 		Entry("yawol.stackit.cloud/defaultNetworkID", "yawol.stackit.cloud/defaultNetworkID"),
 		Entry("yawol.stackit.cloud/skipCloudControllerDefaultNetworkID", "yawol.stackit.cloud/skipCloudControllerDefaultNetworkID"),
 		Entry("yawol.stackit.cloud/floatingNetworkID", "yawol.stackit.cloud/floatingNetworkID"),
@@ -570,7 +569,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("TCP idle timeout", func() {
 		It("should set timeout on all TCP and TCProxy listeners", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":                     "true",
@@ -633,7 +632,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should set timeout to 60 minutes if no annotation is specified", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb": "true",
@@ -661,7 +660,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -690,7 +689,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on non-compatible timeouts", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -712,7 +711,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on invalid TCP idle timeout format", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":      "true",
@@ -733,7 +732,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -764,7 +763,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	Context("Custom service plan", func() {
 		It("should create an LB with a custom plan when service-plan-id annotation is set to a valid value", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/service-plan-id": "p250",
@@ -784,7 +783,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec.PlanId).To(HaveValue(Equal("p250")))
 		})
 		It("should not create an LB with a custom plan when service-plan-id annotation is set to an invalid value", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/service-plan-id": "p35",
@@ -802,10 +801,81 @@ var _ = Describe("lbSpecFromService", func() {
 			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
+		//nolint: dupl // the flavor ID is different
+		It("should create an LB with a custom plan when flavor ID annotation is set to a valid value", func() {
+			spec, events, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"yawol.stackit.cloud/flavorId": "72f11e14-2825-471d-a237-b1afa775fdad", // this flavor corresponds to p250 plan
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(events).To(HaveLen(1))
+			//nolint: lll // it needs to match the message in loadbalancer_spec.go
+			Expect(events[0].Message).To(Equal(`Flavors are deprecated in favor of service plans. Picking load balancer service plan p250 for flavor 72f11e14-2825-471d-a237-b1afa775fdad. Use the annotation lb.stackit.cloud/service-plan-id to explicitly choose a service plan.`))
+			Expect(events[0].Type).To(Equal(corev1.EventTypeWarning))
+			Expect(events[0].Reason).To(Equal(EventReasonSelectedPlanID))
+			Expect(spec.PlanId).To(HaveValue(Equal("p250")))
+		})
+		//nolint: dupl // the flavor ID is different
+		It("should create an LB with a custom plan when flavor ID annotation is set to a valid value but doesn't match a service plan ID", func() {
+			spec, events, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"yawol.stackit.cloud/flavorId": "aa603f7b-4214-486c-81ce-369535cef8ed", // this flavor corresponds to p50 plan
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(events).To(HaveLen(1))
+			//nolint: lll // it needs to match the message in loadbalancer_spec.go
+			Expect(events[0].Message).To(Equal(`Flavors are deprecated in favor of service plans. Picking load balancer service plan p50 for flavor aa603f7b-4214-486c-81ce-369535cef8ed. Use the annotation lb.stackit.cloud/service-plan-id to explicitly choose a service plan.`))
+			Expect(events[0].Type).To(Equal(corev1.EventTypeWarning))
+			Expect(events[0].Reason).To(Equal(EventReasonSelectedPlanID))
+			Expect(spec.PlanId).To(HaveValue(Equal("p50")))
+		})
+		It("should not create an LB with a custom plan when flavorId annotation is set to an invalid value", func() {
+			_, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"yawol.stackit.cloud/flavorId": "72f11e14-2825-471d-a237-b1afa775fdaa",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).To(HaveOccurred())
+		})
 	})
 	Context("UDP idle timeout", func() {
 		It("should set timeout on all and only on UDP listeners", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":      "true",
@@ -854,7 +924,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should set timeout to 2 minutes if no annotation is specified", func() {
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb": "true",
@@ -882,7 +952,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -911,7 +981,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on non-compatible timeouts", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -933,7 +1003,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should error on invalid timeout format", func() {
-			_, err := lbSpecFromService(&corev1.Service{
+			_, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":      "true",
@@ -954,7 +1024,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 
 		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
-			spec, err := lbSpecFromService(&corev1.Service{
+			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/internal-lb":       "true",
@@ -984,7 +1054,7 @@ var _ = Describe("lbSpecFromService", func() {
 	})
 
 	It("should attach the load balancer to the specified network", func() {
-		spec, err := lbSpecFromService(&corev1.Service{
+		spec, _, err := lbSpecFromService(&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					"lb.stackit.cloud/internal-lb": "true",
@@ -999,7 +1069,7 @@ var _ = Describe("lbSpecFromService", func() {
 	})
 
 	It("should configure a public service without existing IP as ephemeral", func() {
-		spec, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", nil)
+		spec, _, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, "my-network", nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*spec.Options.EphemeralAddress).To(BeTrue())
 	})

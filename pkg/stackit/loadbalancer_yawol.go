@@ -31,14 +31,15 @@ const (
 	// yawolUDPIdleTimeoutAnnotation defines the idle timeout for all UDP ports.
 	// Deprecated: Use lb.stackit.cloud/udp-idle-timeout instead.
 	yawolUDPIdleTimeoutAnnotation = "yawol.stackit.cloud/udpIdleTimeout"
+	// yawolFlavorID is used to select a plan ID that matches the selected flavor.
+	// Deprecated: Use lb.stackit.cloud/service-plan-id instead.
+	yawolFlavorIDAnnotation = "yawol.stackit.cloud/flavorId"
 )
 
 // Unsupported yawol annotations.
 const (
 	// yawolImageIDAnnotation is not supported.
 	yawolImageIDAnnotation = "yawol.stackit.cloud/imageId"
-	// yawolFlavorID is not supported.
-	yawolFlavorIDAnnotation = "yawol.stackit.cloud/flavorId"
 	// yawolDefaultNetworkIDAnnotation is not supported.
 	// The load balancer is always only connected to the SKE network.
 	yawolDefaultNetworkIDAnnotation = "yawol.stackit.cloud/defaultNetworkID"
@@ -72,7 +73,6 @@ const (
 
 var yawolUnsupportedAnnotations = []string{
 	yawolImageIDAnnotation,
-	yawolFlavorIDAnnotation,
 	yawolDefaultNetworkIDAnnotation,
 	yawolSkipDefaultNetworkIDAnnotation,
 	yawolFloatingNetworkIDAnnotation,

@@ -10,6 +10,10 @@ import (
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	yaml "gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 )
@@ -151,8 +155,13 @@ func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 	return &stackit, nil
 }
 
-//nolint:golint,all // should be implemented
 func (stackit *Stackit) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, _ <-chan struct{}) {
+	// create an EventRecorder
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientBuilder.ClientOrDie("stackit-cloud-controller-manager").CoreV1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "stackit-cloud-controller-manager"})
+	stackit.loadBalancer.recorder = recorder
 }
 
 func (stackit *Stackit) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
