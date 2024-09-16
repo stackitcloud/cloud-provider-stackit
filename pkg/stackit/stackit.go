@@ -26,6 +26,9 @@ const (
 	stackitRemoteWriteEndpointKey = "STACKIT_REMOTEWRITE_ENDPOINT"
 	stackitRemoteWriteUserKey     = "STACKIT_REMOTEWRITE_USER"
 	stackitRemoteWritePasswordKey = "STACKIT_REMOTEWRITE_PASSWORD"
+
+	// stackitLoadBalancerEmergencyAPIToken ENV to use a static JWT token, used for emergency access
+	stackitLoadBalancerEmergencyAPIToken = "STACKIT_LB_API_EMERGENCY_TOKEN" //nolint:gosec // this is just the env var name
 )
 
 type Stackit struct {
@@ -101,6 +104,7 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 	if config.LoadBalancerAPI.URL == "" {
 		config.LoadBalancerAPI.URL = "https://load-balancer.api.eu01.stackit.cloud"
 	}
+
 	return config, nil
 }
 
@@ -133,9 +137,19 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 
 // NewStackit creates a new instance of the stackit struct from a config struct
 func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
-	innerClient, err := loadbalancer.NewAPIClient(
+	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
-	)
+	}
+
+	// The token is only provided by the 'gardener-extension-provider-stackit' in case of emergency access.
+	// In those cases, the [cfg.LoadBalancerAPI.URL] will also be different (direct API URL instead of the API Gateway)
+	lbEmergencyAPIToken := os.Getenv(stackitLoadBalancerEmergencyAPIToken)
+	if lbEmergencyAPIToken != "" {
+		klog.Warningf("using emergency token for loadbalancer api on host: %s", cfg.LoadBalancerAPI.URL)
+		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
+	}
+
+	innerClient, err := loadbalancer.NewAPIClient(lbOpts...)
 	if err != nil {
 		return nil, err
 	}
