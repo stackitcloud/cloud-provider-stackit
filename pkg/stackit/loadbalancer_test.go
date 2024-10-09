@@ -374,26 +374,6 @@ var _ = Describe("LoadBalancer", func() {
 			Expect(err).To(MatchError(api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second)))
 		})
 
-		It("should enable the project if creating load balancer returns not found", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
-			mockClient.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatusDisabled, nil)
-			mockClient.EXPECT().EnableService(gomock.Any(), projectID).MinTimes(1).Return(nil)
-
-			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
-			Expect(err).To(MatchError(api.NewRetryError("waiting for project to become ready after enabling", 10*time.Second)))
-			// Expect EnableService to have been called.
-		})
-
-		It("should return error if project is not deactivated but load balancer creation returns not found", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, lbapi.ErrorNotFound)
-			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, lbapi.ErrorNotFound)
-			mockClient.EXPECT().GetServiceStatus(gomock.Any(), projectID).Return(lbapi.ProjectStatus("undefined project status"), nil)
-
-			_, err := lbInModeIgnore.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
-			Expect(err).To(HaveOccurred())
-		})
-
 		It("should update the load balancer if the service changed", func() {
 			svc := minimalLoadBalancerService()
 			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil)

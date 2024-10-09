@@ -36,8 +36,6 @@ type Client interface {
 	CreateLoadBalancer(ctx context.Context, projectID string, loadbalancer *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	UpdateLoadBalancer(ctx context.Context, projectID, name string, update *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	UpdateTargetPool(ctx context.Context, projectID string, name string, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
-	EnableService(ctx context.Context, projectID string) error
-	GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error)
 	CreateCredentials(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error)
 	ListCredentials(ctx context.Context, projectID string) (*loadbalancer.ListCredentialsResponse, error)
 	GetCredentials(ctx context.Context, projectID string, credentialRef string) (*loadbalancer.GetCredentialsResponse, error)
@@ -87,22 +85,6 @@ func (cl client) UpdateLoadBalancer(ctx context.Context, projectID, name string,
 func (cl client) UpdateTargetPool(ctx context.Context, projectID, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
 	_, err := cl.client.UpdateTargetPool(ctx, projectID, name, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
 	return err
-}
-
-func (cl client) EnableService(ctx context.Context, projectID string) error {
-	_, err := cl.client.EnableService(ctx, projectID).XRequestID(uuid.NewString()).Execute()
-	return err
-}
-
-func (cl client) GetServiceStatus(ctx context.Context, projectID string) (ProjectStatus, error) {
-	res, err := cl.client.GetServiceStatusExecute(ctx, projectID)
-	if err != nil {
-		return "", err
-	}
-	if res.Status == nil {
-		return "", errors.New("server response is missing project status")
-	}
-	return ProjectStatus(*res.Status), nil
 }
 
 func (cl client) CreateCredentials(

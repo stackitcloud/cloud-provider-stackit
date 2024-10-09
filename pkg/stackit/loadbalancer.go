@@ -227,24 +227,8 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	spec.Name = &name
 
 	lb, createErr := l.client.CreateLoadBalancer(ctx, l.projectID, spec)
-	if createErr != nil && !lbapi.IsNotFound(createErr) {
+	if createErr != nil {
 		return nil, createErr
-	}
-	if lbapi.IsNotFound(createErr) {
-		// If the project is disabled, load balancer creation returns a 404.
-		// In this case we will enable the project, if this actually was the reason for the 404.
-		status, err := l.client.GetServiceStatus(ctx, l.projectID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get project status: %w", err)
-		}
-		if status != lbapi.ProjectStatusDisabled {
-			return nil, fmt.Errorf("failed to create load balancer while the project has status %q: %w", status, createErr)
-		}
-		err = l.client.EnableService(ctx, l.projectID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to enable project: %w", err)
-		}
-		return nil, api.NewRetryError("waiting for project to become ready after enabling", retryDuration)
 	}
 
 	if lb.Status == nil || *lb.Status != lbapi.LBStatusReady {
