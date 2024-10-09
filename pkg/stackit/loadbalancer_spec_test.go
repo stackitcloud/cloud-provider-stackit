@@ -543,7 +543,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 	DescribeTable("unsupported annotations",
 		func(annotation string) {
-			_, _, err := lbSpecFromService(&corev1.Service{
+			_, events, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"lb.stackit.cloud/external-address": externalAddress,
@@ -551,7 +551,12 @@ var _ = Describe("lbSpecFromService", func() {
 					},
 				},
 			}, []*corev1.Node{}, "my-network", nil)
-			Expect(err).To(MatchError(ContainSubstring("unsupported annotation")))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(events).To(ConsistOf(Event{
+				Type:    corev1.EventTypeWarning,
+				Reason:  eventReasonYawolAnnotationPresent,
+				Message: "The following annotations are only valid for yawol load balancers and will be ignored for STACKIT load balancers: " + annotation,
+			}))
 		},
 		Entry("yawol.stackit.cloud/imageId", "yawol.stackit.cloud/imageId"),
 		Entry("yawol.stackit.cloud/defaultNetworkID", "yawol.stackit.cloud/defaultNetworkID"),
@@ -566,6 +571,27 @@ var _ = Describe("lbSpecFromService", func() {
 		Entry("yawol.stackit.cloud/serverGroupPolicy", "yawol.stackit.cloud/serverGroupPolicy"),
 		Entry("yawol.stackit.cloud/additionalNetworks", "yawol.stackit.cloud/additionalNetworks"),
 	)
+
+	It("should emit a single event for multiple ignored annotations", func() {
+		_, events, err := lbSpecFromService(&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"lb.stackit.cloud/external-address": externalAddress,
+					// ignored annotations
+					"yawol.stackit.cloud/imageId":           "my-image",
+					"yawol.stackit.cloud/replicas":          "3",
+					"yawol.stackit.cloud/serverGroupPolicy": "my-policy",
+				},
+			},
+		}, []*corev1.Node{}, "my-network", nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(events).To(ConsistOf(Event{
+			Type:   corev1.EventTypeWarning,
+			Reason: eventReasonYawolAnnotationPresent,
+			Message: "The following annotations are only valid for yawol load balancers and will be ignored for STACKIT load balancers: " +
+				"yawol.stackit.cloud/imageId, yawol.stackit.cloud/replicas, yawol.stackit.cloud/serverGroupPolicy",
+		}))
+	})
 
 	Context("TCP idle timeout", func() {
 		It("should set timeout on all TCP and TCProxy listeners", func() {

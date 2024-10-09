@@ -51,6 +51,8 @@ const (
 	defaultUDPIdleTimeout = 2 * time.Minute
 )
 
+const eventReasonYawolAnnotationPresent = "YawolAnnotationPresent"
+
 var availablePlanIDs = []string{"p10", "p50", "p250", "p750"}
 
 // the default plan ID when no plan ID annotation is found
@@ -496,8 +498,8 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		lb.Options.AccessControl.AllowedSourceRanges = &service.Spec.LoadBalancerSourceRanges
 	}
 
-	if err := checkUnsupportedAnnotations(service); err != nil {
-		return nil, nil, err
+	if event := checkUnsupportedAnnotations(service); event != nil {
+		events = append(events, *event)
 	}
 
 	if events != nil {
@@ -506,10 +508,21 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	return lb, nil, nil
 }
 
-func checkUnsupportedAnnotations(service *corev1.Service) error {
+func checkUnsupportedAnnotations(service *corev1.Service) *Event {
+	usedAnnotations := []string{}
 	for _, a := range yawolUnsupportedAnnotations {
 		if _, found := service.Annotations[a]; found {
-			return fmt.Errorf("unsupported annotation %s", a)
+			usedAnnotations = append(usedAnnotations, a)
+		}
+	}
+	if len(usedAnnotations) > 0 {
+		// The maximum event size is 1024 characters. Even with all ignored we reach less than 600 characters.
+		message := "The following annotations are only valid for yawol load balancers and will be ignored for STACKIT load balancers: " +
+			strings.Join(usedAnnotations, ", ")
+		return &Event{
+			Type:    corev1.EventTypeWarning,
+			Reason:  eventReasonYawolAnnotationPresent,
+			Message: message,
 		}
 	}
 	return nil

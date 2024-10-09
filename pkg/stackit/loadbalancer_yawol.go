@@ -36,7 +36,7 @@ const (
 	yawolFlavorIDAnnotation = "yawol.stackit.cloud/flavorId"
 )
 
-// Unsupported yawol annotations.
+// yawol annotations, that are ignored by the CCM.
 const (
 	// yawolImageIDAnnotation is not supported.
 	yawolImageIDAnnotation = "yawol.stackit.cloud/imageId"
@@ -74,10 +74,8 @@ const (
 var yawolUnsupportedAnnotations = []string{
 	yawolImageIDAnnotation,
 	yawolDefaultNetworkIDAnnotation,
-	yawolSkipDefaultNetworkIDAnnotation,
 	yawolFloatingNetworkIDAnnotation,
 	yawolSkipDefaultNetworkIDAnnotation,
-	yawolFloatingNetworkIDAnnotation,
 	yawolAvailabilityZoneAnnotation,
 	yawolDebugAnnotation,
 	yawolDebugSSHKeyAnnotation,
