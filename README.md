@@ -124,7 +124,7 @@ A load balancer contain both annotations as long as their values are compatible.
 #### Unsopported yawol annotations
 
 These annotations are no longer supported.
-If any of those annotations are present then the load balancer provision will fail.
+They are ignored for provisioning but an event is logged on the Kubernetes service.
 
 | Name | Notes |
 |---|---|
