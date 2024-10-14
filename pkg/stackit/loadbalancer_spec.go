@@ -260,11 +260,12 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		}
 		lb.Options.PrivateNetworkOnly = internal
 	}
-	if _, found := service.Annotations[yawolInternalLBAnnotation]; found {
-		yawolInternal = utils.Ptr(true)
+	if internalStr, found := service.Annotations[yawolInternalLBAnnotation]; found {
+		i, _ := strconv.ParseBool(internalStr)
+		yawolInternal = &i
 		lb.Options.PrivateNetworkOnly = yawolInternal
 	}
-	if yawolInternal != nil && internal != nil && *yawolInternal == *internal {
+	if yawolInternal != nil && internal != nil && *yawolInternal != *internal {
 		return nil, nil, fmt.Errorf("incompatible values for annotations %s and %s", yawolInternalLBAnnotation, internalLBAnnotation)
 	}
 
