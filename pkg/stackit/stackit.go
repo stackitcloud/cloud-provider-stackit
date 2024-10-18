@@ -173,7 +173,7 @@ func (stackit *Stackit) Initialize(clientBuilder cloudprovider.ControllerClientB
 	// create an EventRecorder
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientBuilder.ClientOrDie("stackit-cloud-controller-manager").CoreV1().Events("")})
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientBuilder.ClientOrDie("cloud-controller-manager").CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "stackit-cloud-controller-manager"})
 	stackit.loadBalancer.recorder = recorder
 }
