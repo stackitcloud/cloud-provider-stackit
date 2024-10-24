@@ -38,6 +38,8 @@ const (
 	udpIdleTimeoutAnnotation = "lb.stackit.cloud/udp-idle-timeout"
 	// servicePlanAnnotation defines the service plan to be used when creating an LB
 	servicePlanAnnotation = "lb.stackit.cloud/service-plan-id"
+	// ipModeProxyAnnotation defines whether the service status should reflect that the load balancer is of type proxy.
+	ipModeProxyAnnotation = "lb.stackit.cloud/ip-mode-proxy"
 )
 
 const (

@@ -3,6 +3,7 @@ package stackit
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
@@ -87,7 +89,7 @@ func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, 
 	case err != nil:
 		return nil, false, err
 	}
-	return loadBalancerStatus(lb), true, nil
+	return loadBalancerStatus(lb, service), true, nil
 }
 
 // GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
@@ -198,7 +200,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
-	return loadBalancerStatus(lb), nil
+	return loadBalancerStatus(lb, service), nil
 }
 
 func getMetricsRemoteWriteRef(lb *loadbalancer.LoadBalancer) *string {
@@ -235,7 +237,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
-	return loadBalancerStatus(lb), nil
+	return loadBalancerStatus(lb, service), nil
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
@@ -466,19 +468,23 @@ func (l *LoadBalancer) cleanUpCredentials(ctx context.Context, name string) erro
 	return nil
 }
 
-func loadBalancerStatus(lb *loadbalancer.LoadBalancer) *corev1.LoadBalancerStatus {
+func loadBalancerStatus(lb *loadbalancer.LoadBalancer, svc *corev1.Service) *corev1.LoadBalancerStatus {
 	var ip *string
 	if lb.Options != nil && lb.Options.PrivateNetworkOnly != nil && *lb.Options.PrivateNetworkOnly {
 		ip = lb.PrivateAddress
 	} else {
 		ip = lb.ExternalAddress
 	}
-	var ingress []corev1.LoadBalancerIngress
+	var ingresses []corev1.LoadBalancerIngress
 	if ip != nil {
-		ingress = []corev1.LoadBalancerIngress{{IP: *ip}}
+		ingress := corev1.LoadBalancerIngress{IP: *ip}
+		if ipModeProxy, _ := strconv.ParseBool(svc.Annotations[ipModeProxyAnnotation]); ipModeProxy {
+			ingress.IPMode = ptr.To(corev1.LoadBalancerIPModeProxy)
+		}
+		ingresses = []corev1.LoadBalancerIngress{ingress}
 	}
 	return &corev1.LoadBalancerStatus{
-		Ingress: ingress,
+		Ingress: ingresses,
 	}
 }
 

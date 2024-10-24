@@ -909,6 +909,22 @@ var _ = Describe("LoadBalancer", func() {
 	})
 })
 
+var _ = DescribeTable("loadBalancerStatus",
+	func(lb *loadbalancer.LoadBalancer, svc *corev1.Service, expect *corev1.LoadBalancerStatus) {
+		Expect(loadBalancerStatus(lb, svc)).To(Equal(expect))
+	},
+	Entry("empty address", &loadbalancer.LoadBalancer{}, &corev1.Service{}, &corev1.LoadBalancerStatus{}),
+	Entry("address present",
+		&loadbalancer.LoadBalancer{ExternalAddress: ptr.To("1.2.3.4")}, &corev1.Service{},
+		&corev1.LoadBalancerStatus{Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}}},
+	),
+	Entry("IP mode proxy",
+		&loadbalancer.LoadBalancer{ExternalAddress: ptr.To("1.2.3.4")},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ipModeProxyAnnotation: "true"}}},
+		&corev1.LoadBalancerStatus{Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4", IPMode: ptr.To(corev1.LoadBalancerIPModeProxy)}}},
+	),
+)
+
 // minimalLoadBalancerService returns a service that is valid for provisioning a load balancer by the CCM.
 // It should be used in tests that don't expect a particular configuration.
 func minimalLoadBalancerService() *corev1.Service {

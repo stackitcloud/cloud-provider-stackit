@@ -102,6 +102,7 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/tcp-idle-timeout | 60 minutes | Defines the idle timeout for all TCP ports (including ports with the PROXY protocol). |
 | lb.stackit.cloud/udp-idle-timeout | 2 minutes | Defines the idle timeout for all UDP ports. |
 | lb.stackit.cloud/service-plan-id | p10 | Defines the [plan ID](https://docs.api.eu01.stackit.cloud/documentation/load-balancer/version/v1#tag/Load-Balancer/operation/APIService_CreateLoadBalancer) when creating a load balancer. Allowed values are: p10, p50, p250 and p750 |
+| lb.stackit.cloud/ip-mode-proxy | false | If true, the load balancer will be reported to Kubernetes as a proxy (in the service status). This causes connections to the load balancer IP that come from within the cluster to be routed to through the load balancer, rather than directly to the kube-proxy. Requires Kubernetes v1.30. The annotation has no effect on earlier version. Recommended in combination with the TCP proxy protocol. |
 
 
 #### Supported yawol annotations
