@@ -24,14 +24,14 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   revive:
-    min-confidence: 0
-  gomnd:
-    settings:
-      mnd:
-        # don't include the "operation" and "assign"
-        checks: [argument,case,condition,return]
+    rules:
+      - name: dot-imports
+        exclude: [TEST]
+  mnd:
+    checks: [argument, case, condition, return]
   govet:
-    check-shadowing: false # too many issues with shadowing errors
+    disable:
+      - shadow
   lll:
     line-length: 165
   misspell:
@@ -43,47 +43,47 @@ linters-settings:
 
   importas:
     alias:
-    # kubernetes packages
-    - pkg: k8s.io/api/(\w+)/(v[\w\d]+)
-      alias: $1$2
-    - pkg: k8s.io/apimachinery/pkg/apis/(\w+)/(v[\w\d]+)
-      alias: $1$2
-    - pkg: k8s.io/apimachinery/pkg/api/([^m]\w+)
-      alias: api${1}
-    - pkg: k8s.io/apimachinery/pkg/api/meta/table
-      alias: metatable
-    - pkg: k8s.io/apimachinery/pkg/util/(\w+)
-      alias: util${1}
-    - pkg: k8s.io/client-go/tools/clientcmd/api/(\w+)
-      alias: clientcmd${1}
-    - pkg: sigs.k8s.io/controller-runtime/pkg/client/fake
-      alias: fakeclient
-    - pkg: sigs.k8s.io/controller-runtime/pkg/log/zap
-      alias: logzap
-    - pkg: sigs.k8s.io/controller-runtime/pkg/log
-      alias: logf
-    # gardener packages
-    - pkg: github.com/gardener/gardener/pkg/apis/core
-      alias: gardencore
-    - pkg: github.com/gardener/gardener/pkg/apis/core/([\w\d]+)
-      alias: gardencore${1}
-    - pkg: github.com/gardener/gardener/pkg/apis/core/([\w\d]+)/helper
-      alias: ${1}helper
-    - pkg: github.com/gardener/gardener/pkg/apis/([^c]\w+)/([\w\d]+)
-      alias: $1$2
-    - pkg: github.com/gardener/gardener/pkg/apis/([^c]\w+)/([\w\d]+)/([\w\d]+)
-      alias: $1$2$3
-    - pkg: github.com/gardener/gardener/pkg/(\w+)/apis/config
-      alias: ${1}config
-    - pkg: github.com/gardener/gardener/pkg/(\w+)/apis/config/([\w\d]+)
-      alias: $1$2
-    - pkg: github.com/gardener/gardener/pkg/envtest
-      alias: gardenerenvtest
-    # flux packages
-    - pkg: github.com/fluxcd/(\w+)-controller/api/([\w\d]+)
-      alias: $1$2
-    - pkg: github.com/fluxcd/pkg/apis/meta
-      alias: fluxmeta
+      # kubernetes packages
+      - pkg: k8s.io/api/(\w+)/(v[\w\d]+)
+        alias: $1$2
+      - pkg: k8s.io/apimachinery/pkg/apis/(\w+)/(v[\w\d]+)
+        alias: $1$2
+      - pkg: k8s.io/apimachinery/pkg/api/([^m]\w+)
+        alias: api${1}
+      - pkg: k8s.io/apimachinery/pkg/api/meta/table
+        alias: metatable
+      - pkg: k8s.io/apimachinery/pkg/util/(\w+)
+        alias: util${1}
+      - pkg: k8s.io/client-go/tools/clientcmd/api/(\w+)
+        alias: clientcmd${1}
+      - pkg: sigs.k8s.io/controller-runtime/pkg/client/fake
+        alias: fakeclient
+      - pkg: sigs.k8s.io/controller-runtime/pkg/log/zap
+        alias: logzap
+      - pkg: sigs.k8s.io/controller-runtime/pkg/log
+        alias: logf
+      # gardener packages
+      - pkg: github.com/gardener/gardener/pkg/apis/core
+        alias: gardencore
+      - pkg: github.com/gardener/gardener/pkg/apis/core/([\w\d]+)
+        alias: gardencore${1}
+      - pkg: github.com/gardener/gardener/pkg/apis/core/([\w\d]+)/helper
+        alias: ${1}helper
+      - pkg: github.com/gardener/gardener/pkg/apis/([^c]\w+)/([\w\d]+)
+        alias: $1$2
+      - pkg: github.com/gardener/gardener/pkg/apis/([^c]\w+)/([\w\d]+)/([\w\d]+)
+        alias: $1$2$3
+      - pkg: github.com/gardener/gardener/pkg/(\w+)/apis/config
+        alias: ${1}config
+      - pkg: github.com/gardener/gardener/pkg/(\w+)/apis/config/([\w\d]+)
+        alias: $1$2
+      - pkg: github.com/gardener/gardener/pkg/envtest
+        alias: gardenerenvtest
+      # flux packages
+      - pkg: github.com/fluxcd/(\w+)-controller/api/([\w\d]+)
+        alias: $1$2
+      - pkg: github.com/fluxcd/pkg/apis/meta
+        alias: fluxmeta
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -93,7 +93,7 @@ linters:
     - bodyclose
     - dogsled
     - dupl
-    - exportloopref
+    - copyloopvar
     - exhaustive
     - funlen
     - ginkgolinter
@@ -101,7 +101,7 @@ linters:
     - gocritic
     - gocyclo
     - revive
-    - gomnd
+    - mnd
     - goprintffuncname
     - gosec
     - gosimple

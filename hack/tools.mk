@@ -1,8 +1,8 @@
 TOOLS_BIN_DIR := hack/tools/bin
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
-GOIMPORTS_REVISER_VERSION ?= v3.4.1
-GOLANGCI_LINT_VERSION ?= v1.54.2
+GOIMPORTS_REVISER_VERSION ?= v3.6.5
+GOLANGCI_LINT_VERSION ?= v1.61.0
 
 # Tool targets should declare go.mod as a prerequisite, if the tool's version is managed via go modules. This causes
 # make to rebuild the tool in the desired version, when go.mod is changed.
