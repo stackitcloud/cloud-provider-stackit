@@ -3,6 +3,10 @@
   extends: [
     'config:recommended',
   ],
+  additionalReviewers: [
+    'hown3d',
+    'rgroemmer',
+  ],
   labels: [
     'kind/upgrade',
   ],
