@@ -10,6 +10,7 @@ aliases:
   - robinschneider
   - timebertt
   - duciwuci
+  - hown3d
   ske-ci-infra-approvers:
   - dergeberl
   - einfachnuralex
@@ -20,3 +21,4 @@ aliases:
   - rgroemmer
   - robinschneider
   - timebertt
+  - hown3d
