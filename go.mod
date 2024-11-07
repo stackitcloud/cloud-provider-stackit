@@ -9,7 +9,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stackitcloud/stackit-sdk-go/core v0.14.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.17.0
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
