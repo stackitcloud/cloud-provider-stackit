@@ -20,6 +20,8 @@ require (
 	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
 )
 
+replace k8s.io/cloud-provider v0.29.3 => github.com/stackitcloud/cloud-provider v0.29.3-ske-1
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
