@@ -17,7 +17,7 @@ require (
 	k8s.io/cloud-provider v0.29.3
 	k8s.io/component-base v0.29.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 )
 
 replace k8s.io/cloud-provider v0.29.3 => github.com/stackitcloud/cloud-provider v0.29.3-ske-1
