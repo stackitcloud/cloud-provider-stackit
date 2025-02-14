@@ -24,7 +24,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: cloud-provider-stackit
-        image: reg.infra.ske.eu01.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
+        image: registry.ske.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
         args:
         - --allow-untagged-cloud
         - --cloud-provider=stackit
