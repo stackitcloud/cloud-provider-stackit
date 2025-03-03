@@ -2,7 +2,7 @@ TOOLS_BIN_DIR := hack/tools/bin
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
-GOIMPORTS_REVISER_VERSION ?= v3.6.5
+GOIMPORTS_REVISER_VERSION ?= v3.9.1
 # renovate: datasource=github-releases depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION ?= v1.64.6
 
