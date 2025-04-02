@@ -40,6 +40,12 @@ const (
 	servicePlanAnnotation = "lb.stackit.cloud/service-plan-id"
 	// ipModeProxyAnnotation defines whether the service status should reflect that the load balancer is of type proxy.
 	ipModeProxyAnnotation = "lb.stackit.cloud/ip-mode-proxy"
+	// sessionPersistenceWithSourceIP defines whether the load balancer should use the source IP address for load balancing.
+	// When set to true, all connections from the same source IP are consistently routed to the same target.
+	// This setting changes the load balancing algorithm to Maglev.
+	// Note: This only works reliably when externalTrafficPolicy: Local is set on the Service,
+	// and each node has exactly one backing pod. Otherwise, session persistence may break.
+	sessionPersistenceWithSourceIP = "lb.stackit.cloud/session-persistence-with-source-ip"
 )
 
 const (
@@ -422,6 +428,16 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		}
 	}
 
+	// Parse session persistence with source ip addresss from annotation.
+	useSourceIP := false
+	if val, found := service.Annotations[sessionPersistenceWithSourceIP]; found {
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid bool value for annotation %s: %w", sessionPersistenceWithSourceIP, err)
+		}
+		useSourceIP = parsed
+	}
+
 	targets := []loadbalancer.Target{}
 	for i := range nodes {
 		node := nodes[i]
@@ -486,6 +502,9 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			Name:       &name,
 			TargetPort: utils.Ptr(int64(port.NodePort)),
 			Targets:    &targets,
+			SessionPersistence: &loadbalancer.SessionPersistence{
+				UseSourceIpAddress: utils.Ptr(useSourceIP),
+			},
 		})
 	}
 	lb.Listeners = &listeners
@@ -645,6 +664,9 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 				fulfills = false
 			}
 			if !cmp.PtrValEqual(x.TargetPort, y.TargetPort) {
+				fulfills = false
+			}
+			if cmp.UnpackPtr(cmp.UnpackPtr(x.SessionPersistence).UseSourceIpAddress) != cmp.UnpackPtr(cmp.UnpackPtr(y.SessionPersistence).UseSourceIpAddress) {
 				fulfills = false
 			}
 			if !cmp.PtrValEqualFn(x.ActiveHealthCheck, y.ActiveHealthCheck, func(a, b loadbalancer.ActiveHealthCheck) bool {

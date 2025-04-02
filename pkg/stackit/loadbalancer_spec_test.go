@@ -1078,6 +1078,72 @@ var _ = Describe("lbSpecFromService", func() {
 			)))
 		})
 	})
+	Context("Session Persistence", func() {
+		It("should enable session persistence when annotation is true", func() { //nolint:dupl // It's not a duplicate.
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/session-persistence-with-source-ip": "true",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.TargetPools).To(PointTo(HaveEach(
+				MatchFields(IgnoreExtras, Fields{
+					"SessionPersistence": PointTo(MatchFields(IgnoreExtras, Fields{
+						"UseSourceIpAddress": PointTo(BeTrue()),
+					})),
+				}),
+			)))
+		})
+
+		It("should disable session persistence when annotation is false", func() { //nolint:dupl // It's not a duplicate.
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/session-persistence-with-source-ip": "false",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "my-tcp-port",
+							Protocol: corev1.ProtocolTCP,
+							Port:     80,
+						},
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.TargetPools).To(PointTo(HaveEach(
+				MatchFields(IgnoreExtras, Fields{
+					"SessionPersistence": PointTo(MatchFields(IgnoreExtras, Fields{
+						"UseSourceIpAddress": PointTo(BeFalse()),
+					})),
+				}),
+			)))
+		})
+
+		It("should error on invalid value for useSourceIpAddress", func() {
+			_, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/session-persistence-with-source-ip": "foo",
+					},
+				},
+			}, []*corev1.Node{}, "my-network", nil)
+			Expect(err).To(MatchError(ContainSubstring("invalid bool")))
+		})
+	})
 
 	It("should attach the load balancer to the specified network", func() {
 		spec, _, err := lbSpecFromService(&corev1.Service{
@@ -1829,6 +1895,75 @@ var _ = DescribeTable("compareLBwithSpec",
 					AllowedSourceRanges: utils.Ptr([]string{"10.0.0.0/24"}),
 				},
 			},
+		},
+	}),
+	Entry("When useSourceIpAddress is enabled and matches", &compareLBwithSpecTest{
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(true),
+				},
+			}},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(true),
+				},
+			}},
+		},
+	}),
+	Entry("When useSourceIpAddress is disabled and matches", &compareLBwithSpecTest{
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(false),
+				},
+			}},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(false),
+				},
+			}},
+		},
+	}),
+	Entry("When useSourceIpAddress differs", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(false),
+				},
+			}},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: utils.Ptr(true),
+			},
+			TargetPools: &[]loadbalancer.TargetPool{{
+				SessionPersistence: &loadbalancer.SessionPersistence{
+					UseSourceIpAddress: utils.Ptr(true),
+				},
+			}},
 		},
 	}),
 )

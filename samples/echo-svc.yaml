@@ -12,6 +12,7 @@ metadata:
     # lb.stackit.cloud/tcp-proxy-protocol: "true"
     # lb.stackit.cloud/tcp-proxy-protocol-ports-filter: "9001"
     # lb.stackit.cloud/service-plan-id: "p50"
+    # lb.stackit.cloud/session-persistence-with-source-ip: "true"
 spec:
   selector:
     app: echo

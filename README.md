@@ -103,6 +103,7 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/udp-idle-timeout | 2 minutes | Defines the idle timeout for all UDP ports. |
 | lb.stackit.cloud/service-plan-id | p10 | Defines the [plan ID](https://docs.api.eu01.stackit.cloud/documentation/load-balancer/version/v1#tag/Load-Balancer/operation/APIService_CreateLoadBalancer) when creating a load balancer. Allowed values are: p10, p50, p250 and p750 |
 | lb.stackit.cloud/ip-mode-proxy | false | If true, the load balancer will be reported to Kubernetes as a proxy (in the service status). This causes connections to the load balancer IP that come from within the cluster to be routed to through the load balancer, rather than directly to the kube-proxy. Requires Kubernetes v1.30. The annotation has no effect on earlier version. Recommended in combination with the TCP proxy protocol. |
+| lb.stackit.cloud/session-persistence-with-source-ip | false |  When set to true, all connections from the same source IP are consistently routed to the same target. This setting changes the load balancing algorithm to Maglev. Note, this only works reliably when externalTrafficPolicy: Local is set on the Service, and each node has exactly one backing pod. Otherwise, session persistence may break. |
 
 
 #### Supported yawol annotations
