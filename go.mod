@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/spf13/pflag v1.0.6
 	github.com/stackitcloud/stackit-sdk-go/core v0.15.1
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.18.0
