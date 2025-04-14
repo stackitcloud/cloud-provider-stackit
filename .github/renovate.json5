@@ -18,11 +18,13 @@
       matchPackageNames: [
         'github.com/onsi/gomega',
         'github.com/onsi/ginkgo/v2',
+        'golangci/golangci-lint',
       ],
       matchUpdateTypes: [
         'minor',
         'patch',
       ],
+      automerge: true,
       addLabels: [
         'skip-review',
       ],
