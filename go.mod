@@ -9,7 +9,8 @@ require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/spf13/pflag v1.0.6
-	github.com/stackitcloud/stackit-sdk-go/core v0.15.1
+	github.com/stackitcloud/stackit-sdk-go/core v0.17.1
+	github.com/stackitcloud/stackit-sdk-go/services/iaas v0.23.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v0.18.0
 	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -48,7 +49,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/cel-go v0.22.0 // indirect

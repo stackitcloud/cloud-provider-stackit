@@ -56,6 +56,18 @@ verify-modules: modules ## Verify go module files are up to date.
 .PHONY: verify
 verify: verify-fmt verify-modules check
 
+# generate mock types for the following services (space-separated list)
+MOCK_SERVICES := iaas
+
+.PHONY: mocks
+mocks: $(MOCKGEN)
+	@for service in $(MOCK_SERVICES); do \
+		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | paste -sd,`,DefaultApi; \
+		$(MOCKGEN) -destination ./pkg/mock/$$service/$$service.go -package $$service github.com/stackitcloud/stackit-sdk-go/services/$$service $$INTERFACES; \
+	done
+
+
+
 .PHONY: generate
-generate: 
+generate: mocks
 	go generate ./...
