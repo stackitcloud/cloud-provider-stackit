@@ -46,6 +46,11 @@ const (
 	// Note: This only works reliably when externalTrafficPolicy: Local is set on the Service,
 	// and each node has exactly one backing pod. Otherwise, session persistence may break.
 	sessionPersistenceWithSourceIP = "lb.stackit.cloud/session-persistence-with-source-ip"
+	// listenerNetworkAnnotation defines the network in which the load balancer should listen.
+	// If not set, the SKE network is used for listening.
+	// The value must be a network ID, not a subnet.
+	// The annotation can neither be changed nor be added or removed after service creation.
+	listenerNetworkAnnotation = "lb.stackit.cloud/listener-network"
 )
 
 const (
@@ -252,6 +257,25 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		},
 	}
 
+	if listenerNetwork := service.Annotations[listenerNetworkAnnotation]; listenerNetwork != "" {
+		lb.Networks = &[]loadbalancer.Network{
+			{
+				Role:      utils.Ptr("ROLE_TARGETS"),
+				NetworkId: &networkID,
+			}, {
+				Role:      utils.Ptr("ROLE_LISTENERS"),
+				NetworkId: &listenerNetwork,
+			},
+		}
+	} else {
+		lb.Networks = &[]loadbalancer.Network{
+			{
+				Role:      utils.Ptr("ROLE_LISTENERS_AND_TARGETS"),
+				NetworkId: &networkID,
+			},
+		}
+	}
+
 	events := make([]Event, 0)
 
 	// Parse private network from annotations.
@@ -292,7 +316,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		})
 	}
 
-	// Parse external from annotations.
+	// Parse external IP from annotations.
 	// TODO: Split into separate function.
 	externalIP, found := service.Annotations[externalIPAnnotation]
 	yawolExternalIP, yawolFound := service.Annotations[yawolExistingFloatingIPAnnotation]

@@ -1145,7 +1145,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 	})
 
-	It("should attach the load balancer to the specified network", func() {
+	It("should attach the load balancer to the specified network for both listeners and targets", func() {
 		spec, _, err := lbSpecFromService(&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -1158,6 +1158,27 @@ var _ = Describe("lbSpecFromService", func() {
 			"NetworkId": PointTo(Equal("my-network")),
 			"Role":      PointTo(Equal("ROLE_LISTENERS_AND_TARGETS")),
 		}))))
+	})
+
+	It("should create a load balancer with two networks with dedicated roles", func() {
+		spec, _, err := lbSpecFromService(&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"lb.stackit.cloud/listener-network": "my-listener-network",
+				},
+			},
+		}, []*corev1.Node{}, "my-target-network", nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(spec.Networks).To(PointTo(ConsistOf(
+			MatchFields(IgnoreExtras, Fields{
+				"NetworkId": PointTo(Equal("my-target-network")),
+				"Role":      PointTo(Equal("ROLE_TARGETS")),
+			}),
+			MatchFields(IgnoreExtras, Fields{
+				"NetworkId": PointTo(Equal("my-listener-network")),
+				"Role":      PointTo(Equal("ROLE_LISTENERS")),
+			}),
+		)))
 	})
 
 	It("should configure a public service without existing IP as ephemeral", func() {
