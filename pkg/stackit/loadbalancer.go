@@ -13,9 +13,10 @@ import (
 	"k8s.io/cloud-provider/api"
 	"k8s.io/utils/ptr"
 
+	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 )
 
 const (
@@ -177,7 +178,21 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		// However, we need to copy over the version because it is required on every update.
 		spec.Version = lb.Version
 		spec.Name = &name
-		lb, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, (*loadbalancer.UpdateLoadBalancerPayload)(spec))
+		updatePayload := &loadbalancer.UpdateLoadBalancerPayload{
+			Errors:          spec.Errors,
+			ExternalAddress: spec.ExternalAddress,
+			Listeners:       spec.Listeners,
+			Name:            spec.Name,
+			Networks:        spec.Networks,
+			Options:         spec.Options,
+			PlanId:          spec.PlanId,
+			PrivateAddress:  spec.PrivateAddress,
+			Region:          spec.Region,
+			Status:          loadbalancer.UpdateLoadBalancerPayloadGetStatusAttributeType(spec.Status),
+			TargetPools:     spec.TargetPools,
+			Version:         spec.Version,
+		}
+		lb, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, updatePayload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update load balancer: %w", err)
 		}
@@ -193,10 +208,10 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		}
 	}
 
-	if *lb.Status == lbapi.LBStatusError {
+	if *lb.Status == loadbalancer.LOADBALANCERSTATUS_ERROR {
 		return nil, fmt.Errorf("the load balancer is in an error state")
 	}
-	if *lb.Status != lbapi.LBStatusReady {
+	if *lb.Status != loadbalancer.LOADBALANCERSTATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -233,7 +248,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, createErr
 	}
 
-	if lb.Status == nil || *lb.Status != lbapi.LBStatusReady {
+	if lb.Status == nil || *lb.Status != loadbalancer.LOADBALANCERSTATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -327,7 +342,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 		return nil
 	case err != nil:
 		return err
-	case lb.Status != nil && *lb.Status == lbapi.LBStatusTerminating:
+	case lb.Status != nil && *lb.Status == loadbalancer.LOADBALANCERSTATUS_TERMINATING:
 		return nil
 	}
 

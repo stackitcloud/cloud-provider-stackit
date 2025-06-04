@@ -7,7 +7,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"go.uber.org/mock/gomock"
@@ -16,6 +15,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/utils/ptr"
+
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 )
 
 var notYetReadyError = api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", 10*time.Second).Error()
@@ -181,7 +182,7 @@ var _ = Describe("LoadBalancer", func() {
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
-				Status:          ptr.To(lbapi.LBStatusReady),
+				Status:          ptr.To(loadbalancer.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
 			}
@@ -340,7 +341,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          ptr.To(lbapi.LBStatusReady),
+				Status:          ptr.To(loadbalancer.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
 				PlanId:          ptr.To("p10"),
@@ -388,7 +389,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          ptr.To(lbapi.LBStatusReady),
+				Status:          ptr.To(loadbalancer.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
 			}
@@ -446,7 +447,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          ptr.To(lbapi.LBStatusReady),
+				Status:          ptr.To(loadbalancer.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
 			}
@@ -482,7 +483,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          ptr.To(lbapi.LBStatusReady),
+				Status:          ptr.To(loadbalancer.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         ptr.To("current-version"),
 			}
@@ -534,7 +535,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should finalize deletion if load balancer is state terminating", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
-				Status: utils.Ptr(lbapi.LBStatusTerminating),
+				Status: utils.Ptr(loadbalancer.LOADBALANCERSTATUS_TERMINATING),
 			}, nil)
 
 			err := lbInModeIgnore.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())

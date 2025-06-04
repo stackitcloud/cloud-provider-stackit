@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 )
 
 const (
@@ -251,7 +250,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		Options: &loadbalancer.LoadBalancerOptions{},
 		Networks: &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr("ROLE_LISTENERS_AND_TARGETS"),
+				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &networkID,
 			},
 		},
@@ -260,17 +259,17 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	if listenerNetwork := service.Annotations[listenerNetworkAnnotation]; listenerNetwork != "" {
 		lb.Networks = &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr("ROLE_TARGETS"),
+				Role:      utils.Ptr(loadbalancer.NETWORKROLE_TARGETS),
 				NetworkId: &networkID,
 			}, {
-				Role:      utils.Ptr("ROLE_LISTENERS"),
+				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS),
 				NetworkId: &listenerNetwork,
 			},
 		}
 	} else {
 		lb.Networks = &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr("ROLE_LISTENERS_AND_TARGETS"),
+				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &networkID,
 			},
 		}
@@ -490,22 +489,22 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			name = fmt.Sprintf("port-%s-%d", strings.ToLower(string(port.Protocol)), port.Port)
 		}
 
-		protocol := ""
+		var protocol loadbalancer.ListenerProtocol
 		var tcpOptions *loadbalancer.OptionsTCP
 		var udpOptions *loadbalancer.OptionsUDP
 
 		switch port.Protocol { //nolint:exhaustive // There are protocols that we do not support.
 		case corev1.ProtocolTCP:
 			if proxyProtocolEnableForPort(tcpProxyProtocolEnabled, tcpProxyProtocolPortFilter, port.Port) {
-				protocol = lbapi.ProtocolTCPProxy
+				protocol = loadbalancer.LISTENERPROTOCOL_TCP_PROXY
 			} else {
-				protocol = lbapi.ProtocolTCP
+				protocol = loadbalancer.LISTENERPROTOCOL_TCP
 			}
 			tcpOptions = &loadbalancer.OptionsTCP{
 				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
 			}
 		case corev1.ProtocolUDP:
-			protocol = lbapi.ProtocolUDP
+			protocol = loadbalancer.LISTENERPROTOCOL_UDP
 			udpOptions = &loadbalancer.OptionsUDP{
 				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
 			}
@@ -517,7 +516,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			DisplayName: &name,
 			Port:        utils.Ptr(int64(port.Port)),
 			TargetPool:  &name,
-			Protocol:    &protocol,
+			Protocol:    utils.Ptr(protocol),
 			Tcp:         tcpOptions,
 			Udp:         udpOptions,
 		})
@@ -650,13 +649,13 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 			if !cmp.PtrValEqual(x.TargetPool, y.TargetPool) {
 				fulfills = false
 			}
-			if (cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolTCP || cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolTCPProxy) &&
+			if (cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_TCP || cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_TCP_PROXY) &&
 				!cmp.PtrValEqualFn(x.Tcp, y.Tcp, func(a, b loadbalancer.OptionsTCP) bool {
 					return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 				}) {
 				fulfills = false
 			}
-			if cmp.UnpackPtr(x.Protocol) == lbapi.ProtocolUDP && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
+			if cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_UDP && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
 				return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 			}) {
 				fulfills = false

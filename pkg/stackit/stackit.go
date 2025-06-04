@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	yaml "gopkg.in/yaml.v3"
@@ -16,6 +15,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 )
 
 const (
@@ -39,6 +40,7 @@ type Stackit struct {
 type Config struct {
 	ProjectID            string `yaml:"projectId"`
 	NetworkID            string `yaml:"networkId"`
+	Region               string `yaml:"region"`
 	NonStackitClassNames string `yaml:"nonStackitClassNames"`
 	LoadBalancerAPI      struct {
 		URL string `yaml:"url"`
@@ -57,7 +59,7 @@ func init() {
 			klog.Warningf("failed to build metricsRemoteWrite: %v", err)
 			return nil, err
 		}
-		cloud, err := NewStackit(cfg, obs)
+		cloud, err := NewStackit(&cfg, obs)
 		if err != nil {
 			klog.Warningf("failed to create STACKIT cloud provider: %v", err)
 		}
@@ -84,6 +86,10 @@ func ReadConfig(configReader io.Reader) (Config, error) {
 	if config.NetworkID == "" {
 		return Config{}, errors.New("networkId must be set")
 	}
+	if config.Region == "" {
+		return Config{}, errors.New("region must be set")
+	}
+
 	switch config.NonStackitClassNames {
 	case nonStackitClassNameModeIgnore, nonStackitClassNameModeUpdate, nonStackitClassNameModeUpdateAndCreate:
 		// NonStackitClassNames is valid input
@@ -136,7 +142,7 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 }
 
 // NewStackit creates a new instance of the stackit struct from a config struct
-func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
+func NewStackit(cfg *Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
 	}
@@ -153,7 +159,7 @@ func NewStackit(cfg Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := lbapi.NewClient(innerClient)
+	client, err := lbapi.NewClient(innerClient, cfg.Region)
 	if err != nil {
 		return nil, err
 	}
