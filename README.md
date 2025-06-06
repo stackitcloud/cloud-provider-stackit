@@ -31,19 +31,20 @@ TODOs:
 projectId:
 networkId:
 nonStackitClassNames: # If not set, defaults to "updateAndCreate" (see: Non-STACKIT class names).
+region: eu01
 loadBalancerApi:
   # If not set, defaults to production.
-  url: https://load-balancer-dev.api.eu01.stg.stackit.cloud
+  url: https://load-balancer-dev.api.qa.stackit.cloud
 ```
 
 - Required: STACKIT authentication for SDK
     - To authenticate against the STACKIT API follow [STACKIT SDK authentication](https://github.com/stackitcloud/stackit-sdk-go#authentication). The cloud controller manager supports all authentication methods that are supported by the SDK.
 - Service metrics are available at `https://:10258/metrics`. To allow unauthorized access add `--authorization-always-allow-paths=/metrics`.
-- Load Balancer metrics can be sent to ARGUS. To use this feature all the following environment variables need to be set:
+- Load Balancer metrics can be sent to a remote write endpoint (e.g. STACKIT observability). To use this feature all the following environment variables need to be set:
   - `STACKIT_REMOTEWRITE_ENDPOINT` the remote write push URL to send the metrics to
   - `STACKIT_REMOTEWRITE_USER` the basic auth username
   - `STACKIT_REMOTEWRITE_PASSWORD` the basic auth password
-  - >If none of these environment variables are set, this feature is ignored and no Load Balancer metrics are sent.
+  - If none of these environment variables are set, this feature is ignored and no Load Balancer metrics are sent.
 
 ## Load balancers user documentation
 
@@ -60,6 +61,7 @@ The controller will always manage all services whose class name annotation is `s
 > :warning: The CCM adds a finalizer to the service regardless of whether it has a matching class name annotation or not.
 
 ### Non-STACKIT class names
+
 For load balancers with not `stackit` as class name (identified via the `yawol.stackit.cloud/className` annotation) the controller manages them in different ways.
 The controller modes are configured via `nonStackitClassNames` in the cloud-config.yaml:
 - `ignore`: Return "implemented elsewhere" for all services whose class name
@@ -104,6 +106,7 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/service-plan-id | p10 | Defines the [plan ID](https://docs.api.eu01.stackit.cloud/documentation/load-balancer/version/v1#tag/Load-Balancer/operation/APIService_CreateLoadBalancer) when creating a load balancer. Allowed values are: p10, p50, p250 and p750 |
 | lb.stackit.cloud/ip-mode-proxy | false | If true, the load balancer will be reported to Kubernetes as a proxy (in the service status). This causes connections to the load balancer IP that come from within the cluster to be routed to through the load balancer, rather than directly to the kube-proxy. Requires Kubernetes v1.30. The annotation has no effect on earlier version. Recommended in combination with the TCP proxy protocol. |
 | lb.stackit.cloud/session-persistence-with-source-ip | false |  When set to true, all connections from the same source IP are consistently routed to the same target. This setting changes the load balancing algorithm to Maglev. Note, this only works reliably when externalTrafficPolicy: Local is set on the Service, and each node has exactly one backing pod. Otherwise, session persistence may break. |
+| lb.stackit.cloud/listener-network | *none* | When set, defines the network in which the load balancer should listen. If not set, the SKE network is used for listening. The value must be a network ID, not a subnet. The annotation can neither be changed nor be added or removed after service creation. |
 
 
 #### Supported yawol annotations
