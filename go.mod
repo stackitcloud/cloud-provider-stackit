@@ -12,7 +12,7 @@ require (
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.1
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v0.23.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.2.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
