@@ -493,7 +493,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		var tcpOptions *loadbalancer.OptionsTCP
 		var udpOptions *loadbalancer.OptionsUDP
 
-		switch port.Protocol { //nolint:exhaustive // There are protocols that we do not support.
+		switch port.Protocol {
 		case corev1.ProtocolTCP:
 			if proxyProtocolEnableForPort(tcpProxyProtocolEnabled, tcpProxyProtocolPortFilter, port.Port) {
 				protocol = loadbalancer.LISTENERPROTOCOL_TCP_PROXY

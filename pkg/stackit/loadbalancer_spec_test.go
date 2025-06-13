@@ -684,7 +684,7 @@ var _ = Describe("lbSpecFromService", func() {
 			)))
 		})
 
-		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
+		It("should set timeout based on yawol annotation", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -756,7 +756,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
+		It("should use default timeout if yawol annotation is invalid", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -826,7 +826,7 @@ var _ = Describe("lbSpecFromService", func() {
 			}, []*corev1.Node{}, "my-network", nil)
 			Expect(err).To(HaveOccurred())
 		})
-		//nolint: dupl // the flavor ID is different
+
 		It("should create an LB with a custom plan when flavor ID annotation is set to a valid value", func() {
 			spec, events, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -852,7 +852,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(events[0].Reason).To(Equal(EventReasonSelectedPlanID))
 			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo("p250")))
 		})
-		//nolint: dupl // the flavor ID is different
+
 		It("should create an LB with a custom plan when flavor ID annotation is set to a valid value but doesn't match a service plan ID", func() {
 			spec, events, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -976,7 +976,7 @@ var _ = Describe("lbSpecFromService", func() {
 			)))
 		})
 
-		It("should set timeout based on yawol annotation", func() { //nolint:dupl // It's not a duplicate.
+		It("should set timeout based on yawol annotation", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -1048,7 +1048,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should use default timeout if yawol annotation is invalid", func() { //nolint:dupl // It's not a duplicate.
+		It("should use default timeout if yawol annotation is invalid", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -1078,7 +1078,7 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 	})
 	Context("Session Persistence", func() {
-		It("should enable session persistence when annotation is true", func() { //nolint:dupl // It's not a duplicate.
+		It("should enable session persistence when annotation is true", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -1105,7 +1105,7 @@ var _ = Describe("lbSpecFromService", func() {
 			)))
 		})
 
-		It("should disable session persistence when annotation is false", func() { //nolint:dupl // It's not a duplicate.
+		It("should disable session persistence when annotation is false", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -1435,7 +1435,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 		},
 	}),
-	Entry("When TCP idle timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+	Entry("When TCP idle timeout doesn't match", &compareLBwithSpecTest{
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
@@ -1464,7 +1464,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 		},
 	}),
-	Entry("When UDP idle timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+	Entry("When UDP idle timeout doesn't match", &compareLBwithSpecTest{
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
@@ -1493,7 +1493,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 		},
 	}),
-	Entry("When TCP proxy timeout doesn't match", &compareLBwithSpecTest{ //nolint:dupl // It's not a duplicate.
+	Entry("When TCP proxy timeout doesn't match", &compareLBwithSpecTest{
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{

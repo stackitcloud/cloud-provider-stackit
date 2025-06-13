@@ -307,7 +307,7 @@ var _ = Describe("LoadBalancer", func() {
 			}, nil)
 			// TODO: match payload
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).
-				DoAndReturn(func(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+				DoAndReturn(func(_ context.Context, _ string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
 					return &loadbalancer.CreateCredentialsResponse{
 						Credential: &loadbalancer.CredentialsResponse{
 							CredentialsRef: utils.Ptr("my-credential-ref"),
@@ -677,7 +677,7 @@ var _ = Describe("LoadBalancer", func() {
 	})
 
 	Describe("UpdateLoadBalancer", func() {
-		It("should update targets", func() { //nolint:dupl // the class name is stackit
+		It("should update targets", func() {
 			mockClient.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
 
 			svc := &corev1.Service{
@@ -740,7 +740,7 @@ var _ = Describe("LoadBalancer", func() {
 			Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
 		})
 
-		It("should update targets for non-STACKIT class name mode \"create & update\"", func() { //nolint:dupl // the class name is yawol
+		It("should update targets for non-STACKIT class name mode \"create & update\"", func() {
 			mockClient.EXPECT().UpdateTargetPool(gomock.Any(), projectID, gomock.Any(), "my-port", gomock.Any()).MinTimes(1)
 
 			svc := &corev1.Service{

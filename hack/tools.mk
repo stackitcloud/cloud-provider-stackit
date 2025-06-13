@@ -4,7 +4,7 @@ export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
 GOIMPORTS_REVISER_VERSION ?= v3.9.1
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION ?= v1.64.8
+GOLANGCI_LINT_VERSION ?= v2.1.6
 # renovate: datasource=github-releases depName=uber-go/mock
 MOCKGEN_VERSION ?= v0.5.2
 
