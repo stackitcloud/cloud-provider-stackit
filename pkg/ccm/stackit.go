@@ -1,4 +1,4 @@
-package stackit
+package ccm
 
 import (
 	"errors"
@@ -6,17 +6,16 @@ import (
 	"io"
 	"os"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
-
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/lbapi"
 )
 
 const (
@@ -32,7 +31,7 @@ const (
 	stackitLoadBalancerEmergencyAPIToken = "STACKIT_LB_API_EMERGENCY_TOKEN" //nolint:gosec // this is just the env var name
 )
 
-type Stackit struct {
+type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
 }
 
@@ -59,7 +58,7 @@ func init() {
 			klog.Warningf("failed to build metricsRemoteWrite: %v", err)
 			return nil, err
 		}
-		cloud, err := NewStackit(&cfg, obs)
+		cloud, err := NewCloudControllerManager(&cfg, obs)
 		if err != nil {
 			klog.Warningf("failed to create STACKIT cloud provider: %v", err)
 		}
@@ -141,8 +140,8 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 	return nil, fmt.Errorf("missing from env: %q", missingKeys)
 }
 
-// NewStackit creates a new instance of the stackit struct from a config struct
-func NewStackit(cfg *Config, obs *MetricsRemoteWrite) (*Stackit, error) {
+// NewCloudControllerManager creates a new instance of the stackit struct from a config struct
+func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
 	}
@@ -159,7 +158,7 @@ func NewStackit(cfg *Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := lbapi.NewClient(innerClient, cfg.Region)
+	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -169,49 +168,49 @@ func NewStackit(cfg *Config, obs *MetricsRemoteWrite) (*Stackit, error) {
 		return nil, err
 	}
 
-	stackit := Stackit{
+	ccm := CloudControllerManager{
 		loadBalancer: lb,
 	}
-	return &stackit, nil
+	return &ccm, nil
 }
 
-func (stackit *Stackit) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, _ <-chan struct{}) {
+func (ccm *CloudControllerManager) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, _ <-chan struct{}) {
 	// create an EventRecorder
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientBuilder.ClientOrDie("cloud-controller-manager").CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "stackit-cloud-controller-manager"})
-	stackit.loadBalancer.recorder = recorder
+	ccm.loadBalancer.recorder = recorder
 }
 
-func (stackit *Stackit) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return stackit.loadBalancer, true
+func (ccm *CloudControllerManager) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+	return ccm.loadBalancer, true
 }
 
-func (stackit *Stackit) Instances() (cloudprovider.Instances, bool) {
+func (ccm *CloudControllerManager) Instances() (cloudprovider.Instances, bool) {
 	return nil, false
 }
 
-func (stackit *Stackit) InstancesV2() (cloudprovider.InstancesV2, bool) {
+func (ccm *CloudControllerManager) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
 
-func (stackit *Stackit) Zones() (cloudprovider.Zones, bool) {
+func (ccm *CloudControllerManager) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-func (stackit *Stackit) Clusters() (cloudprovider.Clusters, bool) {
+func (ccm *CloudControllerManager) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (stackit *Stackit) Routes() (cloudprovider.Routes, bool) {
+func (ccm *CloudControllerManager) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-func (stackit *Stackit) ProviderName() string {
+func (ccm *CloudControllerManager) ProviderName() string {
 	return ProviderName
 }
 
-func (stackit *Stackit) HasClusterID() bool {
+func (ccm *CloudControllerManager) HasClusterID() bool {
 	return false
 }

@@ -1,4 +1,4 @@
-package lbapi
+package ccm_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestLBAPI(t *testing.T) {
+func TestStackit(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "LBAPI Suite")
+	RunSpecs(t, "Stackit Suite")
 }

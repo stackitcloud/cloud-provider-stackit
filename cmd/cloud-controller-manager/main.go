@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	_ "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -17,6 +16,8 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version"
 	"k8s.io/klog/v2"
+
+	_ "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 )
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 
 	if err := command.Execute(); err != nil {
 		logs.FlushLogs()
-		os.Exit(1) //nolint:golint,gocritic // os.Exit(1) is executed before defer
+		os.Exit(1) //nolint:gocritic // os.Exit(1) is executed before defer
 	}
 }
 

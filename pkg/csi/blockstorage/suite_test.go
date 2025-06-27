@@ -1,4 +1,4 @@
-package stackit
+package blockstorage
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestSTACKITProvider(t *testing.T) {
+func TestControllerServer(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "CSI STACKIT Provider Suite")
+	RunSpecs(t, "Block Storage CSI Suite")
 }

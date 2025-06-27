@@ -1,4 +1,4 @@
-package stackit_test
+package ccm_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"

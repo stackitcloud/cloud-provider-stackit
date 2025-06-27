@@ -1,4 +1,4 @@
-package stackit
+package ccm
 
 // This file contains annotations defined by yawol.
 // Some of them are supported by the cloud controller manager to simplify the transition.
