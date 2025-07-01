@@ -103,7 +103,7 @@ func handle() {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIAASClient()
+		iaasClient, err := stackit.CreateIAASClient(&cfg)
 		if err != nil {
 			klog.Fatalf("Failed to create IAAS client: %v", err)
 		}

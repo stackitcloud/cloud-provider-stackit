@@ -114,7 +114,8 @@ type BlockStorageOpts struct {
 }
 
 type GlobalOpts struct {
-	ProjectID string `gcfg:"project-id"`
+	ProjectID  string `gcfg:"project-id"`
+	IaasAPIURL string `gcfg:"iaas-api-url"`
 }
 
 type Config struct {
@@ -153,8 +154,9 @@ func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, err
 	return instance, nil
 }
 
-func CreateIAASClient() (iaas.DefaultApi, error) {
+func CreateIAASClient(cfg *Config) (iaas.DefaultApi, error) {
 	var userAgent []string
+	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))
 	for _, data := range userAgentData {
 		// Prepend userAgents
@@ -162,7 +164,13 @@ func CreateIAASClient() (iaas.DefaultApi, error) {
 	}
 	klog.V(4).Infof("Using user-agent: %s", userAgent)
 
-	return iaas.NewAPIClient(sdkconfig.WithUserAgent(strings.Join(userAgent, ",")))
+	if cfg.Global.IaasAPIURL != "" {
+		opts = append(opts, sdkconfig.WithEndpoint(cfg.Global.IaasAPIURL))
+	}
+
+	opts = append(opts, sdkconfig.WithUserAgent(strings.Join(userAgent, " ")))
+
+	return iaas.NewAPIClient(opts...)
 }
 
 func NewLoadbalancerClient(cl loadbalancer.DefaultApi, region string) (LoadbalancerClient, error) {
