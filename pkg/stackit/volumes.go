@@ -39,8 +39,11 @@ func (os *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolu
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	req, err := os.iaas.CreateVolume(ctxWithHTTPResp, os.projectID).CreateVolumePayload(*payload).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 
 	return req, nil
@@ -59,8 +62,11 @@ func (os *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	err = os.iaas.DeleteVolume(ctxWithHTTPResp, os.projectID, volumeID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return err
 	}
 
 	return err
@@ -83,8 +89,11 @@ func (os *iaasClient) AttachVolume(ctx context.Context, instanceID, volumeID str
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	_, err = os.iaas.AddVolumeToServer(ctxWithHTTPResp, os.projectID, instanceID, volumeID).AddVolumeToServerPayload(payload).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return "", csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return "", csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return "", err
 	}
 	return *volume.Id, err
 }
@@ -122,8 +131,11 @@ func (os *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, "", csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, "", csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, "", err
 	}
 
 	return *volumes.Items, "", err
@@ -171,8 +183,11 @@ func (os *iaasClient) DetachVolume(ctx context.Context, instanceID, volumeID str
 	if volume.ServerId != nil && *volume.ServerId == instanceID {
 		err = os.iaas.RemoveVolumeFromServer(ctxWithHTTPResp, os.projectID, instanceID, volumeID).Execute()
 		if err != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return csiError.WrapErrorWithResponseID(fmt.Errorf("failed to detach volume %s from compute %s : %v", *volume.Id, instanceID, err), reqID)
+			if httpResp != nil {
+				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+				return csiError.WrapErrorWithResponseID(fmt.Errorf("failed to detach volume %s from compute %s : %v", *volume.Id, instanceID, err), reqID)
+			}
+			return err
 		}
 		klog.V(2).Infof("Successfully detached volume: %s from compute: %s", *volume.Id, instanceID)
 		return nil
@@ -233,8 +248,11 @@ func (os *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Vol
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	vol, err := os.iaas.GetVolume(ctxWithHTTPResp, os.projectID, volumeID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 	return vol, nil
 }
@@ -245,8 +263,11 @@ func (os *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]i
 	// TODO: Add API filter once available.
 	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 
 	filterMap := map[string]string{"Name": volName}
@@ -313,10 +334,13 @@ func (os *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus s
 	case VolumeAttachedStatus, VolumeAvailableStatus:
 		resizeErr := os.iaas.ResizeVolume(ctxWithHTTPResp, os.projectID, volumeID).ResizeVolumePayload(extendOpts).Execute()
 		if resizeErr != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return csiError.WrapErrorWithResponseID(resizeErr, reqID)
+			if httpResp != nil {
+				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+				return csiError.WrapErrorWithResponseID(resizeErr, reqID)
+			}
+			return resizeErr
 		}
-		return resizeErr
+		return nil
 	default:
 		return fmt.Errorf("volume cannot be resized, when status is %s", volumeStatus)
 	}

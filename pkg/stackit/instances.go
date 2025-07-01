@@ -15,8 +15,11 @@ func (os *iaasClient) GetInstanceByID(ctx context.Context, instanceID string) (*
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	server, err := os.iaas.GetServer(ctxWithHTTPResp, os.projectID, instanceID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 	return server, nil
 }

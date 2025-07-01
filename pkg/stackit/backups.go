@@ -52,8 +52,11 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID).CreateBackupPayload(opts).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 
 	return backup, nil
@@ -65,8 +68,11 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 	// TODO: Add API filter once available.
 	backups, err := os.iaas.ListBackups(ctxWithHTTPResp, os.projectID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 
 	filteredBackups := filterBackups(*backups.Items, filters)
@@ -78,8 +84,11 @@ func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	err := os.iaas.DeleteBackup(ctxWithHTTPResp, os.projectID, backupID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-		return csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return err
 	}
 	return nil
 }
@@ -89,8 +98,11 @@ func (os *iaasClient) GetBackupByID(ctx context.Context, backupID string) (*iaas
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	backup, err := os.iaas.GetBackupExecute(ctxWithHTTPResp, os.projectID, backupID)
 	if err != nil {
-		reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 	return backup, nil
 }

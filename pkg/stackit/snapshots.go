@@ -39,8 +39,11 @@ func (os *iaasClient) CreateSnapshot(ctx context.Context, name, volID string, ta
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	snapshot, err := os.iaas.CreateSnapshot(ctxWithHTTPResp, os.projectID).CreateSnapshotPayload(opts).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 
 	return snapshot, nil
@@ -52,8 +55,11 @@ func (os *iaasClient) ListSnapshots(ctx context.Context, filters map[string]stri
 	// TODO: Add API filter once available.
 	snaps, err := os.iaas.ListSnapshots(ctxWithHTTPResp, os.projectID).Execute()
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, "", csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, "", csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, "", err
 	}
 
 	filteredSnaps := filterSnapshots(*snaps.Items, filters)
@@ -65,8 +71,11 @@ func (os *iaasClient) DeleteSnapshot(ctx context.Context, snapID string) error {
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	err := os.iaas.DeleteSnapshotExecute(ctxWithHTTPResp, os.projectID, snapID)
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return err
 	}
 	return nil
 }
@@ -76,8 +85,11 @@ func (os *iaasClient) GetSnapshotByID(ctx context.Context, snapshotID string) (*
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	snap, err := os.iaas.GetSnapshotExecute(ctxWithHTTPResp, os.projectID, snapshotID)
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
 	}
 	return snap, nil
 }
@@ -114,8 +126,11 @@ func (os *iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (b
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	snap, err := os.iaas.GetSnapshotExecute(ctxWithHTTPResp, os.projectID, snapshotID)
 	if err != nil {
-		reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-		return false, csiError.WrapErrorWithResponseID(err, reqID)
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return false, csiError.WrapErrorWithResponseID(err, reqID)
+		}
+		return false, err
 	}
 
 	return *snap.Status == SnapshotReadyStatus, nil
