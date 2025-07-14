@@ -92,6 +92,7 @@ mocks: $(MOCKGEN)
 	done
 	@$(MOCKGEN) -destination ./pkg/stackit/iaas_mock.go -package stackit ./pkg/stackit IaasClient
 	@$(MOCKGEN) -destination ./pkg/stackit/loadbalancer_mock.go -package stackit ./pkg/stackit LoadbalancerClient
+	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
 	@$(MOCKGEN) -destination ./pkg/util/mount/mount_mock.go -package mount ./pkg/util/mount IMount
 	@$(MOCKGEN) -destination ./pkg/util/metadata/metadata_mock.go -package metadata ./pkg/util/metadata IMetadata
 

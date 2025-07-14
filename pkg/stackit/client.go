@@ -93,6 +93,15 @@ type LoadbalancerClient interface {
 	DeleteCredentials(ctx context.Context, projectID string, credentialRef string) error
 }
 
+// NodeClient is the API client wrapper for the cloud-controller-manager's node-controller
+type NodeClient interface {
+	GetServer(ctx context.Context, projectID, serverID string) (*iaas.Server, error)
+	DeleteServer(ctx context.Context, projectID, serverID string) error
+	CreateServer(ctx context.Context, projectID string, create *iaas.CreateServerPayload) (*iaas.Server, error)
+	UpdateServer(ctx context.Context, projectID, serverID string, update *iaas.UpdateServerPayload) (*iaas.Server, error)
+	ListServers(ctx context.Context, projectID string) (*[]iaas.Server, error)
+}
+
 type iaasClient struct {
 	iaas      iaas.DefaultApi
 	projectID string
@@ -102,6 +111,10 @@ type iaasClient struct {
 type lbClient struct {
 	client loadbalancer.DefaultApi
 	region string
+}
+
+type nodeClient struct {
+	client *iaas.APIClient
 }
 
 //nolint:gocritic // The openstack package currently shadows but will be renamed anyway.
@@ -178,6 +191,10 @@ func NewLoadbalancerClient(cl loadbalancer.DefaultApi, region string) (Loadbalan
 		client: cl,
 		region: region,
 	}, nil
+}
+
+func NewNodeClient(cl *iaas.APIClient) (NodeClient, error) {
+	return &nodeClient{client: cl}, nil
 }
 
 func isOpenAPINotFound(err error) bool {

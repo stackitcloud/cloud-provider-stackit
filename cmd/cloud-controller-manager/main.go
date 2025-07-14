@@ -17,7 +17,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"
 	"k8s.io/klog/v2"
 
-	_ "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	_ "github.com/stackitcloud/cloud-provider-stackit/pkg/ccm"
 )
 
 func main() {
