@@ -88,17 +88,19 @@ func ParseEndpoint(ep string) (proto, addr string, err error) {
 
 func DetermineMaxVolumesByFlavor(flavor string) int64 {
 	flavorParts := strings.Split(flavor, ".")
-	// Flavors starting with 'n' are nvidia GPU flavors
-	if strings.HasPrefix(flavor, "n") {
-		// All GPU VM's can only mount 14 volumes
-		return 14
+
+	// The following numbers were specified by the IaaS team. They are based on actual tests.
+	switch {
+	case strings.HasPrefix(flavor, "n"):
+		// Flavors starting with 'n' are nvidia GPU flavors, all GPU VM's can only mount 10 volumes
+		return 10
+	case strings.HasSuffix(flavorParts[0], "2a"):
+		// AMD 2nd Gen
+		return 159
+	default:
+		// All other flavors can mount 28 volumes
+		return 25
 	}
-	// AMD 2nd Gen
-	if strings.HasSuffix(flavorParts[0], "2a") {
-		return 162
-	}
-	// All other flavors can mount 28 volumes
-	return 28
 }
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
