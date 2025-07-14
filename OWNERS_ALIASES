@@ -12,6 +12,7 @@ aliases:
   - duciwuci
   - hown3d
   - xoxys
+  - ftl
   ske-ci-infra-approvers:
   - dergeberl
   - einfachnuralex
@@ -24,3 +25,4 @@ aliases:
   - timebertt
   - hown3d
   - xoxys
+  - ftl
