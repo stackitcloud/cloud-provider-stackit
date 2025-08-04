@@ -2,12 +2,11 @@
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-BUILD_IMAGES ?= stackit-csi-plugin
+BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*')
 REGISTRY ?= reg3.infra.ske.eu01.stackit.cloud/stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
-LDFLAGS := "-w -s -X 'github.com/stackitcloud/cloud-provider-stackit/pkg/util/version.Version=$(VERSION)'"
 
 .PHONY: all
 all: verify
@@ -25,15 +24,23 @@ $(BUILD_IMAGES): $(SOURCES)
 		-o $@ \
 		cmd/$@/main.go
 
-# Build a single image for the local default platform and push to the local
-# container engine
-build-local-image-%:
-	docker buildx build --output type=docker \
-		--build-arg VERSION=$(VERSION) \
-		--tag $(REGISTRY)/$*:$(VERSION) \
-		--platform $(shell echo $(addprefix linux/,$(PLATFORMS)) | sed 's/ /,/g') \
-		--target $* \
-		.
+.PHONY: images
+images: $(foreach image,$(BUILD_IMAGES),image-$(image))
+
+# lazy reference, evaluated when called
+LOCAL = false
+ifeq ($(LOCAL),true)
+# includes busybox as extra dependency true check needed tools
+APKO_EXTRA_PACKAGES = busybox
+endif
+
+image-%: $(APKO) $(KO)
+	APKO_EXTRA_PACKAGES=$(APKO_EXTRA_PACKAGES) \
+	LOCAL=$(LOCAL) \
+	VERSION=$(VERSION) \
+	PLATFORMS="$(PLATFORMS)" \
+	REGISTRY=$(REGISTRY) \
+	./hack/build.sh $*
 
 .PHONY: clean-tools-bin
 clean-tools-bin: ## Empty the tools binary directory.
@@ -80,6 +87,28 @@ verify-modules: modules ## Verify go module files are up to date.
 
 .PHONY: verify
 verify: verify-fmt verify-modules check
+
+verify-e2e: verify-e2e-csi
+
+verify-e2e-csi-sequential: FOCUS = "External.Storage.*(\[Feature:|\[Disruptive\]|\[Serial\])"
+verify-e2e-csi-sequential: verify-e2e-csi
+
+verify-e2e-csi-parallel: FOCUS = "External.Storage.*(\[Feature:|\[Disruptive\]|\[Serial\])"
+verify-e2e-csi-parallel: SKIP = "\[Feature:|\[Disruptive\]|\[Serial\]"
+verify-e2e-csi-parallel: verify-e2e-csi
+
+verify-e2e-csi: $(KUBERNETES_TEST)
+	$(KUBERNETES_TEST_GINKGO) -v \
+  	-focus='$(FOCUS)' \
+		-skip='$(SKIP)' \
+  	$(KUBERNETES_TEST) -- \
+    -storage.testdriver=$(PWD)/test/e2e/csi/block-storage.yaml
+
+verify-image-stackit-csi-plugin: LOCAL = true
+verify-image-stackit-csi-plugin: APKO_EXTRA_PACKAGES = busybox
+verify-image-stackit-csi-plugin: image-stackit-csi-plugin
+	@echo "verifying binaries in image"
+	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/stackit-csi-plugin:$(VERSION) 
 
 # generate mock types for the following services (space-separated list)
 MOCK_SERVICES := iaas loadbalancer

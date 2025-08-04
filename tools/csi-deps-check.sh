@@ -30,7 +30,7 @@ set -o errexit
 /sbin/mke2fs -V
 /sbin/mkfs.ext4 -V
 /sbin/mkfs.xfs -V
-/usr/sbin/xfs_io -V
+/usr/sbin/xfs_io -V # not used by mount-utils though
 /sbin/xfs_repair -V
 /usr/sbin/xfs_growfs -V
 /bin/btrfs --version
@@ -39,3 +39,4 @@ set -o errexit
 # go mod github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount
 /bin/udevadm --version
 /bin/findmnt -V
+

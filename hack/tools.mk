@@ -1,12 +1,21 @@
 TOOLS_BIN_DIR := hack/tools/bin
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
+OS := $(shell uname -s | tr "[:upper:]" "[:lower:]")
+ARCH := $(shell uname -m)
+
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
 GOIMPORTS_REVISER_VERSION ?= v3.9.1
 # renovate: datasource=github-releases depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION ?= v2.1.6
 # renovate: datasource=github-releases depName=uber-go/mock
 MOCKGEN_VERSION ?= v0.5.2
+# renovate: datasource=github-releases depName=chainguard-dev/apko
+APKO_VERSION ?= v0.28.0
+# renovate: datasource=github-releases depName=ko-build/ko
+KO_VERSION ?= v0.18.0
+
+KUBERNETES_TEST_VERSION ?= v1.32.0
 
 # Tool targets should declare go.mod as a prerequisite, if the tool's version is managed via go modules. This causes
 # make to rebuild the tool in the desired version, when go.mod is changed.
@@ -35,3 +44,16 @@ $(GOLANGCI_LINT): $(call tool_version_file,$(GOLANGCI_LINT),$(GOLANGCI_LINT_VERS
 MOCKGEN := $(TOOLS_BIN_DIR)/mockgen
 $(MOCKGEN): $(call tool_version_file,$(MOCKGEN),$(MOCKGEN_VERSION))
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
+
+APKO := $(TOOLS_BIN_DIR)/apko
+$(APKO): $(call tool_version_file,$(APKO),$(APKO_VERSION))
+	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install chainguard.dev/apko@$(APKO_VERSION)
+
+KO := $(TOOLS_BIN_DIR)/ko
+$(KO): $(call tool_version_file,$(KO),$(KO_VERSION))
+	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/google/ko@$(KO_VERSION)
+
+KUBERNETES_TEST := $(TOOLS_BIN_DIR)/e2e.test
+KUBERNETES_TEST_GINKGO := $(TOOLS_BIN_DIR)/ginkgo
+$(KUBERNETES_TEST): $(call tool_version_file,$(KUBERNETES_TEST),$(KUBERNETES_TEST_VERSION))
+	curl --location https://dl.k8s.io/$(KUBERNETES_TEST_VERSION)/kubernetes-test-$(OS)-$(ARCH).tar.gz | tar -C $(TOOLS_BIN_DIR) --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
