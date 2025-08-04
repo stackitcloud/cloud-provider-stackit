@@ -49,8 +49,7 @@ if git_tag="$(git describe --tags --exact-match 2>/dev/null)"; then
   tags+=("$git_tag")
 fi
 
-REPO=${REGISTRY}/stackitcloud/${IMAGE}
-BASE_IMAGE=${REPO}-base
+BASE_IMAGE=${REGISTRY}/${REPO}-base
 platforms=(${PLATFORMS})
 if [[ -f cmd/$IMAGE/apko-base-image.yaml ]]; then
   if [[ ${LOCAL} == "true" ]]; then
@@ -82,7 +81,7 @@ labels=(
   org.opencontainers.image.url=https://github.com/stackitcloud/cloud-provider-stackit
 )
 
-KO_DOCKER_REPO=${REPO} \
+KO_DOCKER_REPO=${REGISTRY}/${REPO} \
   ko build --local=${LOCAL} \
   -t $(comma_seperated "${tags[@]}") \
   --sbom=none \
