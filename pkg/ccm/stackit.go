@@ -8,7 +8,6 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +35,6 @@ const (
 
 type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
-	instances    *Instances
 }
 
 // Config is used to read and store information from the cloud configuration file
@@ -167,21 +165,6 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		return nil, err
 	}
 
-	iaasInnerClient, err := iaas.NewAPIClient(
-		sdkconfig.WithRegion(cfg.Region),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
-	}
-	nodeClient, err := stackit.NewNodeClient(iaasInnerClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Node client: %v", err)
-	}
-	instances, err := NewInstance(nodeClient, cfg.ProjectID, cfg.Region)
-	if err != nil {
-		return nil, err
-	}
-
 	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.NonStackitClassNames, obs)
 	if err != nil {
 		return nil, err
@@ -189,7 +172,6 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 
 	ccm := CloudControllerManager{
 		loadBalancer: lb,
-		instances:    instances,
 	}
 	return &ccm, nil
 }
@@ -204,7 +186,7 @@ func (ccm *CloudControllerManager) Initialize(clientBuilder cloudprovider.Contro
 }
 
 func (ccm *CloudControllerManager) InstancesV2() (cloudprovider.InstancesV2, bool) {
-	return ccm.instances, true
+	return nil, true
 }
 
 func (ccm *CloudControllerManager) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
