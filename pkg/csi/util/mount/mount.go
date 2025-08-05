@@ -29,7 +29,7 @@ import (
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/blockdevice"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/blockdevice"
 )
 
 const (

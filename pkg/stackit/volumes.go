@@ -13,7 +13,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
-	csiError "github.com/stackitcloud/cloud-provider-stackit/pkg/util/errors"
+	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 )
 
 const (
@@ -41,7 +41,7 @@ func (os *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolu
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (os *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return csiError.WrapErrorWithResponseID(err, reqID)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return err
 	}
@@ -91,7 +91,7 @@ func (os *iaasClient) AttachVolume(ctx context.Context, instanceID, volumeID str
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return "", csiError.WrapErrorWithResponseID(err, reqID)
+			return "", stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return "", err
 	}
@@ -133,7 +133,7 @@ func (os *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, "", csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, "", stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, "", err
 	}
@@ -150,7 +150,7 @@ func (os *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		attached, err := os.diskIsAttached(ctx, instanceID, volumeID)
-		if err != nil && !csiError.IsNotFound(err) {
+		if err != nil && !stackiterrors.IsNotFound(err) {
 			// if this is a race condition indicate the volume is deleted
 			// during sleep phase, ignore the error and return attach=false
 			return false, err
@@ -185,7 +185,7 @@ func (os *iaasClient) DetachVolume(ctx context.Context, instanceID, volumeID str
 		if err != nil {
 			if httpResp != nil {
 				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-				return csiError.WrapErrorWithResponseID(fmt.Errorf("failed to detach volume %s from compute %s : %v", *volume.Id, instanceID, err), reqID)
+				return stackiterrors.WrapErrorWithResponseID(fmt.Errorf("failed to detach volume %s from compute %s : %v", *volume.Id, instanceID, err), reqID)
 			}
 			return err
 		}
@@ -196,6 +196,7 @@ func (os *iaasClient) DetachVolume(ctx context.Context, instanceID, volumeID str
 	// Disk has no attachments or not attached to provided compute
 	return nil
 }
+
 func (os *iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error {
 	backoff := wait.Backoff{
 		Duration: diskDetachInitDelay,
@@ -250,7 +251,7 @@ func (os *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Vol
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}
@@ -265,7 +266,7 @@ func (os *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]i
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}
@@ -283,7 +284,7 @@ func (os *iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.V
 	}
 
 	if len(vols) == 0 {
-		return nil, csiError.ErrNotFound
+		return nil, stackiterrors.ErrNotFound
 	}
 
 	if len(vols) > 1 {
@@ -336,7 +337,7 @@ func (os *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus s
 		if resizeErr != nil {
 			if httpResp != nil {
 				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-				return csiError.WrapErrorWithResponseID(resizeErr, reqID)
+				return stackiterrors.WrapErrorWithResponseID(resizeErr, reqID)
 			}
 			return resizeErr
 		}

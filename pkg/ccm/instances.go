@@ -23,8 +23,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 
 	corev1 "k8s.io/api/core/v1"
@@ -135,7 +135,7 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 			Address: server.GetName(),
 		})
 
-	availabilityZone := util.SanitizeLabel(server.GetAvailabilityZone())
+	availabilityZone := labels.Sanitize(server.GetAvailabilityZone())
 
 	return &cloudprovider.InstanceMetadata{
 		ProviderID:    i.makeInstanceID(server),
@@ -198,7 +198,7 @@ func getServerByName(ctx context.Context, client stackit.NodeClient, name, proje
 		return nil, cloudprovider.InstanceNotFound
 	}
 
-	//TODO: Implement field selector for ListServers so we don't have to do the following
+	// TODO: Implement field selector for ListServers so we don't have to do the following
 	for i := range serverList {
 		server := serverList[i]
 		if serverName, ok := server.GetNameOk(); ok && serverName == name {

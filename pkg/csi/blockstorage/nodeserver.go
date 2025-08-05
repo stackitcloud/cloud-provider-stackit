@@ -32,10 +32,10 @@ import (
 	utilpath "k8s.io/utils/path"
 
 	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/blockdevice"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/blockdevice"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 type nodeServer struct {
@@ -219,7 +219,6 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		r := mountutil.NewResizeFs(ns.Mount.Mounter().Exec)
 
 		needResize, err := r.NeedResize(devicePath, stagingTarget)
-
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not determine if volume %q need to be resized: %v", volumeID, err)
 		}

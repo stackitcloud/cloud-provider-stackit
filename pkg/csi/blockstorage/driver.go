@@ -8,9 +8,9 @@ import (
 	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/version"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
 )
 
 const (

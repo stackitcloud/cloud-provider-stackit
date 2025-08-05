@@ -11,10 +11,10 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/version"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
 )
 
 var (

@@ -34,8 +34,7 @@ import (
 
 	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util"
-	cpoerrors "github.com/stackitcloud/cloud-provider-stackit/pkg/util/errors"
+	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 )
 
 type controllerServer struct {
@@ -81,11 +80,11 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Volume Size - Default is 1 GiB
-	volSizeBytes := int64(1 * util.GIBIBYTE)
+	volSizeBytes := 1 * GIBIBYTE
 	if req.GetCapacityRange() != nil {
 		volSizeBytes = req.GetCapacityRange().GetRequiredBytes()
 	}
-	volSizeGB := util.RoundUpSize(volSizeBytes, util.GIBIBYTE)
+	volSizeGB := roundUpSize(volSizeBytes, GIBIBYTE)
 
 	// Volume Type
 	volType := volParams["type"]
@@ -155,7 +154,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeSourceType = stackit.SnapshotSource
 
 		snap, err := cloud.GetSnapshotByID(ctx, sourceSnapshotID)
-		if cpoerrors.IgnoreNotFound(err) != nil {
+		if stackiterrors.IgnoreNotFound(err) != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
 		}
 		// If the snapshot exists but is not yet available, fail.
@@ -163,7 +162,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Errorf(codes.Unavailable, "VolumeContentSource Snapshot %s is not yet available. status: %s", sourceSnapshotID, *snap.Status)
 		}
 		// Only continue checking if the Snapshot is found
-		if !cpoerrors.IsNotFound(err) {
+		if !stackiterrors.IsNotFound(err) {
 			// TODO: Remove cloud.GetVolume() once IaaS adds the AZ field in the response of GetSnapshotByID()
 			snapshotVolSrc, err := cloud.GetVolume(ctx, snap.GetVolumeId())
 			if err != nil {
@@ -176,7 +175,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		// In case a snapshot is not found
 		// check if a Backup with the same ID exists
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			var back *iaas.Backup
 			back, err = cloud.GetBackupByID(ctx, sourceBackupID)
 			if err != nil {
@@ -196,7 +195,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		sourceVolID = content.GetVolume().GetVolumeId()
 		sourceVolume, err := cloud.GetVolume(ctx, sourceVolID)
 		if err != nil {
-			if cpoerrors.IsNotFound(err) {
+			if stackiterrors.IsNotFound(err) {
 				return nil, status.Errorf(codes.NotFound, "Source Volume %s not found", sourceVolID)
 			}
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume %s: %v", sourceVolID, err)
@@ -212,8 +211,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		PerformanceClass: ptr.To(volType),
 		Size:             ptr.To(volSizeGB),
 		AvailabilityZone: ptr.To(volAvailability),
-		//TODO: IaaS API is crap and does not allow dots or slashes. Waiting for IaaS to update regex.
-		//Labels:           ptr.To(util.ConvertMapStringToInterface(properties)),
+		// TODO: IaaS API is crap and does not allow dots or slashes. Waiting for IaaS to update regex.
+		// Labels:           ptr.To(util.ConvertMapStringToInterface(properties)),
 	}
 
 	// Only set CreateVolumePayload.Source when actually creating volume from source/snapshot/backup
@@ -267,7 +266,7 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	err := cloud.DeleteVolume(ctx, volID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("Volume %s is already deleted.", volID)
 			return &csi.DeleteVolumeResponse{}, nil
 		}
@@ -302,7 +301,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	_, err := cloud.GetVolume(ctx, volumeID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Volume %s not found", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] get volume failed with error %v", err)
@@ -310,7 +309,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	_, err = cloud.GetInstanceByID(ctx, instanceID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
 		}
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
@@ -347,7 +346,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 	_, err := cloud.GetInstanceByID(ctx, instanceID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because node %s does not exist", volumeID, instanceID)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
@@ -356,7 +355,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 	err = cloud.DetachVolume(ctx, instanceID, volumeID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because it does not exist", volumeID)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
@@ -367,7 +366,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	err = cloud.WaitDiskDetached(ctx, instanceID, volumeID)
 	if err != nil {
 		klog.Errorf("Failed to WaitDiskDetached: %v", err)
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because it was deleted in the meanwhile", volumeID)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
@@ -385,7 +384,7 @@ func (cs *controllerServer) createVolumeEntries(vlist []iaas.Volume) []*csi.List
 		entries[i] = &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
 				VolumeId:      *v.Id,
-				CapacityBytes: *v.Size * util.GIBIBYTE,
+				CapacityBytes: *v.Size * GIBIBYTE,
 			},
 		}
 		if v.ServerId != nil {
@@ -409,12 +408,12 @@ func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	cloud := cs.Instance
 
 	var volumeList []iaas.Volume
-	//TODO: There is not pagination for listing volumes so we will just pass empty to startingToken
+	// TODO: There is not pagination for listing volumes so we will just pass empty to startingToken
 	// It's not used anyway.
 	volumeList, _, err = cloud.ListVolumes(ctx, maxEntries, "")
 	if err != nil {
 		klog.Errorf("Failed to ListVolumes: %v", err)
-		if cpoerrors.IsInvalidError(err) {
+		if stackiterrors.IsInvalidError(err) {
 			return nil, status.Errorf(codes.Aborted, "[ListVolumes] Invalid request: %v", err)
 		}
 		return nil, status.Errorf(codes.Internal, "ListVolumes failed with error %v", err)
@@ -532,7 +531,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		return &csi.CreateSnapshotResponse{
 			Snapshot: &csi.Snapshot{
 				SnapshotId:     *snap.Id,
-				SizeBytes:      *snap.Size * util.GIBIBYTE,
+				SizeBytes:      *snap.Size * GIBIBYTE,
 				SourceVolumeId: *snap.VolumeId,
 				CreationTime:   ctime,
 				ReadyToUse:     true,
@@ -568,7 +567,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	err = cloud.DeleteSnapshot(ctx, *backup.SnapshotId)
-	if err != nil && !cpoerrors.IsNotFound(err) {
+	if err != nil && !stackiterrors.IsNotFound(err) {
 		klog.Errorf("Failed to DeleteSnapshot: %v", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("DeleteSnapshot failed with error %v", err))
 	}
@@ -576,7 +575,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	return &csi.CreateSnapshotResponse{
 		Snapshot: &csi.Snapshot{
 			SnapshotId:     *backup.Id,
-			SizeBytes:      *backup.Size * util.GIBIBYTE,
+			SizeBytes:      *backup.Size * GIBIBYTE,
 			SourceVolumeId: *backup.VolumeId,
 			CreationTime:   ctime,
 			ReadyToUse:     true,
@@ -686,7 +685,7 @@ func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	// Delegate the check to stackit itself
 	err = cloud.DeleteSnapshot(ctx, id)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("Snapshot %s is already deleted.", id)
 			return &csi.DeleteSnapshotResponse{}, nil
 		}
@@ -703,7 +702,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	if snapshotID != "" {
 		snap, err := cloud.GetSnapshotByID(ctx, snapshotID)
 		if err != nil {
-			if cpoerrors.IsNotFound(err) {
+			if stackiterrors.IsNotFound(err) {
 				klog.V(3).Infof("Snapshot %s not found", snapshotID)
 				return &csi.ListSnapshotsResponse{}, nil
 			}
@@ -714,7 +713,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 		entry := &csi.ListSnapshotsResponse_Entry{
 			Snapshot: &csi.Snapshot{
-				SizeBytes:      *snap.Size * util.GIBIBYTE,
+				SizeBytes:      *snap.Size * GIBIBYTE,
 				SnapshotId:     *snap.Id,
 				SourceVolumeId: *snap.VolumeId,
 				CreationTime:   ctime,
@@ -758,7 +757,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 		sentry := csi.ListSnapshotsResponse_Entry{
 			Snapshot: &csi.Snapshot{
-				SizeBytes:      *v.Size * util.GIBIBYTE,
+				SizeBytes:      *v.Size * GIBIBYTE,
 				SnapshotId:     *v.Id,
 				SourceVolumeId: *v.VolumeId,
 				CreationTime:   ctime,
@@ -799,7 +798,7 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 
 	_, err := cloud.GetVolume(ctx, volumeID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "ValidateVolumeCapabilities Volume %s not found", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "ValidateVolumeCapabilities %v", err)
@@ -843,7 +842,7 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	var err error
 	volume, err = cloud.GetVolume(ctx, volumeID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "Volume %s not found", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "ControllerGetVolume failed with error %v", err)
@@ -852,7 +851,7 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	ventry := csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      volumeID,
-			CapacityBytes: *volume.Size * util.GIBIBYTE,
+			CapacityBytes: *volume.Size * GIBIBYTE,
 		},
 	}
 
@@ -878,7 +877,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	}
 
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
-	volSizeGB := util.RoundUpSize(volSizeBytes, util.GIBIBYTE)
+	volSizeGB := roundUpSize(volSizeBytes, GIBIBYTE)
 	maxVolSize := volCap.GetLimitBytes()
 
 	if maxVolSize > 0 && maxVolSize < volSizeBytes {
@@ -887,7 +886,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	volume, err := cloud.GetVolume(ctx, volumeID)
 	if err != nil {
-		if cpoerrors.IsNotFound(err) {
+		if stackiterrors.IsNotFound(err) {
 			return nil, status.Error(codes.NotFound, "Volume not found")
 		}
 		return nil, status.Errorf(codes.Internal, "GetVolume failed with error %v", err)
@@ -897,7 +896,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		// a volume was already resized
 		klog.V(2).Infof("Volume %q has been already expanded to %d, requested %d", volumeID, volume.Size, volSizeGB)
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         *volume.Size * util.GIBIBYTE,
+			CapacityBytes:         *volume.Size * GIBIBYTE,
 			NodeExpansionRequired: true,
 		}, nil
 	}
@@ -973,7 +972,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:           *vol.Id,
-			CapacityBytes:      *vol.Size * util.GIBIBYTE,
+			CapacityBytes:      *vol.Size * GIBIBYTE,
 			AccessibleTopology: accessibleTopology,
 			ContentSource:      volsrc,
 			VolumeContext:      volCnx,

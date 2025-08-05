@@ -26,11 +26,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	"k8s.io/utils/exec"
 )
 
@@ -48,7 +49,7 @@ const (
 
 	// Config drive is defined as an iso9660 or vfat (deprecated) drive
 	// with the "config-2" label.
-	//https://docs.openstack.org/nova/latest/user/config-drive.html
+	// https://docs.openstack.org/nova/latest/user/config-drive.html
 	configDriveLabel        = "config-2"
 	configDrivePathTemplate = "stackit/%s/meta_data.json"
 
@@ -68,8 +69,23 @@ var metadataCache *Metadata
 // revive:enable:exported
 // Opts is used for configuring how to talk to metadata service or config drive
 type Opts struct {
-	SearchOrder    string          `gcfg:"search-order"`
-	RequestTimeout util.MyDuration `gcfg:"request-timeout"`
+	SearchOrder    string   `gcfg:"search-order"`
+	RequestTimeout Duration `gcfg:"request-timeout"`
+}
+
+// Duration is the encoding.TextUnmarshaler interface for time.Duration
+type Duration struct {
+	time.Duration
+}
+
+// UnmarshalText is used to convert from text to Duration
+func (d *Duration) UnmarshalText(text []byte) error {
+	res, err := time.ParseDuration(string(text))
+	if err != nil {
+		return err
+	}
+	d.Duration = res
+	return nil
 }
 
 // DeviceMetadata is a single/simplified data structure for all kinds of device metadata types.
@@ -337,7 +353,7 @@ func (m *metadataService) GetAvailabilityZone(ctx context.Context) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return util.SanitizeLabel(md.AvailabilityZone), nil
+	return labels.Sanitize(md.AvailabilityZone), nil
 }
 
 func (m *metadataService) GetFlavor(ctx context.Context) (string, error) {

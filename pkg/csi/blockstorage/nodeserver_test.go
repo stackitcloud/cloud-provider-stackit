@@ -13,8 +13,8 @@ import (
 	mountutils "k8s.io/mount-utils"
 
 	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 var _ = Describe("NodeServer", func() {

@@ -12,8 +12,7 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
 	"k8s.io/utils/ptr"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util"
-	csiError "github.com/stackitcloud/cloud-provider-stackit/pkg/util/errors"
+	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 )
 
 const (
@@ -46,7 +45,7 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 		},
 	}
 	if tags != nil {
-		opts.Labels = ptr.To(util.ConvertMapStringToInterface(tags))
+		opts.Labels = ptr.To(map[string]interface{}(labelsFromTags(tags)))
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -54,7 +53,7 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}
@@ -70,7 +69,7 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}
@@ -86,7 +85,7 @@ func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return csiError.WrapErrorWithResponseID(err, reqID)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return err
 	}
@@ -100,7 +99,7 @@ func (os *iaasClient) GetBackupByID(ctx context.Context, backupID string) (*iaas
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}

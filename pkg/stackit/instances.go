@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	csiError "github.com/stackitcloud/cloud-provider-stackit/pkg/util/errors"
+	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
@@ -17,7 +17,7 @@ func (os *iaasClient) GetInstanceByID(ctx context.Context, instanceID string) (*
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return nil, csiError.WrapErrorWithResponseID(err, reqID)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return nil, err
 	}

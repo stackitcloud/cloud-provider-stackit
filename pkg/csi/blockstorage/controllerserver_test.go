@@ -19,7 +19,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util"
 )
 
 var _ = Describe("ControllerServer test", Ordered, func() {
@@ -30,7 +29,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		FakeCluster        = "cluster"
 		expandTargetStatus = []string{stackit.VolumeAvailableStatus, stackit.VolumeAttachedStatus}
 		stdCapRange        = &csi.CapacityRange{
-			RequiredBytes: util.GIBIBYTE * 20,
+			RequiredBytes: GIBIBYTE * 20,
 		}
 		stdSnapParams = map[string]string{
 			"type": "snapshot",
@@ -79,7 +78,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.Volume.VolumeId).To(Equal("volume-id"))
-			Expect(resp.Volume.CapacityBytes).To(Equal(int64(util.GIBIBYTE * 20)))
+			Expect(resp.Volume.CapacityBytes).To(Equal(GIBIBYTE * 20))
 		})
 
 		It("should not accept an empty volume name", func() {
@@ -198,7 +197,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.Volume.VolumeId).To(Equal("existing-available-volume-id"))
-			Expect(resp.Volume.CapacityBytes).To(Equal(int64(util.GIBIBYTE * 20)))
+			Expect(resp.Volume.CapacityBytes).To(Equal(GIBIBYTE * 20))
 		})
 
 		It("should fail if a volume exists but does not fit in size", func() {
@@ -269,9 +268,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		})
 
 		Context("content source", func() {
-			var (
-				req *csi.CreateVolumeRequest
-			)
+			var req *csi.CreateVolumeRequest
 
 			BeforeEach(func() {
 				req = &csi.CreateVolumeRequest{
@@ -610,13 +607,13 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Volume: &csi.Volume{
 						VolumeId:      "fake",
-						CapacityBytes: 10 * util.GIBIBYTE,
+						CapacityBytes: 10 * GIBIBYTE,
 					},
 				},
 				{
 					Volume: &csi.Volume{
 						VolumeId:      "fake1",
-						CapacityBytes: 10 * util.GIBIBYTE,
+						CapacityBytes: 10 * GIBIBYTE,
 					},
 					Status: &csi.ListVolumesResponse_VolumeStatus{
 						PublishedNodeIds: []string{"serverID"},
@@ -679,7 +676,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			}
 			expectedVol := &iaas.Volume{
 				ServerId: ptr.To("fake"),
-				Size:     ptr.To(int64(100 * util.GIBIBYTE)),
+				Size:     ptr.To(100 * GIBIBYTE),
 			}
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(expectedVol, nil)
 			resp, err := fakeCs.ControllerGetVolume(context.Background(), req)
@@ -694,7 +691,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:      "fake",
 				CapacityRange: stdCapRange,
 			}
-			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
+			volSizeGB := roundUpSize(req.GetCapacityRange().GetRequiredBytes(), GIBIBYTE)
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
 				Size:   ptr.To(int64(10)),
 				Status: ptr.To(stackit.VolumeAvailableStatus),
@@ -709,7 +706,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:      "fake",
 				CapacityRange: stdCapRange,
 			}
-			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
+			volSizeGB := roundUpSize(req.GetCapacityRange().GetRequiredBytes(), GIBIBYTE)
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
 				Size:   ptr.To(int64(10)),
 				Status: ptr.To("ERROR"),
@@ -793,7 +790,6 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("should find multiple backups and report with error", func() {
-
 				iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).Return([]iaas.Backup{
 					{
 						Id: ptr.To("fake-snapshot"),
@@ -888,7 +884,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				// properties := map[string]string{blockStorageCSIClusterIDKey: "cluster"}
 				properties := map[string]string{}
 
-				//TODO: Again filters are not implemented yet by the API
+				// TODO: Again filters are not implemented yet by the API
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), "fake-snapshot", req.SourceVolumeId, properties).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
@@ -905,15 +901,14 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					CreatedAt: ptr.To(time.Now()),
 				}
 
-				//TODO: Again filters are not implemented yet by the API
+				// TODO: Again filters are not implemented yet by the API
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{*expectedSnap}, "", nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(ptr.To("AVAILABLE"), nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("should fail when we find more than one snapshot with the same name", func() {
-
-				//TODO: Again filters are not implemented yet by the API
+				// TODO: Again filters are not implemented yet by the API
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{
 					{
 						Id: ptr.To("fake-snapshot"),
@@ -928,8 +923,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				Expect(status.Convert(err).Message()).To(ContainSubstring("Multiple snapshots reported by Cinder with same name"))
 			})
 			It("should fail when snapshot name already exists but with different volume id", func() {
-
-				//TODO: Again filters are not implemented yet by the API
+				// TODO: Again filters are not implemented yet by the API
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{
 					{
 						Id:       ptr.To("fake-snapshot"),
@@ -953,7 +947,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Snapshot: &csi.Snapshot{
 						SnapshotId:     "special-snapshot",
-						SizeBytes:      10 * util.GIBIBYTE,
+						SizeBytes:      10 * GIBIBYTE,
 						CreationTime:   timestamppb.New(snapShotCreationTime),
 						SourceVolumeId: "fake",
 						ReadyToUse:     true,
@@ -980,7 +974,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Snapshot: &csi.Snapshot{
 						SnapshotId:     "fake-snapshot",
-						SizeBytes:      10 * util.GIBIBYTE,
+						SizeBytes:      10 * GIBIBYTE,
 						CreationTime:   timestamppb.New(snapShotCreationTime),
 						SourceVolumeId: "something-different",
 						ReadyToUse:     true,

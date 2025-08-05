@@ -31,12 +31,12 @@ import (
 	"gopkg.in/gcfg.v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/version"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 // userAgentData is used to add extra information to the STACKIT SDK user-agent

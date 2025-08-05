@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/metadata"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
@@ -16,9 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	serverGRPCEndpointCallCounter uint64
-)
+var serverGRPCEndpointCallCounter uint64
 
 func NewControllerServiceCapability(rpcType csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
 	return &csi.ControllerServiceCapability{
@@ -101,6 +99,29 @@ func DetermineMaxVolumesByFlavor(flavor string) int64 {
 		// All other flavors can mount 28 volumes
 		return 25
 	}
+}
+
+const (
+	BYTE int64 = 1.0 << (10 * iota)
+	KIBIBYTE
+	MEBIBYTE
+	GIBIBYTE
+	TEBIBYTE
+)
+
+// roundUpSize calculates how many allocation units are needed to accommodate
+// a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
+// allocates volumes in gibibyte-sized chunks,
+// roundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
+// (2 GiB is the smallest allocatable volume that can hold 1500MiB)
+//
+//nolint:unparam // might use different size in the future
+func roundUpSize(volumeSizeBytes, allocationUnitBytes int64) int64 {
+	roundedUp := volumeSizeBytes / allocationUnitBytes
+	if volumeSizeBytes%allocationUnitBytes > 0 {
+		roundedUp++
+	}
+	return roundedUp
 }
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
