@@ -87,8 +87,14 @@ verify-modules: modules ## Verify go module files are up to date.
 		echo "go module files are out of date, please run 'make modules'"; exit 1; \
 	fi
 
+.PHONY: verify-generate
+verify-generate: generate ## Verify go module files are up to date.
+	@if !(git diff --quiet HEAD); then \
+		echo "generate created a diff, please run 'make generate'"; exit 1; \
+	fi
+
 .PHONY: verify
-verify: verify-fmt verify-modules check
+verify: verify-fmt verify-modules verify-generate check
 
 verify-e2e: verify-e2e-csi
 
@@ -117,6 +123,9 @@ MOCK_SERVICES := iaas loadbalancer
 
 .PHONY: mocks
 mocks: $(MOCKGEN)
+	# clean mocks
+	@rm **/*/*_mock.go || true
+	# generate mocks
 	@for service in $(MOCK_SERVICES); do \
 		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | paste -sd,`,DefaultApi; \
 		$(MOCKGEN) -destination ./pkg/mock/$$service/$$service.go -package $$service github.com/stackitcloud/stackit-sdk-go/services/$$service $$INTERFACES; \
@@ -124,8 +133,8 @@ mocks: $(MOCKGEN)
 	@$(MOCKGEN) -destination ./pkg/stackit/iaas_mock.go -package stackit ./pkg/stackit IaasClient
 	@$(MOCKGEN) -destination ./pkg/stackit/loadbalancer_mock.go -package stackit ./pkg/stackit LoadbalancerClient
 	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
-	@$(MOCKGEN) -destination ./pkg/util/mount/mount_mock.go -package mount ./pkg/util/mount IMount
-	@$(MOCKGEN) -destination ./pkg/util/metadata/metadata_mock.go -package metadata ./pkg/util/metadata IMetadata
+	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
+	@$(MOCKGEN) -destination ./pkg/csi/util/mount/mount_mock.go -package mount ./pkg/csi/util/mount IMount
 
 .PHONY: generate
 generate: mocks

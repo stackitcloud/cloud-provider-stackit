@@ -42,75 +42,75 @@ func (m *MockNodeClient) EXPECT() *MockNodeClientMockRecorder {
 }
 
 // CreateServer mocks base method.
-func (m *MockNodeClient) CreateServer(ctx context.Context, projectId string, create *iaas.CreateServerPayload) (*iaas.Server, error) {
+func (m *MockNodeClient) CreateServer(ctx context.Context, projectID string, create *iaas.CreateServerPayload) (*iaas.Server, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateServer", ctx, projectId, create)
+	ret := m.ctrl.Call(m, "CreateServer", ctx, projectID, create)
 	ret0, _ := ret[0].(*iaas.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateServer indicates an expected call of CreateServer.
-func (mr *MockNodeClientMockRecorder) CreateServer(ctx, projectId, create any) *gomock.Call {
+func (mr *MockNodeClientMockRecorder) CreateServer(ctx, projectID, create any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServer", reflect.TypeOf((*MockNodeClient)(nil).CreateServer), ctx, projectId, create)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServer", reflect.TypeOf((*MockNodeClient)(nil).CreateServer), ctx, projectID, create)
 }
 
 // DeleteServer mocks base method.
-func (m *MockNodeClient) DeleteServer(ctx context.Context, projectId, serverId string) error {
+func (m *MockNodeClient) DeleteServer(ctx context.Context, projectID, serverID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteServer", ctx, projectId, serverId)
+	ret := m.ctrl.Call(m, "DeleteServer", ctx, projectID, serverID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteServer indicates an expected call of DeleteServer.
-func (mr *MockNodeClientMockRecorder) DeleteServer(ctx, projectId, serverId any) *gomock.Call {
+func (mr *MockNodeClientMockRecorder) DeleteServer(ctx, projectID, serverID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServer", reflect.TypeOf((*MockNodeClient)(nil).DeleteServer), ctx, projectId, serverId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServer", reflect.TypeOf((*MockNodeClient)(nil).DeleteServer), ctx, projectID, serverID)
 }
 
 // GetServer mocks base method.
-func (m *MockNodeClient) GetServer(ctx context.Context, projectId, serverId string) (*iaas.Server, error) {
+func (m *MockNodeClient) GetServer(ctx context.Context, projectID, serverID string) (*iaas.Server, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetServer", ctx, projectId, serverId)
+	ret := m.ctrl.Call(m, "GetServer", ctx, projectID, serverID)
 	ret0, _ := ret[0].(*iaas.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetServer indicates an expected call of GetServer.
-func (mr *MockNodeClientMockRecorder) GetServer(ctx, projectId, serverId any) *gomock.Call {
+func (mr *MockNodeClientMockRecorder) GetServer(ctx, projectID, serverID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockNodeClient)(nil).GetServer), ctx, projectId, serverId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockNodeClient)(nil).GetServer), ctx, projectID, serverID)
 }
 
 // ListServers mocks base method.
-func (m *MockNodeClient) ListServers(ctx context.Context, projectId string) (*[]iaas.Server, error) {
+func (m *MockNodeClient) ListServers(ctx context.Context, projectID string) (*[]iaas.Server, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListServers", ctx, projectId)
+	ret := m.ctrl.Call(m, "ListServers", ctx, projectID)
 	ret0, _ := ret[0].(*[]iaas.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListServers indicates an expected call of ListServers.
-func (mr *MockNodeClientMockRecorder) ListServers(ctx, projectId any) *gomock.Call {
+func (mr *MockNodeClientMockRecorder) ListServers(ctx, projectID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServers", reflect.TypeOf((*MockNodeClient)(nil).ListServers), ctx, projectId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServers", reflect.TypeOf((*MockNodeClient)(nil).ListServers), ctx, projectID)
 }
 
 // UpdateServer mocks base method.
-func (m *MockNodeClient) UpdateServer(ctx context.Context, projectId, serverId string, update *iaas.UpdateServerPayload) (*iaas.Server, error) {
+func (m *MockNodeClient) UpdateServer(ctx context.Context, projectID, serverID string, update *iaas.UpdateServerPayload) (*iaas.Server, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateServer", ctx, projectId, serverId, update)
+	ret := m.ctrl.Call(m, "UpdateServer", ctx, projectID, serverID, update)
 	ret0, _ := ret[0].(*iaas.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateServer indicates an expected call of UpdateServer.
-func (mr *MockNodeClientMockRecorder) UpdateServer(ctx, projectId, serverId, update any) *gomock.Call {
+func (mr *MockNodeClientMockRecorder) UpdateServer(ctx, projectID, serverID, update any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServer", reflect.TypeOf((*MockNodeClient)(nil).UpdateServer), ctx, projectId, serverId, update)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServer", reflect.TypeOf((*MockNodeClient)(nil).UpdateServer), ctx, projectID, serverID, update)
 }
