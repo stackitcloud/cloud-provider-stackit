@@ -9,7 +9,7 @@ GOIMPORTS_REVISER_VERSION ?= v3.9.1
 # renovate: datasource=github-releases depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION ?= v2.1.6
 # renovate: datasource=github-releases depName=uber-go/mock
-MOCKGEN_VERSION ?= v0.5.2
+MOCKGEN_VERSION ?= v0.6.0
 # renovate: datasource=github-releases depName=chainguard-dev/apko
 APKO_VERSION ?= v0.30.4
 # renovate: datasource=github-releases depName=ko-build/ko
