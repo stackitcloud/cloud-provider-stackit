@@ -99,16 +99,19 @@ verify: verify-fmt verify-modules verify-generate check
 verify-e2e: verify-e2e-csi
 
 verify-e2e-csi-sequential: FOCUS = "External.Storage.*(\[Feature:|\[Disruptive\]|\[Serial\])"
+verify-e2e-csi-sequential: E2E_FLAGS = -v
 verify-e2e-csi-sequential: verify-e2e-csi
 
 verify-e2e-csi-parallel: FOCUS = "External.Storage"
 verify-e2e-csi-parallel: SKIP = "\[Feature:|\[Disruptive\]|\[Serial\]"
+verify-e2e-csi-parallel: E2E_FLAGS = -v -p
 verify-e2e-csi-parallel: verify-e2e-csi
 
 verify-e2e-csi: $(KUBERNETES_TEST)
-	$(KUBERNETES_TEST_GINKGO) -v \
+	$(KUBERNETES_TEST_GINKGO) \
+  	$(E2E_FLAGS) \
   	-focus=$(FOCUS) \
-		-skip=$(SKIP) \
+	-skip=$(SKIP) \
   	$(KUBERNETES_TEST) -- \
     -storage.testdriver=$(PWD)/test/e2e/csi/block-storage.yaml
 
