@@ -18,12 +18,15 @@ package blockstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,6 +44,18 @@ type controllerServer struct {
 	Driver   *Driver
 	Instance stackit.IaasClient
 	csi.UnimplementedControllerServer
+}
+
+type stackitParameterConfig struct {
+	PerformanceClass  *string `mapstructure:"type,omitempty"`
+	AvailabilityZone  *string `mapstructure:"availability,omitempty"`
+	Encrypted         *string `mapstructure:"encrypted,omitempty"`
+	KMSKeyringID      *string `mapstructure:"kmsKeyringID,omitempty"`
+	KMSKeyID          *string `mapstructure:"kmsKeyID,omitempty"`
+	KMSKeyVersion     *string `mapstructure:"kmsKeyVersion,omitempty"`
+	KMSServiceAccount *string `mapstructure:"kmsServiceAccount,omitempty"`
+	// optional - IaaS will set this value to the projectID of the volume, this is only relevant in case the KMS is in a different project
+	KMSProjectID *string `mapstructure:"kmsProjectID,omitempty"`
 }
 
 const (
@@ -65,7 +80,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Volume Name
 	volName := req.GetName()
 	volCapabilities := req.GetVolumeCapabilities()
-	volParams := req.GetParameters()
+	volParams, err := createParameterConfig(req.GetParameters())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	if volName == "" {
 		return nil, status.Error(codes.InvalidArgument, "[CreateVolume] missing Volume Name")
@@ -80,20 +98,17 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Volume Size - Default is 1 GiB
-	volSizeBytes := 1 * GIBIBYTE
+	volSizeBytes := 1 * util.GIBIBYTE
 	if req.GetCapacityRange() != nil {
 		volSizeBytes = req.GetCapacityRange().GetRequiredBytes()
 	}
-	volSizeGB := roundUpSize(volSizeBytes, GIBIBYTE)
-
-	// Volume Type
-	volType := volParams["type"]
+	volSizeGB := util.RoundUpSize(volSizeBytes, util.GIBIBYTE)
 
 	var volAvailability string
 	if cs.Driver.withTopology {
 		// First check if volAvailability is already specified, if not get preferred from Topology
 		// Required, incase vol AZ is different from node AZ
-		volAvailability = volParams["availability"]
+		volAvailability = ptr.Deref(volParams.AvailabilityZone, "")
 		if volAvailability == "" {
 			accessibleTopologyReq := req.GetAccessibilityRequirements()
 			// Check from Topology
@@ -101,12 +116,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 				volAvailability = sharedcsi.GetAZFromTopology(topologyKey, accessibleTopologyReq)
 			}
 		}
-	}
-
-	// get the PVC annotation
-	pvcAnnotations := sharedcsi.GetPVCAnnotations(cs.Driver.pvcLister, volParams)
-	for k, v := range pvcAnnotations {
-		klog.V(4).Infof("CreateVolume: retrieved %q pvc annotation: %s: %s", k, v, volName)
 	}
 
 	// Verify a volume with the provided name doesn't already exist for this tenant
@@ -191,6 +200,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
+	// Clone from a Volume Source
 	if content != nil && content.GetVolume() != nil {
 		sourceVolID = content.GetVolume().GetVolumeId()
 		sourceVolume, err := cloud.GetVolume(ctx, sourceVolID)
@@ -208,21 +218,40 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	opts := &iaas.CreateVolumePayload{
 		Name:             ptr.To(volName),
-		PerformanceClass: ptr.To(volType),
+		PerformanceClass: volParams.PerformanceClass,
 		Size:             ptr.To(volSizeGB),
 		AvailabilityZone: ptr.To(volAvailability),
-		// TODO: IaaS API is crap and does not allow dots or slashes. Waiting for IaaS to update regex.
-		// Labels:           ptr.To(util.ConvertMapStringToInterface(properties)),
+		//TODO: IaaS API does not allow dots or slashes. Additionally we would like to actually use metadata/annotations
+		//Labels:           ptr.To(util.ConvertMapStringToInterface(properties)),
 	}
 
 	// Only set CreateVolumePayload.Source when actually creating volume from source/snapshot/backup
 	if volumeSourceType != "" {
+		if volumeSourceType == stackit.SnapshotSource || volumeSourceType == stackit.VolumeSource {
+			// Changing the performance class while restoring from Snapshot or Volume is not supported
+			opts.PerformanceClass = nil
+		}
 		// Again sourceSnapshotID == sourceBackupID
 		volumeSourceID := determineSourceIDForSourceType(volumeSourceType, sourceSnapshotID, sourceVolID)
 		klog.V(4).Infof("Creating volume from %s source", volumeSourceType)
 		opts.Source = &iaas.VolumeSource{
 			Id:   ptr.To(volumeSourceID),
 			Type: ptr.To(string(volumeSourceType)),
+		}
+	}
+
+	// The encryption config is already set for volumes created from snapshot or volume. We MUST never set it when
+	// restoring from snapshot or volume.
+	// TODO: Unclear if BackupSource is the same as the above or is actually changeable. IaaS is testing.
+	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackit.BackupSource) {
+		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")
+		}
+		if encrypted {
+			if err := setVolumeEncryptionParameters(opts, volParams); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "Failed to set volume encryption parameters: %v", err)
+			}
 		}
 	}
 
@@ -248,6 +277,32 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, *vol.AvailabilityZone, *vol.Size)
 
 	return getCreateVolumeResponse(vol), nil
+}
+
+func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *stackitParameterConfig) error {
+	err := validateEncryptionConfig(volParams)
+	if err != nil {
+		return err
+	}
+
+	kmsKeyVersionInt, err := strconv.Atoi(*volParams.KMSKeyVersion)
+	if err != nil {
+		return errors.New("parameter kmsKeyVersion must be of type integer")
+	}
+
+	encryptionConfig := &iaas.VolumeEncryptionParameter{
+		KekKeyId:       volParams.KMSKeyID,
+		KekKeyVersion:  ptr.To(int64(kmsKeyVersionInt)),
+		KekKeyringId:   volParams.KMSKeyringID,
+		ServiceAccount: volParams.KMSServiceAccount,
+	}
+
+	if volParams.KMSProjectID != nil {
+		encryptionConfig.KekProjectId = volParams.KMSProjectID
+	}
+
+	opts.EncryptionParameters = encryptionConfig
+	return nil
 }
 
 func (cs *controllerServer) ControllerModifyVolume(_ context.Context, _ *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
@@ -378,24 +433,6 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
-func (cs *controllerServer) createVolumeEntries(vlist []iaas.Volume) []*csi.ListVolumesResponse_Entry {
-	entries := make([]*csi.ListVolumesResponse_Entry, len(vlist))
-	for i, v := range vlist {
-		entries[i] = &csi.ListVolumesResponse_Entry{
-			Volume: &csi.Volume{
-				VolumeId:      *v.Id,
-				CapacityBytes: *v.Size * GIBIBYTE,
-			},
-		}
-		if v.ServerId != nil {
-			entries[i].Status = &csi.ListVolumesResponse_VolumeStatus{
-				PublishedNodeIds: []string{*v.ServerId},
-			}
-		}
-	}
-	return entries
-}
-
 func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.V(4).Infof("ListVolumes: called with %+#v request", req)
 
@@ -418,7 +455,7 @@ func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		}
 		return nil, status.Errorf(codes.Internal, "ListVolumes failed with error %v", err)
 	}
-	volumeEntries := cs.createVolumeEntries(volumeList)
+	volumeEntries := createVolumeEntries(volumeList)
 
 	klog.V(4).Infof("ListVolumes: completed with %d entries", len(volumeEntries))
 	return &csi.ListVolumesResponse{
@@ -531,7 +568,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		return &csi.CreateSnapshotResponse{
 			Snapshot: &csi.Snapshot{
 				SnapshotId:     *snap.Id,
-				SizeBytes:      *snap.Size * GIBIBYTE,
+				SizeBytes:      *snap.Size * util.GIBIBYTE,
 				SourceVolumeId: *snap.VolumeId,
 				CreationTime:   ctime,
 				ReadyToUse:     true,
@@ -575,7 +612,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	return &csi.CreateSnapshotResponse{
 		Snapshot: &csi.Snapshot{
 			SnapshotId:     *backup.Id,
-			SizeBytes:      *backup.Size * GIBIBYTE,
+			SizeBytes:      *backup.Size * util.GIBIBYTE,
 			SourceVolumeId: *backup.VolumeId,
 			CreationTime:   ctime,
 			ReadyToUse:     true,
@@ -713,7 +750,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 		entry := &csi.ListSnapshotsResponse_Entry{
 			Snapshot: &csi.Snapshot{
-				SizeBytes:      *snap.Size * GIBIBYTE,
+				SizeBytes:      *snap.Size * util.GIBIBYTE,
 				SnapshotId:     *snap.Id,
 				SourceVolumeId: *snap.VolumeId,
 				CreationTime:   ctime,
@@ -757,7 +794,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 		sentry := csi.ListSnapshotsResponse_Entry{
 			Snapshot: &csi.Snapshot{
-				SizeBytes:      *v.Size * GIBIBYTE,
+				SizeBytes:      *v.Size * util.GIBIBYTE,
 				SnapshotId:     *v.Id,
 				SourceVolumeId: *v.VolumeId,
 				CreationTime:   ctime,
@@ -851,7 +888,7 @@ func (cs *controllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	ventry := csi.ControllerGetVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      volumeID,
-			CapacityBytes: *volume.Size * GIBIBYTE,
+			CapacityBytes: *volume.Size * util.GIBIBYTE,
 		},
 	}
 
@@ -877,7 +914,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	}
 
 	volSizeBytes := req.GetCapacityRange().GetRequiredBytes()
-	volSizeGB := roundUpSize(volSizeBytes, GIBIBYTE)
+	volSizeGB := util.RoundUpSize(volSizeBytes, util.GIBIBYTE)
 	maxVolSize := volCap.GetLimitBytes()
 
 	if maxVolSize > 0 && maxVolSize < volSizeBytes {
@@ -896,7 +933,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		// a volume was already resized
 		klog.V(2).Infof("Volume %q has been already expanded to %d, requested %d", volumeID, volume.Size, volSizeGB)
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         *volume.Size * GIBIBYTE,
+			CapacityBytes:         *volume.Size * util.GIBIBYTE,
 			NodeExpansionRequired: true,
 		}, nil
 	}
@@ -972,7 +1009,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:           *vol.Id,
-			CapacityBytes:      *vol.Size * GIBIBYTE,
+			CapacityBytes:      *vol.Size * util.GIBIBYTE,
 			AccessibleTopology: accessibleTopology,
 			ContentSource:      volsrc,
 			VolumeContext:      volCnx,
@@ -994,4 +1031,52 @@ func determineSourceIDForSourceType(srcType stackit.VolumeSourceTypes, sourceSna
 	default:
 		return ""
 	}
+}
+
+func createParameterConfig(parameters map[string]string) (*stackitParameterConfig, error) {
+	var config stackitParameterConfig
+	err := mapstructure.Decode(parameters, &config)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func createVolumeEntries(vlist []iaas.Volume) []*csi.ListVolumesResponse_Entry {
+	entries := make([]*csi.ListVolumesResponse_Entry, len(vlist))
+	for i := range vlist {
+		volume := &vlist[i]
+		entries[i] = &csi.ListVolumesResponse_Entry{
+			Volume: &csi.Volume{
+				VolumeId:      *volume.Id,
+				CapacityBytes: *volume.Size * util.GIBIBYTE,
+			},
+		}
+		if volume.ServerId != nil {
+			entries[i].Status = &csi.ListVolumesResponse_VolumeStatus{
+				PublishedNodeIds: []string{*volume.ServerId},
+			}
+		}
+	}
+	return entries
+}
+
+// validateEncryptionConfig validates that the required parameters are set
+func validateEncryptionConfig(volParams *stackitParameterConfig) error {
+	if volParams.PerformanceClass == nil {
+		return errors.New("parameter type must be set for encrypted volumes")
+	}
+	if volParams.KMSServiceAccount == nil {
+		return errors.New("parameter kmsServiceAccount must be set for encrypted volumes")
+	}
+	if volParams.KMSKeyID == nil {
+		return errors.New("parameter kmsKeyID must be set for encrypted volumes")
+	}
+	if volParams.KMSKeyringID == nil {
+		return errors.New("parameter kmsKeyringID must be set for encrypted volumes")
+	}
+	if volParams.KMSKeyVersion == nil {
+		return errors.New("parameter kmsKeyVersion must be set for encrypted volumes")
+	}
+	return nil
 }

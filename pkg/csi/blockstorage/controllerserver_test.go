@@ -10,6 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	"github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
@@ -29,7 +30,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		FakeCluster        = "cluster"
 		expandTargetStatus = []string{stackit.VolumeAvailableStatus, stackit.VolumeAttachedStatus}
 		stdCapRange        = &csi.CapacityRange{
-			RequiredBytes: GIBIBYTE * 20,
+			RequiredBytes: util.GIBIBYTE * 20,
 		}
 		stdSnapParams = map[string]string{
 			"type": "snapshot",
@@ -78,7 +79,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.Volume.VolumeId).To(Equal("volume-id"))
-			Expect(resp.Volume.CapacityBytes).To(Equal(GIBIBYTE * 20))
+			Expect(resp.Volume.CapacityBytes).To(Equal(util.GIBIBYTE * 20))
 		})
 
 		It("should not accept an empty volume name", func() {
@@ -197,7 +198,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.Volume.VolumeId).To(Equal("existing-available-volume-id"))
-			Expect(resp.Volume.CapacityBytes).To(Equal(GIBIBYTE * 20))
+			Expect(resp.Volume.CapacityBytes).To(Equal(util.GIBIBYTE * 20))
 		})
 
 		It("should fail if a volume exists but does not fit in size", func() {
@@ -607,13 +608,13 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Volume: &csi.Volume{
 						VolumeId:      "fake",
-						CapacityBytes: 10 * GIBIBYTE,
+						CapacityBytes: 10 * util.GIBIBYTE,
 					},
 				},
 				{
 					Volume: &csi.Volume{
 						VolumeId:      "fake1",
-						CapacityBytes: 10 * GIBIBYTE,
+						CapacityBytes: 10 * util.GIBIBYTE,
 					},
 					Status: &csi.ListVolumesResponse_VolumeStatus{
 						PublishedNodeIds: []string{"serverID"},
@@ -676,7 +677,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			}
 			expectedVol := &iaas.Volume{
 				ServerId: ptr.To("fake"),
-				Size:     ptr.To(100 * GIBIBYTE),
+				Size:     ptr.To(100 * util.GIBIBYTE),
 			}
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(expectedVol, nil)
 			resp, err := fakeCs.ControllerGetVolume(context.Background(), req)
@@ -691,7 +692,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:      "fake",
 				CapacityRange: stdCapRange,
 			}
-			volSizeGB := roundUpSize(req.GetCapacityRange().GetRequiredBytes(), GIBIBYTE)
+			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
 				Size:   ptr.To(int64(10)),
 				Status: ptr.To(stackit.VolumeAvailableStatus),
@@ -706,7 +707,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:      "fake",
 				CapacityRange: stdCapRange,
 			}
-			volSizeGB := roundUpSize(req.GetCapacityRange().GetRequiredBytes(), GIBIBYTE)
+			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
 				Size:   ptr.To(int64(10)),
 				Status: ptr.To("ERROR"),
@@ -947,7 +948,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Snapshot: &csi.Snapshot{
 						SnapshotId:     "special-snapshot",
-						SizeBytes:      10 * GIBIBYTE,
+						SizeBytes:      10 * util.GIBIBYTE,
 						CreationTime:   timestamppb.New(snapShotCreationTime),
 						SourceVolumeId: "fake",
 						ReadyToUse:     true,
@@ -974,7 +975,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				{
 					Snapshot: &csi.Snapshot{
 						SnapshotId:     "fake-snapshot",
-						SizeBytes:      10 * GIBIBYTE,
+						SizeBytes:      10 * util.GIBIBYTE,
 						CreationTime:   timestamppb.New(snapShotCreationTime),
 						SourceVolumeId: "something-different",
 						ReadyToUse:     true,

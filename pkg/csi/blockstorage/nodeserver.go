@@ -25,6 +25,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -437,6 +438,8 @@ func (ns *nodeServer) NodeExpandVolume(_ context.Context, req *csi.NodeExpandVol
 	if ns.Opts.RescanOnResize {
 		// comparing current volume size with the expected one
 		newSize := req.GetCapacityRange().GetRequiredBytes()
+		// Since we only create volumes to the next available GB, there is no need to compare bytes.
+		newSize = util.RoundUpSize(newSize, util.GIBIBYTE)
 		if err := blockdevice.RescanBlockDeviceGeometry(devicePath, volumePath, newSize); err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not verify %q volume size: %v", volumeID, err)
 		}

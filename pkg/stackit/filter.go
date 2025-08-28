@@ -37,11 +37,12 @@ func filterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volu
 		return volumes
 	}
 
-	for _, obj := range volumes {
-		if val, ok := filters["Name"]; ok && val != obj.GetName() {
+	for i := range volumes {
+		volume := &volumes[i]
+		if val, ok := filters["Name"]; ok && val != volume.GetName() {
 			continue
 		}
-		filteredVolumes = append(filteredVolumes, obj)
+		filteredVolumes = append(filteredVolumes, *volume)
 	}
 
 	return filteredVolumes

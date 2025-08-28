@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	"golang.org/x/sys/unix"
 
 	"k8s.io/klog/v2"
@@ -73,6 +74,7 @@ func GetBlockDeviceSize(path string) (int64, error) {
 func checkBlockDeviceSize(devicePath, deviceMountPath string, newSize int64) error {
 	klog.V(4).Infof("Detecting %q volume size", deviceMountPath)
 	size, err := GetBlockDeviceSize(devicePath)
+	size = util.RoundUpSize(size, util.GIBIBYTE)
 	if err != nil {
 		return err
 	}
@@ -80,7 +82,7 @@ func checkBlockDeviceSize(devicePath, deviceMountPath string, newSize int64) err
 	klog.V(3).Infof("Detected %q volume size: %d", deviceMountPath, size)
 
 	if size < newSize {
-		return fmt.Errorf("current volume size is less than expected one: %d < %d", size, newSize)
+		return fmt.Errorf("current volume size is less than expected one: actual: %d, expected: %d", size, newSize)
 	}
 
 	return nil
