@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"gopkg.in/yaml.v3"
@@ -16,6 +15,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 )
 
 const (
@@ -146,6 +148,7 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
+		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
 
 	// The token is only provided by the 'gardener-extension-provider-stackit' in case of emergency access.

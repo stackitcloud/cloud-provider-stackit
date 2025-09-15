@@ -11,12 +11,14 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.19.0
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
+	github.com/prometheus/client_golang v1.22.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.9
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.3
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v0.28.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.5.1
 	go.uber.org/mock v0.6.0
+	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.36.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.7
@@ -78,7 +80,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
@@ -105,7 +106,6 @@ require (
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.10.0 // indirect

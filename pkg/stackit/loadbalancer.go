@@ -23,7 +23,10 @@ func (cl lbClient) DeleteLoadBalancer(ctx context.Context, projectID, name strin
 
 // CreateLoadBalancer returns ErrorNotFound if the project is not enabled.
 func (cl lbClient) CreateLoadBalancer(ctx context.Context, projectID string, create *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	lb, err := cl.client.CreateLoadBalancer(ctx, projectID, cl.region).CreateLoadBalancerPayload(*create).XRequestID(uuid.NewString()).Execute()
+	lb, err := cl.client.CreateLoadBalancer(ctx, projectID, cl.region).
+		CreateLoadBalancerPayload(*create).
+		XRequestID(uuid.NewString()).
+		Execute()
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
 	}
@@ -33,11 +36,15 @@ func (cl lbClient) CreateLoadBalancer(ctx context.Context, projectID string, cre
 func (cl lbClient) UpdateLoadBalancer(ctx context.Context, projectID, name string, update *loadbalancer.UpdateLoadBalancerPayload) (
 	*loadbalancer.LoadBalancer, error,
 ) {
-	return cl.client.UpdateLoadBalancer(ctx, projectID, cl.region, name).UpdateLoadBalancerPayload(*update).Execute()
+	return cl.client.UpdateLoadBalancer(ctx, projectID, cl.region, name).
+		UpdateLoadBalancerPayload(*update).
+		Execute()
 }
 
 func (cl lbClient) UpdateTargetPool(ctx context.Context, projectID, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
-	_, err := cl.client.UpdateTargetPool(ctx, projectID, cl.region, name, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
+	_, err := cl.client.UpdateTargetPool(ctx, projectID, cl.region, name, targetPoolName).
+		UpdateTargetPoolPayload(payload).
+		Execute()
 	return err
 }
 
@@ -50,21 +57,20 @@ func (cl lbClient) GetCredentials(ctx context.Context, projectID, credentialsRef
 }
 
 func (cl lbClient) CreateCredentials(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) { //nolint:lll // looks weird when shortened
-	return cl.client.CreateCredentials(ctx, projectID, cl.region).CreateCredentialsPayload(payload).XRequestID(uuid.NewString()).Execute()
+	return cl.client.CreateCredentials(ctx, projectID, cl.region).
+		CreateCredentialsPayload(payload).
+		XRequestID(uuid.NewString()).
+		Execute()
 }
 
 func (cl lbClient) UpdateCredentials(ctx context.Context, projectID, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
-	_, err := cl.client.UpdateCredentials(ctx, projectID, cl.region, credentialsRef).UpdateCredentialsPayload(payload).Execute()
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := cl.client.UpdateCredentials(ctx, projectID, cl.region, credentialsRef).
+		UpdateCredentialsPayload(payload).
+		Execute()
+	return err
 }
 
 func (cl lbClient) DeleteCredentials(ctx context.Context, projectID, credentialsRef string) error {
 	_, err := cl.client.DeleteCredentials(ctx, projectID, cl.region, credentialsRef).Execute()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
