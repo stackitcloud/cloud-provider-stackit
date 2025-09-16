@@ -1,11 +1,63 @@
 {
-  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
-    'config:recommended',
-    'github>stackitcloud/ske-ci-infra//config/renovate/ske.json5',
+    "config:recommended",
+    "github>stackitcloud/ske-ci-infra//config/renovate/ske.json5",
   ],
   additionalReviewers: [
-    'hown3d',
-    'rgroemmer',
+    "hown3d",
+    "rgroemmer"
   ],
+  "baseBranchPatterns": [
+    "main",
+    "release-v1.33",
+    "release-v1.32",
+    "release-v1.31"
+  ],
+  "packageRules": [
+    {
+      "matchPackagePatterns": [
+        "k8s.io/*"
+      ],
+      "matchBaseBranches": [
+        "main",
+      ]
+    },
+    {
+      "matchPackagePatterns": [
+        "k8s.io/*"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "^0.33\\.\\d+$",
+      "matchBaseBranches": [
+        "release-v1.33",
+      ]
+    },
+    {
+      "matchPackagePatterns": [
+        "k8s.io/*"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "^0.32\\.\\d+$",
+      "matchBaseBranches": [
+        "release-v1.32",
+      ]
+    },
+    {
+      "matchPackagePatterns": [
+        "k8s.io/*"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "^0.31\\.\\d+$",
+      "matchBaseBranches": [
+        "release-v1.31",
+      ]
+    },
+  ]
 }
