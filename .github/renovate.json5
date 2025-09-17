@@ -16,12 +16,26 @@
   ],
   packageRules: [
     {
+      matchManagers: [
+        'gomod',
+      ],
+      matchUpdateTypes: [
+        'patch',
+        'digest'
+      ],
+      automerge: true,
+      addLabels: [
+        'skip-review',
+      ],
+    },
+    {
       matchPackageNames: [
         '/^k8s.io/'
       ],
       matchBaseBranches: [
         'main',
-      ]
+      ],
+      automerge: false,
     },
     {
       matchPackageNames: [
@@ -31,6 +45,7 @@
         'release-v1.33',
       ],
       allowedVersions: "<0.34.0",
+      automerge: false,
     },
     {
       matchPackageNames: [
@@ -40,6 +55,7 @@
         'release-v1.32',
       ],
       allowedVersions: "<0.33.0",
+      automerge: false,
     },
     {
       matchPackageNames: [
@@ -49,6 +65,7 @@
         'release-v1.31',
       ],
       allowedVersions: "<0.32.0",
+      automerge: false,
     },
   ]
 }
