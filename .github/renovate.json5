@@ -67,5 +67,24 @@
       allowedVersions: "<0.32.0",
       automerge: false,
     },
+    {
+      groupName: "devTools non-major",
+      matchManagers: [
+        'regex'
+      ],
+      matchFileNames: [
+        '/Makefile$/',
+        '/\\.mk$/',
+        '/\\.sh$/',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
+      automerge: true,
+      addLabels: [
+        'skip-review',
+      ],
+    }
   ]
 }
