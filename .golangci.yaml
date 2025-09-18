@@ -114,6 +114,10 @@ linters:
           - revive
           - staticcheck
         text: should not use dot imports
+      - linters:
+          - revive
+        text: 'var-naming: avoid meaningless package names'
+        path: 'pkg/csi/util/*'
     paths:
       - third_party$
       - builtin$

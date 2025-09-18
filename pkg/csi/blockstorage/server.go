@@ -17,6 +17,7 @@ limitations under the License.
 package blockstorage
 
 import (
+	"context"
 	"net"
 	"os"
 	"sync"
@@ -82,7 +83,8 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 		}
 	}
 
-	listener, err := net.Listen(proto, addr)
+	listenConfig := net.ListenConfig{}
+	listener, err := listenConfig.Listen(context.Background(), proto, addr)
 	if err != nil {
 		klog.Fatalf("Failed to listen: %v", err)
 	}
