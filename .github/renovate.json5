@@ -16,6 +16,17 @@
   ],
   packageRules: [
     {
+      matchPackageNames: [
+        '/^github.com/stackitcloud/stackit-sdk-go/'
+      ],
+      postUpgradeTasks: {
+        commands: [
+          'make generate',
+        ],
+        executionMode: 'branch'
+      }
+    },
+    {
       matchManagers: [
         'gomod',
       ],
