@@ -157,10 +157,12 @@ github.com/stackitcloud/cloud-provider v0.33.2-ske-1 h1:5ul5l6h474fxSQm55OSHZoTt
 github.com/stackitcloud/cloud-provider v0.33.2-ske-1/go.mod h1:yS8ArLLLZV1+Tv6hkSYrZuYEVz+wQgiekUtaqe9Wxao=
 github.com/stackitcloud/stackit-sdk-go/core v0.17.3 h1:GsZGmRRc/3GJLmCUnsZswirr5wfLRrwavbnL/renOqg=
 github.com/stackitcloud/stackit-sdk-go/core v0.17.3/go.mod h1:HBCXJGPgdRulplDzhrmwC+Dak9B/x0nzNtmOpu+1Ahg=
-github.com/stackitcloud/stackit-sdk-go/services/iaas v0.28.0 h1:ggnr5AD62QiP+Us+RMAB+uPYN8cq08V6LtUNZe/c8TA=
-github.com/stackitcloud/stackit-sdk-go/services/iaas v0.28.0/go.mod h1:b/jgJf7QHdRzU2fmZeJJtu5j0TAevDRghzcn5MyRmOI=
+github.com/stackitcloud/stackit-sdk-go/services/iaas v0.30.0 h1:01+noyCSadNH3ALHufcVXxNs0hBsetzJkOMN1Fe0VLc=
+github.com/stackitcloud/stackit-sdk-go/services/iaas v0.30.0/go.mod h1:854gnLR92NvAbJAA1xZEumrtNh1DoBP1FXTMvhwYA6w=
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.5.1 h1:OdJEs8eOfrzn9tCBDLxIyP8hX50zPfcXNYnRoQX+chs=
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.5.1/go.mod h1:11uzaOPCF9SeDHXEGOPMlHDD3J5r2TnvCGUwW9Igq9c=
+github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.17.1 h1:r7oaINTwLmIG31AaqKTuQHHFF8YNuYGzi+46DOuSjw4=
+github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.17.1/go.mod h1:ipcrPRbwfQXHH18dJVfY7K5ujHF5dTT6isoXgmA7YwQ=
 github.com/stoewer/go-strcase v1.3.1 h1:iS0MdW+kVTxgMoE1LAZyMiYJFKlOzLooE4MxjirtkAs=
 github.com/stoewer/go-strcase v1.3.1/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
