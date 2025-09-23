@@ -18,7 +18,7 @@ require (
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v0.30.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.5.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.17.0
 	golang.org/x/sys v0.36.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.7
