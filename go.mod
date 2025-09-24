@@ -16,7 +16,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.3
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v0.30.0
-	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.5.1
+	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.6.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.17.0
 	golang.org/x/sys v0.36.0
