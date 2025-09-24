@@ -14,32 +14,32 @@
     'release-v1.32',
     'release-v1.31',
   ],
-  regexManagers: [
+  customManagers: [
     {
       customType: 'regex',
       managerFilePatterns: [
-        'pkg/csi/blockstorage/driver.go'
+        'pkg/csi/blockstorage/driver.go',
       ],
       matchStrings: [
-        'specVersion\\s*=\\s*\"(?<currentValue>.+?)\"'
+        'specVersion\\s*=\\s*"(?<currentValue>.+?)"',
       ],
       depNameTemplate: 'github.com/container-storage-interface/spec',
       versioningTemplate: 'semver',
       extractVersionTemplate: '^v?(?<version>.*)$',
-      datasourceTemplate: 'go'
-    }
+      datasourceTemplate: 'go',
+    },
   ],
   packageRules: [
     {
       matchPackageNames: [
-        '/^github.com/stackitcloud/stackit-sdk-go/'
+        '/^github.com/stackitcloud/stackit-sdk-go/',
       ],
       postUpgradeTasks: {
         commands: [
           'make generate',
         ],
-        executionMode: 'branch'
-      }
+        executionMode: 'branch',
+      },
     },
     {
       matchManagers: [
