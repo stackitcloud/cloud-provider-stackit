@@ -16,6 +16,13 @@
   ],
   packageRules: [
     {
+      groupName: 'kubernetes packages',
+      matchPackageNames: [
+        '/^k8s.io/',
+        'github.com/kubernetes-csi/csi-lib-utils',
+      ],
+    },
+    {
       matchPackageNames: [
         '/^github.com/stackitcloud/stackit-sdk-go/'
       ],
