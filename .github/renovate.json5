@@ -42,6 +42,18 @@
       },
     },
     {
+      matchPackageNames: [
+        'github.com/stackitcloud/stackit-sdk-go/services/loadbalancer'
+      ],
+      additionalReviewers: [
+        "team:loadbalancer"
+      ],
+      matchUpdateTypes: [
+        'major',
+        'minor'
+      ],
+    },
+    {
       matchManagers: [
         'gomod',
       ],
