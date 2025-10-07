@@ -51,13 +51,14 @@ type LoadBalancer struct {
 	projectID               string
 	networkID               string
 	nonStackitClassNameMode string
+	extraLabels             map[string]string
 	// metricsRemoteWrite setting this enables remote writing of metrics and nil means it is disabled
 	metricsRemoteWrite *MetricsRemoteWrite
 }
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID, nonStackitClassNameMode string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
+func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID string, extraLabels map[string]string, nonStackitClassNameMode string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
 	// LoadBalancer.recorder is set in CloudControllerManager.Initialize
 	return &LoadBalancer{
 		client:                  client,
@@ -65,6 +66,7 @@ func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID, no
 		networkID:               networkID,
 		nonStackitClassNameMode: nonStackitClassNameMode,
 		metricsRemoteWrite:      metricsRemoteWrite,
+		extraLabels:             extraLabels,
 	}, nil
 }
 
@@ -187,6 +189,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 			PlanId:          spec.PlanId,
 			PrivateAddress:  spec.PrivateAddress,
 			Region:          spec.Region,
+			Labels:          spec.Labels,
 			Status:          loadbalancer.UpdateLoadBalancerPayloadGetStatusAttributeType(spec.Status),
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
@@ -236,6 +239,9 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	spec, events, err := lbSpecFromService(service, nodes, l.networkID, metricsRemoteWrite)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
+	}
+	if l.extraLabels != nil {
+		spec.Labels = ptr.To(l.extraLabels)
 	}
 	for _, event := range events {
 		l.recorder.Event(service, event.Type, event.Reason, event.Message)
@@ -373,6 +379,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 			TargetPools: lb.TargetPools,
 			Version:     lb.Version,
 			PlanId:      lb.PlanId,
+			Labels:      lb.Labels,
 		}
 		_, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, payload)
 		if err != nil {

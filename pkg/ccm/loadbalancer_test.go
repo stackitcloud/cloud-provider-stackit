@@ -49,17 +49,17 @@ var _ = Describe("LoadBalancer", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		mockClient = stackit.NewMockLoadbalancerClient(ctrl)
 		var err error
-		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore, &MetricsRemoteWrite{
+		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nonStackitClassNameModeIgnore, &MetricsRemoteWrite{
 			endpoint: "test-endpoint",
 			username: "test-username",
 			password: "test-password",
 		})
 		Expect(err).NotTo(HaveOccurred())
-		lbInModeIgnore, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeIgnore, nil)
+		lbInModeIgnore, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nonStackitClassNameModeIgnore, nil)
 		Expect(err).NotTo(HaveOccurred())
-		lbInModeUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdate, nil)
+		lbInModeUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nonStackitClassNameModeUpdate, nil)
 		Expect(err).NotTo(HaveOccurred())
-		lbInModeCreateAndUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nonStackitClassNameModeUpdateAndCreate, nil)
+		lbInModeCreateAndUpdate, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nonStackitClassNameModeUpdateAndCreate, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

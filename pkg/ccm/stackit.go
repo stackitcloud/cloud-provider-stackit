@@ -41,10 +41,11 @@ type CloudControllerManager struct {
 
 // Config is used to read and store information from the cloud configuration file
 type Config struct {
-	ProjectID            string `yaml:"projectId"`
-	NetworkID            string `yaml:"networkId"`
-	Region               string `yaml:"region"`
-	NonStackitClassNames string `yaml:"nonStackitClassNames"`
+	ProjectID            string            `yaml:"projectId"`
+	NetworkID            string            `yaml:"networkId"`
+	ExtraLabels          map[string]string `yaml:"extraLabels"`
+	Region               string            `yaml:"region"`
+	NonStackitClassNames string            `yaml:"nonStackitClassNames"`
 	LoadBalancerAPI      struct {
 		URL string `yaml:"url"`
 	} `yaml:"loadBalancerApi"`
@@ -168,7 +169,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.NonStackitClassNames, obs)
+	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.ExtraLabels, cfg.NonStackitClassNames, obs)
 	if err != nil {
 		return nil, err
 	}
