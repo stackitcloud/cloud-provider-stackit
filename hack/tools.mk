@@ -11,7 +11,7 @@ GOLANGCI_LINT_VERSION ?= v2.5.0
 # renovate: datasource=github-releases depName=uber-go/mock
 MOCKGEN_VERSION ?= v0.6.0
 # renovate: datasource=github-releases depName=chainguard-dev/apko
-APKO_VERSION ?= v0.30.14
+APKO_VERSION ?= v0.30.15
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.18.0
 
