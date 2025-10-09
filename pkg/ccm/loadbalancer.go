@@ -148,7 +148,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // It is long but no
 		}
 	}
 
-	// Default mode is "updateAndCreate" (see SKE ADR 36).
+	// Default mode is "updateAndCreate".
 	// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
 
 	if stackit.IsNotFound(err) {
@@ -282,7 +282,7 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 				return cloudprovider.ImplementedElsewhere
 			}
 		default:
-			// Default mode is "updateAndCreate" (see SKE ADR 36).
+			// Default mode is "updateAndCreate".
 			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
 		}
 	}
@@ -334,7 +334,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted( //nolint:gocyclo // It is long
 			}
 			return cloudprovider.ImplementedElsewhere
 		default:
-			// Default mode is "updateAndCreate" (see SKE ADR 36).
+			// Default mode is "updateAndCreate".
 			// In "updateAndCreate" mode ignore class name annotation and update & create all load balancers.
 		}
 	}

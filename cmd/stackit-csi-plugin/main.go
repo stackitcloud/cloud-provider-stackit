@@ -105,12 +105,12 @@ func handle() {
 
 		iaasClient, err := stackit.CreateIAASClient(&cfg)
 		if err != nil {
-			klog.Fatalf("Failed to create IAAS client: %v", err)
+			klog.Fatalf("Failed to create IaaS client: %v", err)
 		}
 
 		stackitProvider, err := stackit.CreateSTACKITProvider(iaasClient, &cfg)
 		if err != nil {
-			klog.Fatalf("Failed to create stackit: %v", err)
+			klog.Fatalf("Failed to create STACKIT provider: %v", err)
 		}
 
 		d.SetupControllerService(stackitProvider)
