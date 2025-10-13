@@ -1,31 +1,35 @@
 ---
 name: Bug report
 about: Report a bug in the cloud-provider-stackit
-title: ''
+title: ""
 labels: bug
-assignees: ''
-
+assignees: ""
 ---
 
 ## Description
-*Please add a clear and concise description of what the bug is.*
+
+_Please add a clear and concise description of what the bug is._
 
 ## Steps to reproduce
-*Please provide us with the steps to reproduce the behavior.*
+
+_Please provide us with the steps to reproduce the behavior._
 
 1. Run ...
 2. ...
 
 ## Actual behavior
-*Please describe the current behavior of the cloud-provider-stackit. Don't forget to add detailed information like error messages.*
+
+_Please describe the current behavior of the cloud-provider-stackit. Don't forget to add detailed information like error messages._
 
 ## Expected behavior
-*Please describe the behavior which you would expect from the cloud-provider-stackit in that case.*
+
+_Please describe the behavior which you would expect from the cloud-provider-stackit in that case._
 
 ## Environment
- - Kubernetes version:
- - Version of the cloud-provider-stackit:
+
+- Kubernetes version:
+- Version of the cloud-provider-stackit:
 
 **Additional information**
 
-*Feel free to add any additional information here.*
+_Feel free to add any additional information here._

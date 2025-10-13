@@ -1,24 +1,23 @@
 ---
 name: Feature request
 about: Suggest an idea for the cloud-provider-stackit
-title: ''
+title: ""
 labels: enhancement
-assignees: ''
-
+assignees: ""
 ---
 
 ## Problem description
 
-*Is your feature request related to a problem? If so, please give us a clear and concise description of what the problem is.*
+_Is your feature request related to a problem? If so, please give us a clear and concise description of what the problem is._
 
 ## Proposed solution
 
-*A clear and concise description of what you want to happen.*
+_A clear and concise description of what you want to happen._
 
 ## Alternative solutions (optional)
 
-*A clear and concise description of any alternative solutions or features you've considered. (optional)*
+_A clear and concise description of any alternative solutions or features you've considered. (optional)_
 
 ## Additional information
 
-*Feel free to add any additional information here.*
+_Feel free to add any additional information here._

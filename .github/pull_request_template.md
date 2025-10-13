@@ -1,4 +1,5 @@
 **How to categorize this PR?**
+
 <!--
 Please select the kind of this pull request, e.g.:
 /kind enhancement
@@ -11,11 +12,10 @@ Tide will not merge your PR, if it is missing a `kind/*` label.
 
 **Related work items**:
 
-Fixes [ADO#xxxxxx](https://dev.azure.com/schwarzit/schwarzit.ske/_workitems/edit/xxxxxx)
-
 **Special notes for your reviewer**:
 
 **Breaking changes**:
+
 <!--
 If your PR contains breaking changes, list the changes in detail here.
 This could be:
