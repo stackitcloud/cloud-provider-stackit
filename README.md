@@ -9,6 +9,8 @@ This repository includes:
 - Kubernetes Resources for the Manager
 - Ginko bootstrapped Test Suite
 
+FOO
+
 Does not include:
 
 - readyz and healthz
