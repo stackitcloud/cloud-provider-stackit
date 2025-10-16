@@ -1,0 +1,27 @@
+contents:
+  keyring:
+  - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  repositories:
+  - https://packages.wolfi.dev/os
+  packages:
+  - ca-certificates
+  - blkid
+  - blockdev
+  - e2fsprogs
+  - e2fsprogs-extra
+  - lsblk
+  - mount
+  - umount
+  - btrfs-progs
+  - udev
+  - util-linux-misc # contains fsck
+  - xfsprogs 
+  - xfsprogs-extra # contains xfs_io
+  - findmnt
+
+accounts:
+  run-as: root
+
+layering:
+  strategy: origin
+  budget: 10

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+spec:
+  selector:
+    matchLabels:
+      app: echo
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      containers:
+      - name: echo
+        image: istio/tcp-echo-server:1.2
+        ports:
+        - containerPort: 9000

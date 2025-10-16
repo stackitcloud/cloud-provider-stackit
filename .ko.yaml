@@ -1,0 +1,7 @@
+builds:
+- id: stackit-csi-plugin
+  main: ./cmd/stackit-csi-plugin
+  ldflags:
+  - -s -w
+  - -X github.com/stackitcloud/cloud-provider-stackit/pkg/version.Version={{.Env.VERSION}}
+  

@@ -1,0 +1,128 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'github>stackitcloud/ske-ci-infra//config/renovate/ske.json5',
+  ],
+  additionalReviewers: [
+    'hown3d',
+    'nschad',
+  ],
+  baseBranchPatterns: [
+    'main',
+    'release-v1.33',
+    'release-v1.32',
+    'release-v1.31',
+  ],
+  customManagers: [
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        'pkg/csi/blockstorage/driver.go',
+      ],
+      matchStrings: [
+        'specVersion\\s*=\\s*"(?<currentValue>.+?)"',
+      ],
+      depNameTemplate: 'github.com/container-storage-interface/spec',
+      versioningTemplate: 'semver',
+      extractVersionTemplate: '^v?(?<version>.*)$',
+      datasourceTemplate: 'go',
+    },
+  ],
+  packageRules: [
+    {
+      matchPackageNames: [
+        '/^github.com/stackitcloud/stackit-sdk-go/',
+      ],
+      postUpgradeTasks: {
+        commands: [
+          'make generate',
+        ],
+        executionMode: 'branch',
+      },
+    },
+    {
+      matchPackageNames: [
+        'github.com/stackitcloud/stackit-sdk-go/services/loadbalancer'
+      ],
+      additionalReviewers: [
+        "team:loadbalancer"
+      ],
+      matchUpdateTypes: [
+        'major',
+        'minor'
+      ],
+    },
+    {
+      matchManagers: [
+        'gomod',
+      ],
+      matchUpdateTypes: [
+        'patch',
+        'digest',
+      ],
+      automerge: true,
+      addLabels: [
+        'skip-review',
+      ],
+    },
+    {
+      matchPackageNames: [
+        '/^k8s.io/',
+      ],
+      matchBaseBranches: [
+        'main',
+      ],
+      automerge: false,
+    },
+    {
+      matchPackageNames: [
+        '/^k8s.io/',
+      ],
+      matchBaseBranches: [
+        'release-v1.33',
+      ],
+      allowedVersions: '<0.34.0',
+      automerge: false,
+    },
+    {
+      matchPackageNames: [
+        '/^k8s.io/',
+      ],
+      matchBaseBranches: [
+        'release-v1.32',
+      ],
+      allowedVersions: '<0.33.0',
+      automerge: false,
+    },
+    {
+      matchPackageNames: [
+        '/^k8s.io/',
+      ],
+      matchBaseBranches: [
+        'release-v1.31',
+      ],
+      allowedVersions: '<0.32.0',
+      automerge: false,
+    },
+    {
+      groupName: 'devTools non-major',
+      matchManagers: [
+        'custom.regex',
+      ],
+      matchFileNames: [
+        '/Makefile$/',
+        '/\\.mk$/',
+        '/\\.sh$/',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
+      automerge: true,
+      addLabels: [
+        'skip-review',
+      ],
+    },
+  ],
+}
