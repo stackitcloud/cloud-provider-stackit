@@ -1,0 +1,287 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package mount
+
+import (
+	"fmt"
+	"os"
+	"path"
+	"strings"
+	"time"
+
+	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
+
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/blockdevice"
+)
+
+const (
+	probeVolumeDuration      = 1 * time.Second
+	probeVolumeTimeout       = 60 * time.Second
+	operationFinishInitDelay = 1 * time.Second
+	operationFinishFactor    = 1.1
+	operationFinishSteps     = 15
+)
+
+type IMount interface {
+	Mounter() *mount.SafeFormatAndMount
+	ScanForAttach(devicePath string) error
+	GetDevicePath(volumeID string) (string, error)
+	IsLikelyNotMountPointAttach(targetpath string) (bool, error)
+	UnmountPath(mountPath string) error
+	MakeFile(pathname string) error
+	MakeDir(pathname string) error
+	GetDeviceStats(path string) (*DeviceStats, error)
+	GetMountFs(path string) ([]byte, error)
+}
+
+type DeviceStats struct {
+	Block bool
+
+	AvailableBytes  int64
+	TotalBytes      int64
+	UsedBytes       int64
+	AvailableInodes int64
+	TotalInodes     int64
+	UsedInodes      int64
+}
+
+type Mount struct {
+	BaseMounter *mount.SafeFormatAndMount
+}
+
+var _ IMount = &Mount{}
+
+var MInstance IMount
+
+func getBaseMounter() *mount.SafeFormatAndMount {
+	nMounter := mount.New("")
+	nExec := exec.New()
+	return &mount.SafeFormatAndMount{
+		Interface: nMounter,
+		Exec:      nExec,
+	}
+}
+
+// GetMountProvider returns instance of Mounter
+func GetMountProvider() IMount {
+	if MInstance == nil {
+		MInstance = &Mount{BaseMounter: getBaseMounter()}
+	}
+	return MInstance
+}
+
+// Mounter returns instance of SafeFormatAndMount
+func (m *Mount) Mounter() *mount.SafeFormatAndMount {
+	return m.BaseMounter
+}
+
+// probeVolume probes volume in compute
+func probeVolume() error {
+	// rescan scsi bus
+	scsiPath := "/sys/class/scsi_host/"
+	if dirs, err := os.ReadDir(scsiPath); err == nil {
+		for _, f := range dirs {
+			name := scsiPath + f.Name() + "/scan"
+			data := []byte("- - -")
+			if err := os.WriteFile(name, data, 0666); err != nil {
+				return fmt.Errorf("unable to scan %s: %w", f.Name(), err)
+			}
+		}
+	}
+
+	executor := exec.New()
+	args := []string{"trigger"}
+	cmd := executor.Command("udevadm", args...)
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.V(3).Infof("error running udevadm trigger %v\n", err)
+		return err
+	}
+	return nil
+}
+
+// GetDevicePath returns the path of an attached block storage volume, specified by its id.
+func (m *Mount) GetDevicePath(volumeID string) (string, error) {
+	backoff := wait.Backoff{
+		Duration: operationFinishInitDelay,
+		Factor:   operationFinishFactor,
+		Steps:    operationFinishSteps,
+	}
+
+	var devicePath string
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		devicePath = m.getDevicePathBySerialID(volumeID)
+		if devicePath != "" {
+			return true, nil
+		}
+		// see issue https://github.com/kubernetes/cloud-provider-openstack/issues/705
+		if err := probeVolume(); err != nil {
+			// log the error, but continue. Might not happen in edge cases
+			klog.V(5).Infof("Unable to probe attached disk: %v", err)
+		}
+		return false, nil
+	})
+
+	if wait.Interrupted(err) {
+		return "", fmt.Errorf("failed to find device for the volumeID: %q within the alloted time", volumeID)
+	} else if devicePath == "" {
+		return "", fmt.Errorf("device path was empty for volumeID: %q", volumeID)
+	}
+	return devicePath, nil
+}
+
+// GetDevicePathBySerialID returns the path of an attached block storage volume, specified by its id.
+func (m *Mount) getDevicePathBySerialID(volumeID string) string {
+	// Build a list of candidate device paths.
+	// Certain Nova drivers will set the disk serial ID, including the Cinder volume id.
+	candidateDeviceNodes := []string{
+		// KVM
+		fmt.Sprintf("virtio-%s", volumeID[:20]),
+		// KVM #852
+		fmt.Sprintf("virtio-%s", volumeID),
+		// KVM virtio-scsi
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID[:20]),
+		// KVM virtio-scsi #852
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID),
+		// ESXi
+		fmt.Sprintf("wwn-0x%s", strings.ReplaceAll(volumeID, "-", "")),
+	}
+
+	files, err := os.ReadDir("/dev/disk/by-id/")
+	if err != nil {
+		klog.V(4).Infof("ReadDir failed with error %v", err)
+	}
+
+	for _, f := range files {
+		for _, c := range candidateDeviceNodes {
+			if c == f.Name() {
+				klog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n",
+					f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
+				return path.Join("/dev/disk/by-id/", f.Name())
+			}
+		}
+	}
+
+	klog.V(4).Infof("Failed to find device for the volumeID: %q by serial ID", volumeID)
+	return ""
+}
+
+// ScanForAttach
+func (m *Mount) ScanForAttach(devicePath string) error {
+	ticker := time.NewTicker(probeVolumeDuration)
+	defer ticker.Stop()
+	timer := time.NewTimer(probeVolumeTimeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			klog.V(5).Infof("Checking Cinder disk %q is attached.", devicePath)
+			if err := probeVolume(); err != nil {
+				// log the error, but continue. Might not happen in edge cases
+				klog.V(5).Infof("Unable to probe attached disk: %v", err)
+			}
+
+			exists, err := mount.PathExists(devicePath)
+			if exists && err == nil {
+				return nil
+			}
+			klog.V(3).Infof("Could not find attached Cinder disk %s", devicePath)
+		case <-timer.C:
+			return fmt.Errorf("could not find attached Cinder disk %s. Timeout waiting for mount paths to be created", devicePath)
+		}
+	}
+}
+
+// IsLikelyNotMountPointAttach
+func (m *Mount) IsLikelyNotMountPointAttach(targetpath string) (bool, error) {
+	notMnt, err := m.BaseMounter.IsLikelyNotMountPoint(targetpath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(targetpath, 0750)
+			if err == nil {
+				notMnt = true
+			}
+		}
+	}
+	return notMnt, err
+}
+
+func (m *Mount) GetMountFs(volumePath string) ([]byte, error) {
+	args := []string{"-o", "source", "--first-only", "--noheadings", "--target", volumePath}
+	return m.BaseMounter.Exec.Command("findmnt", args...).CombinedOutput()
+}
+
+// UnmountPath
+func (m *Mount) UnmountPath(mountPath string) error {
+	return mount.CleanupMountPoint(mountPath, m.BaseMounter, false /* extensiveMountPointCheck */)
+}
+
+// MakeDir creates dir
+func (m *Mount) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// MakeFile creates an empty file
+func (m *Mount) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer func() { _ = f.Close() }()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Mount) GetDeviceStats(devicePath string) (*DeviceStats, error) {
+	isBlock, err := blockdevice.IsBlockDevice(devicePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if isBlock {
+		size, err := blockdevice.GetBlockDeviceSize(devicePath)
+		if err != nil {
+			return nil, err
+		}
+
+		return &DeviceStats{
+			Block:      true,
+			TotalBytes: size,
+		}, nil
+	}
+
+	var statfs unix.Statfs_t
+	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
+	err = unix.Statfs(devicePath, &statfs)
+	if err != nil {
+		return nil, err
+	}
+
+	return newDeviceStats(&statfs), nil
+}

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cloud-provider-stackit
+  namespace: kube-system
+  name: cloud-provider-stackit
+spec:
+  selector:
+    app: cloud-provider-stackit
+  ports:
+  - name: main
+    port: 80
+    targetPort: 8888
+    protocol: TCP
+  - name: metrics
+    port: 8080
+    targetPort: metrics
+    protocol: TCP
+  type: ClusterIP
