@@ -2,7 +2,8 @@
 .idea
 /dev
 /secrets
-/hack/tools/bin
+/hack/tools/bin/*
+!/hack/tools/bin/.gitkeep
 cover.out
 cover.html
 .envrc
