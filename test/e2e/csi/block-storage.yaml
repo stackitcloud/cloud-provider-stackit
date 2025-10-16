@@ -1,0 +1,33 @@
+StorageClass:
+  FromExistingClassName: "premium-perf4-stackit"
+SnapshotClass:
+  FromExistingClassName: "stackit"
+DriverInfo:
+  Name: block-storage.csi.stackit.cloud
+  Capabilities:
+    # whether to support RAW block mode
+    block: true
+    # support volume expansion for controller
+    controllerExpansion: true
+    # volume ownership via fsGroup
+    fsGroup: true
+    # exec a file in the volume
+    exec: true
+    # support ReadWriteMany access modes
+    rwx: false
+    # multiple pods on a node can use the same volume concurrently
+    multipods: false
+    # data is persisted across pod restarts
+    persistence: true
+    # support populate data from pvc
+    pvcDataSource: true
+    # support populate data from snapshot
+    snapshotDataSource: true
+    # topology
+    topology: true
+    # driver publishes cap
+    capacity: false
+    # Support for ReadWriteOncePod
+    readWriteOncePod: true
+    multiplePVsSameID: false
+    capReadOnlyMany: false
