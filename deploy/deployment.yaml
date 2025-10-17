@@ -23,31 +23,31 @@ spec:
       serviceAccountName: stackit-cloud-controller-manager
       terminationGracePeriodSeconds: 30
       containers:
-        - name: stackit-cloud-controller-manager
-          image: registry.ske.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
-          args:
-            - --cloud-provider=stackit
-            - --webhook-secure-port=0
-            - --concurrent-service-syncs=3
-            - --controllers=service-lb-controller
-            - --authorization-always-allow-paths=/metrics
-            - --leader-elect=true
-            - --leader-elect-resource-name=stackit-cloud-controller-manager
-          # - --cloud-config=cloud-config.yaml
-          # - --cluster-name=<cluster-id>
-          ports:
-            - containerPort: 10258
-              hostPort: 10258
-              name: https
-              protocol: TCP
-            - containerPort: 9090
-              hostPort: 9090
-              name: metrics
-              protocol: TCP
-          resources:
-            limits:
-              cpu: "0.5"
-              memory: 500Mi
-            requests:
-              cpu: "0.1"
-              memory: 100Mi
+      - name: stackit-cloud-controller-manager
+        image: registry.ske.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
+        args:
+        - --cloud-provider=stackit
+        - --webhook-secure-port=0
+        - --concurrent-service-syncs=3
+        - --controllers=service-lb-controller
+        - --authorization-always-allow-paths=/metrics
+        - --leader-elect=true
+        - --leader-elect-resource-name=stackit-cloud-controller-manager
+        # - --cloud-config=cloud-config.yaml
+        # - --cluster-name=<cluster-id>
+        ports:
+          - containerPort: 10258
+            hostPort: 10258
+            name: https
+            protocol: TCP
+          - containerPort: 9090
+            hostPort: 9090
+            name: metrics
+            protocol: TCP
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 500Mi
+          requests:
+            cpu: "0.1"
+            memory: 100Mi
