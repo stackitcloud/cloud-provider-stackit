@@ -40,5 +40,5 @@ loadBalancerApi:
 
 ## User Documentation
 
-- [Load Balancer](https://github.com/stackitcloud/cloud-provider-stackit/docs/load-balancer.md)
-- [CSI Driver](https://github.com/stackitcloud/cloud-provider-stackit/docs/csi-driver.md)
+- [Load Balancer](docs/load-balancer.md)
+- [CSI Driver](docs/csi-driver.md)
