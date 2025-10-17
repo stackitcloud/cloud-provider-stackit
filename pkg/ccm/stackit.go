@@ -200,5 +200,5 @@ func (ccm *CloudControllerManager) ProviderName() string {
 }
 
 func (ccm *CloudControllerManager) HasClusterID() bool {
-	return false
+	return true
 }
