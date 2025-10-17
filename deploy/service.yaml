@@ -2,12 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: cloud-provider-stackit
+    app: stackit-cloud-controller-manager
   namespace: kube-system
-  name: cloud-provider-stackit
+  name: stackit-cloud-controller-manager
 spec:
   selector:
-    app: cloud-provider-stackit
+    app: stackit-cloud-controller-manager
   ports:
   - name: main
     port: 80
