@@ -49,6 +49,9 @@ if git_tag="$(git describe --tags --exact-match 2>/dev/null)"; then
   tags+=("$git_tag")
 fi
 
+if [[ ${IS_DEV} == "true" ]]; then
+  REPO=${REPO}-dev
+fi
 BASE_IMAGE=${REGISTRY}/${REPO}-base
 platforms=(${PLATFORMS})
 if [[ -f cmd/$IMAGE/apko-base-image.yaml ]]; then
