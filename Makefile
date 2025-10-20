@@ -6,8 +6,9 @@ BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*')
 REGISTRY ?= ghcr.io
-REPO ?= stackitcloud/cloud-provider-stackit-dev
+REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
+IS_DEV ?= true
 
 .PHONY: all
 all: verify
@@ -42,6 +43,7 @@ image-%: $(APKO) $(KO)
 	PLATFORMS="$(PLATFORMS)" \
 	REGISTRY=$(REGISTRY) \
 	REPO=$(REPO)/$* \
+	IS_DEV=$(IS_DEV) \
 	./hack/build.sh $*
 
 .PHONY: clean-tools-bin
