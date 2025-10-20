@@ -84,7 +84,7 @@ spec:
       serviceAccountName: stackit-cloud-controller-manager
       containers:
       - name: stackit-cloud-controller-manager
-        image: registry.ske.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
+        image: ghcr.io/stackitcloud/cloud-provider-stackit:latest
         args:
         # CCM flags
         - --cloud-provider=stackit
