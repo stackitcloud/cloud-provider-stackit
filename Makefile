@@ -4,7 +4,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
-VERSION ?= $(shell git describe --dirty --tags --match='v*')
+VERSION ?= $(shell git describe --dirty --tags --match='v*' 2>/dev/null || git rev-parse --short HEAD)
 REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
