@@ -37,7 +37,7 @@ func (os *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolu
 	payload.Description = ptr.To(VolumeDescription)
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	req, err := os.iaas.CreateVolume(ctxWithHTTPResp, os.projectID).CreateVolumePayload(*payload).Execute()
+	req, err := os.iaas.CreateVolume(ctxWithHTTPResp, os.projectID, os.region).CreateVolumePayload(*payload).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -60,7 +60,7 @@ func (os *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	err = os.iaas.DeleteVolume(ctxWithHTTPResp, os.projectID, volumeID).Execute()
+	err = os.iaas.DeleteVolume(ctxWithHTTPResp, os.projectID, os.region, volumeID).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -87,7 +87,7 @@ func (os *iaasClient) AttachVolume(ctx context.Context, instanceID, volumeID str
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	_, err = os.iaas.AddVolumeToServer(ctxWithHTTPResp, os.projectID, instanceID, volumeID).AddVolumeToServerPayload(payload).Execute()
+	_, err = os.iaas.AddVolumeToServer(ctxWithHTTPResp, os.projectID, os.region, instanceID, volumeID).AddVolumeToServerPayload(payload).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -129,7 +129,7 @@ func (os *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.
 	// TODO: Add support for pagination when IaaS adds it
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID).Execute()
+	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID, os.region).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -181,7 +181,7 @@ func (os *iaasClient) DetachVolume(ctx context.Context, instanceID, volumeID str
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	if volume.ServerId != nil && *volume.ServerId == instanceID {
-		err = os.iaas.RemoveVolumeFromServer(ctxWithHTTPResp, os.projectID, instanceID, volumeID).Execute()
+		err = os.iaas.RemoveVolumeFromServer(ctxWithHTTPResp, os.projectID, os.region, instanceID, volumeID).Execute()
 		if err != nil {
 			if httpResp != nil {
 				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -247,7 +247,7 @@ func (os *iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID s
 func (os *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	vol, err := os.iaas.GetVolume(ctxWithHTTPResp, os.projectID, volumeID).Execute()
+	vol, err := os.iaas.GetVolume(ctxWithHTTPResp, os.projectID, os.region, volumeID).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -262,7 +262,7 @@ func (os *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]i
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	// TODO: Add API filter once available.
-	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID).Execute()
+	volumes, err := os.iaas.ListVolumes(ctxWithHTTPResp, os.projectID, os.region).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
@@ -333,7 +333,7 @@ func (os *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus s
 
 	switch volumeStatus {
 	case VolumeAttachedStatus, VolumeAvailableStatus:
-		resizeErr := os.iaas.ResizeVolume(ctxWithHTTPResp, os.projectID, volumeID).ResizeVolumePayload(extendOpts).Execute()
+		resizeErr := os.iaas.ResizeVolume(ctxWithHTTPResp, os.projectID, os.region, volumeID).ResizeVolumePayload(extendOpts).Execute()
 		if resizeErr != nil {
 			if httpResp != nil {
 				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
