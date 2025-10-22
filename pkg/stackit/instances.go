@@ -13,7 +13,7 @@ import (
 func (os *iaasClient) GetInstanceByID(ctx context.Context, instanceID string) (*iaas.Server, error) {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	server, err := os.iaas.GetServer(ctxWithHTTPResp, os.projectID, instanceID).Execute()
+	server, err := os.iaas.GetServer(ctxWithHTTPResp, os.projectID, os.region, instanceID).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)

@@ -2,6 +2,7 @@ package stackit
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,14 +22,18 @@ var _ = Describe("Backup", func() {
 		config    *Config
 	)
 
+	const projectID = "project-id"
+	const region = "eu01"
+
 	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
+		t := GinkgoT()
+		mockCtrl = gomock.NewController(t)
 		mockAPI = mock.NewMockDefaultApi(mockCtrl)
+		t.Setenv("STACKIT_REGION", region)
+		Expect(os.Getenv("STACKIT_REGION")).To(Equal(region))
 	})
 
 	Context("CreateBackup", func() {
-		const projectID = "project-id"
-
 		BeforeEach(func() {
 			config = &Config{
 				Global: GlobalOpts{
@@ -49,6 +54,7 @@ var _ = Describe("Backup", func() {
 					mockCtrl,
 					mockAPI,
 					projectID,
+					region,
 					expectedPayload,
 				)
 
@@ -92,10 +98,10 @@ var _ = Describe("Backup", func() {
 	})
 })
 
-func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi, projectID string, expectedPayload iaas.CreateBackupPayload) {
+func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi, projectID, region string, expectedPayload iaas.CreateBackupPayload) {
 	createRequest := mock.NewMockApiCreateBackupRequest(mockCtrl)
 	createRequest.EXPECT().CreateBackupPayload(expectedPayload).Return(createRequest)
 	createRequest.EXPECT().Execute().Return(&iaas.Backup{Id: ptr.To("expected backup")}, nil)
 
-	mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID).Return(createRequest)
+	mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(createRequest)
 }
