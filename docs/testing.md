@@ -6,11 +6,11 @@ The CSI E2E test suite validates the full functionality of the CSI driver. Tests
 ### Parallel E2E Test Suite
 To execute the main CSI E2E test suite, which covers most driver features, use the following command. This suite runs tests in parallel to maximize efficiency.
 
-- **Command:** make verify-e2e-csi-parallel
+- **Command:** `make verify-e2e-csi-parallel`
 - **Scope:** Tests a broad spectrum of the CSI driver's core features (e.g., volume provisioning, mounting, unmounting, deletion), except `VolumeSnapshot`.
 
 ### Sequential E2E Test Suite (Snapshots & Backups)
-Specific tests related to VolumeSnapshots and Backups must be run sequentially to ensure proper state management and ordering of operations.
+Specific tests related to `VolumeSnapshot` must be run sequentially to ensure proper state management and ordering of operations.
 
 ### Prerequisite: VolumeSnapshotClass
 Before running the sequential tests, the necessary `VolumeSnapshotClass` resource must be applied to the Kubernetes cluster. This configuration ensures the CSI driver is correctly configured to handle snapshot operations.
