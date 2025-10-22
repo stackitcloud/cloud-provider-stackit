@@ -3,6 +3,8 @@
 ## 🧪 Running End-to-End (E2E) Tests for the CSI Driver
 The CSI E2E test suite validates the full functionality of the CSI driver. Tests are divided into parallel and sequential execution sets to accommodate different operational requirements, particularly for stateful operations like snapshots.
 
+> :warning: Make sure that the kubernetes version of the e2e test (hack/tools.mk@KUBERNETES_TEST_VERSION) matches your kubernetes version!
+
 ### Parallel E2E Test Suite
 To execute the main CSI E2E test suite, which covers most driver features, use the following command. This suite runs tests in parallel to maximize efficiency.
 
