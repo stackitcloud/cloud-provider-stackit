@@ -22,6 +22,7 @@ const (
 	snapReadySteps      = 10
 
 	//TODO: needs implementation, don't remove it
+	//nolint:unused
 	snapshotDescription = "Created by STACKIT CSI driver"
 
 	SnapshotType             = "type"
