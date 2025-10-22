@@ -31,7 +31,7 @@ var (
 func main() {
 	cmd := &cobra.Command{
 		Use:   "stackit-csi-plugin",
-		Short: "STACKIT block-storage CSI plugin for SKE",
+		Short: "STACKIT block-storage CSI plugin",
 		Run: func(_ *cobra.Command, _ []string) {
 			handle()
 		},
