@@ -95,16 +95,17 @@ type LoadbalancerClient interface {
 
 // NodeClient is the API client wrapper for the cloud-controller-manager's node-controller
 type NodeClient interface {
-	GetServer(ctx context.Context, projectID, serverID string) (*iaas.Server, error)
-	DeleteServer(ctx context.Context, projectID, serverID string) error
-	CreateServer(ctx context.Context, projectID string, create *iaas.CreateServerPayload) (*iaas.Server, error)
-	UpdateServer(ctx context.Context, projectID, serverID string, update *iaas.UpdateServerPayload) (*iaas.Server, error)
-	ListServers(ctx context.Context, projectID string) (*[]iaas.Server, error)
+	GetServer(ctx context.Context, projectID, region, serverID string) (*iaas.Server, error)
+	DeleteServer(ctx context.Context, projectID, region, serverID string) error
+	CreateServer(ctx context.Context, projectID string, region string, create *iaas.CreateServerPayload) (*iaas.Server, error)
+	UpdateServer(ctx context.Context, projectID, region, serverID string, update *iaas.UpdateServerPayload) (*iaas.Server, error)
+	ListServers(ctx context.Context, projectID, region string) (*[]iaas.Server, error)
 }
 
 type iaasClient struct {
 	iaas      iaas.DefaultApi
 	projectID string
+	region    string
 	bsOpts    BlockStorageOpts
 }
 
@@ -157,11 +158,14 @@ func GetConfigForFile(path string) (Config, error) {
 
 // CreateSTACKITProvider creates STACKIT Instance
 func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, error) {
+	// TODO: Rework this?
+	region := os.Getenv("STACKIT_REGION")
 	// Init iaasClient
 	instance := &iaasClient{
 		iaas:      client,
 		bsOpts:    cfg.BlockStorage,
 		projectID: cfg.Global.ProjectID,
+		region:    region,
 	}
 
 	return instance, nil

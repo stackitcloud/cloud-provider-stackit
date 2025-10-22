@@ -38,24 +38,26 @@ var _ = Describe("Node Controller", func() {
 		instance       *Instances
 
 		projectID string
+		region    string
 		serverID  string
 	)
 
 	BeforeEach(func() {
 		projectID = "my-project"
+		region = "eu01"
 		serverID = "my-server"
 
 		ctrl := gomock.NewController(GinkgoT())
 		nodeMockClient = stackit.NewMockNodeClient(ctrl)
 
 		var err error
-		instance, err = NewInstance(nodeMockClient, projectID, "eu-01")
+		instance, err = NewInstance(nodeMockClient, projectID, "eu01")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("InstanceExists", func() {
 		It("does not error if instance not found", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(&[]iaas.Server{}, nil)
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{}, nil)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -67,7 +69,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get the instance when provider ID not there", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(&[]iaas.Server{
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
 					Name: ptr.To("foo"),
 				},
@@ -83,7 +85,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get the instance when provider ID is there", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
 				Name: ptr.To("foo"),
 			}, nil)
 
@@ -100,7 +102,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("error when list server fails", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(nil, fmt.Errorf("failed due to some reason"))
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(nil, fmt.Errorf("failed due to some reason"))
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -111,7 +113,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("does not error when get server instance not found", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, serverID).Return(nil, stackit.ErrorNotFound)
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(nil, stackit.ErrorNotFound)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -128,7 +130,7 @@ var _ = Describe("Node Controller", func() {
 
 	Describe("InstanceShutdown", func() {
 		It("successfully gets the instance status with provider ID", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(&[]iaas.Server{
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
 					Name:   ptr.To("foo"),
 					Status: ptr.To(instanceStopping),
@@ -145,7 +147,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully gets the instance status without provider ID", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
 				Name:   ptr.To("foo"),
 				Status: ptr.To("ACTIVE"),
 			}, nil)
@@ -163,7 +165,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("fails if server not found", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(nil, stackit.ErrorNotFound)
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(nil, stackit.ErrorNotFound)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -177,7 +179,7 @@ var _ = Describe("Node Controller", func() {
 
 	Describe("InstanceMetadata", func() {
 		It("does not error if instance not found", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(&[]iaas.Server{}, nil)
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{}, nil)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -189,7 +191,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get all the metadata values", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(&[]iaas.Server{
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
 					Name:        ptr.To("foo"),
 					Id:          ptr.To(serverID),
@@ -220,11 +222,11 @@ var _ = Describe("Node Controller", func() {
 					Address: "foo",
 				},
 			}))
-			Expect(metadata.Region).To(Equal("eu-01"))
+			Expect(metadata.Region).To(Equal("eu01"))
 		})
 
 		It("errors when list server fails", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID).Return(nil, fmt.Errorf("failed due to some reason"))
+			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(nil, fmt.Errorf("failed due to some reason"))
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
