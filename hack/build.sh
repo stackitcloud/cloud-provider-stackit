@@ -19,7 +19,7 @@ if [[ -z ${LOCAL} ]]; then
   LOCAL="false"
 fi
 
-function comma_seperated() {
+function comma_separated() {
   local arr=("$@")
   local IFS=,
   echo "${arr[*]}"
@@ -35,9 +35,9 @@ fi
 # generate a tag that renovate can easily compare (similar to prow's image tags)
 # format: v<commit-timestamp>-<short-commit-sha>
 tags=(
-  "v$(date -d @$(git show -s --format=%ct @) -u +%Y%m%d%H%M%S)-$(git rev-parse HEAD | head -c7)"
-  ${VERSION}
-  $(echo ${PULL_BASE_REF} | sed 's/\//_/g' | sed 's/#//g')
+  "v$(date -d @"$(git show -s --format=%ct @)" -u +%Y%m%d%H%M%S)-$(git rev-parse HEAD | head -c7)"
+  "${VERSION}"
+  "$(echo "${PULL_BASE_REF}" | sed 's/\//_/g' | sed 's/#//g')"
 )
 
 if [[ -n "${PULL_NUMBER:=""}" ]]; then
@@ -49,21 +49,24 @@ if git_tag="$(git describe --tags --exact-match 2>/dev/null)"; then
   tags+=("$git_tag")
 fi
 
+if [[ ${IS_DEV} == "true" ]]; then
+  REPO=${REPO}-dev
+fi
 BASE_IMAGE=${REGISTRY}/${REPO}-base
-platforms=(${PLATFORMS})
+IFS=' ' read -r -a platforms <<< "${PLATFORMS}"
 if [[ -f cmd/$IMAGE/apko-base-image.yaml ]]; then
   if [[ ${LOCAL} == "true" ]]; then
     BASE_IMAGE=ko.local/${IMAGE}-base
-    platforms=($(uname -m))
+    mapfile -t platforms < <(uname -m)
   fi
 
-  APKO_IMAGE=$(apko publish --local=${LOCAL} cmd/${IMAGE}/apko-base-image.yaml ${BASE_IMAGE} --sbom=false -p "${APKO_EXTRA_PACKAGES}" --arch $(comma_seperated "${platforms[@]}"))
+  APKO_IMAGE=$(apko publish --local="${LOCAL}" "cmd/${IMAGE}/apko-base-image.yaml" "${BASE_IMAGE}" --sbom=false -p "${APKO_EXTRA_PACKAGES}" --arch "$(comma_separated "${platforms[@]}")")
   export KO_DEFAULTBASEIMAGE=${APKO_IMAGE}
   if [[ ${LOCAL} == "true" ]]; then
     # apko only published images to registry apko.local with repo cache when running in local mode.
     # Need to tag to registry ko.local for ko to see that the image needs to be resolved locally
     # will be fixed in https://github.com/chainguard-dev/apko/pull/1781
-    docker tag ${APKO_IMAGE} ${BASE_IMAGE}
+    docker tag "${APKO_IMAGE}" "${BASE_IMAGE}"
     export KO_DEFAULTBASEIMAGE=${BASE_IMAGE}
   fi
 fi
@@ -76,16 +79,16 @@ done
 
 labels=(
   org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  org.opencontainers.image.revision=${VERSION}
+  org.opencontainers.image.revision="${VERSION}"
   org.opencontainers.image.source=https://github.com/stackitcloud/cloud-provider-stackit
   org.opencontainers.image.url=https://github.com/stackitcloud/cloud-provider-stackit
 )
 
 KO_DOCKER_REPO=${REGISTRY}/${REPO} \
-  ko build --local=${LOCAL} \
-  -t $(comma_seperated "${tags[@]}") \
+  ko build --local="${LOCAL}" \
+  -t "$(comma_separated "${tags[@]}")" \
   --sbom=none \
-  --platform $(comma_seperated "${ko_platforms[@]}") \
+  --platform "$(comma_separated "${ko_platforms[@]}")" \
   --bare \
-  --image-label=$(comma_seperated "${labels[@]}") \
-  ./cmd/$IMAGE
+  --image-label="$(comma_separated "${labels[@]}")" \
+  "./cmd/$IMAGE"
