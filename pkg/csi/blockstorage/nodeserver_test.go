@@ -43,7 +43,6 @@ var _ = Describe("NodeServer", func() {
 			mountMock,
 			metadataMock,
 			stackit.BlockStorageOpts{},
-			map[string]string{}, // topologies
 		)
 	})
 

@@ -105,12 +105,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volSizeGB := util.RoundUpSize(volSizeBytes, util.GIBIBYTE)
 
 	var volAvailability string
-	// First check if volAvailability is already specified, if not get preferred from Topology
-	// Required, incase vol AZ is different from node AZ
+	// First check if volAvailability is already specified, if not, get preferred from topology
+	// Required, in case volume AZ is different from node AZ
 	volAvailability = ptr.Deref(volParams.AvailabilityZone, "")
 	if volAvailability == "" {
 		accessibleTopologyReq := req.GetAccessibilityRequirements()
-		// Check from Topology
+		// Check from topology
 		if accessibleTopologyReq != nil {
 			volAvailability = sharedcsi.GetAZFromTopology(topologyKey, accessibleTopologyReq)
 		}
