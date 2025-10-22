@@ -25,7 +25,6 @@ var (
 	httpEndpoint             string
 	provideControllerService bool
 	provideNodeService       bool
-	withTopology             bool
 )
 
 func main() {
@@ -65,8 +64,6 @@ func main() {
 
 	cmd.Flags().StringVar(&cloudConfig, "cloud-config", "", "CSI driver cloud config. This option can be given multiple times")
 
-	cmd.PersistentFlags().BoolVar(&withTopology, "with-topology", true, "cluster is topology-aware")
-
 	cmd.PersistentFlags().StringToStringVar(&additionalTopologies, "additional-topology", map[string]string{},
 		"Additional CSI driver topology keys, for example topology.kubernetes.io/region=REGION1."+
 			"This option can be specified multiple times to add multiple additional topology keys.")
@@ -90,20 +87,19 @@ func main() {
 func handle() {
 	// Initialize cloud
 	d := blockstorage.NewDriver(&blockstorage.DriverOpts{
-		Endpoint:     endpoint,
-		ClusterID:    cluster,
-		PVCLister:    csi.GetPVCLister(),
-		WithTopology: withTopology,
+		Endpoint:  endpoint,
+		ClusterID: cluster,
+		PVCLister: csi.GetPVCLister(),
 	})
 
 	if provideControllerService {
 		var err error
-		cfg, err := stackit.GetConfigForFile(cloudConfig)
+		cfg, err := stackit.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIAASClient(&cfg)
+		iaasClient, err := stackit.CreateIaaSClient(&cfg)
 		if err != nil {
 			klog.Fatalf("Failed to create IaaS client: %v", err)
 		}
@@ -120,7 +116,7 @@ func handle() {
 		// Initialize mount
 		mountProvider := mount.GetMountProvider()
 
-		cfg, err := stackit.GetConfigForFile(cloudConfig)
+		cfg, err := stackit.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
