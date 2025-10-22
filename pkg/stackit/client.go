@@ -158,8 +158,10 @@ func GetConfigForFile(path string) (Config, error) {
 
 // CreateSTACKITProvider creates STACKIT Instance
 func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, error) {
-	// TODO: Rework this?
 	region := os.Getenv("STACKIT_REGION")
+	if region == "" {
+		panic("STACKIT_REGION environment variable not set")
+	}
 	// Init iaasClient
 	instance := &iaasClient{
 		iaas:      client,
