@@ -20,7 +20,6 @@ import (
 var (
 	endpoint                 string
 	cloudConfig              string
-	additionalTopologies     map[string]string
 	cluster                  string
 	httpEndpoint             string
 	provideControllerService bool
@@ -63,10 +62,6 @@ func main() {
 	}
 
 	cmd.Flags().StringVar(&cloudConfig, "cloud-config", "", "CSI driver cloud config. This option can be given multiple times")
-
-	cmd.PersistentFlags().StringToStringVar(&additionalTopologies, "additional-topology", map[string]string{},
-		"Additional CSI driver topology keys, for example topology.kubernetes.io/region=REGION1."+
-			"This option can be specified multiple times to add multiple additional topology keys.")
 
 	cmd.PersistentFlags().StringVar(&cluster, "cluster", "", "The identifier of the cluster that the plugin is running in.")
 	cmd.PersistentFlags().StringVar(&httpEndpoint, "http-endpoint", "",
@@ -124,7 +119,7 @@ func handle() {
 		// Initialize Metadata
 		metadataProvider := metadata.GetMetadataProvider(fmt.Sprintf("%s,%s", metadata.MetadataID, metadata.ConfigDriveID))
 
-		d.SetupNodeService(mountProvider, metadataProvider, cfg.BlockStorage, additionalTopologies)
+		d.SetupNodeService(mountProvider, metadataProvider, cfg.BlockStorage)
 	}
 
 	d.Run()
