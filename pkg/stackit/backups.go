@@ -49,7 +49,7 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID).CreateBackupPayload(opts).Execute()
+	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region).CreateBackupPayload(opts).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
@@ -65,7 +65,7 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	// TODO: Add API filter once available.
-	backups, err := os.iaas.ListBackups(ctxWithHTTPResp, os.projectID).Execute()
+	backups, err := os.iaas.ListBackups(ctxWithHTTPResp, os.projectID, os.region).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
@@ -81,7 +81,7 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	err := os.iaas.DeleteBackup(ctxWithHTTPResp, os.projectID, backupID).Execute()
+	err := os.iaas.DeleteBackup(ctxWithHTTPResp, os.projectID, backupID, os.region).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
@@ -95,7 +95,7 @@ func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 func (os *iaasClient) GetBackupByID(ctx context.Context, backupID string) (*iaas.Backup, error) {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	backup, err := os.iaas.GetBackupExecute(ctxWithHTTPResp, os.projectID, backupID)
+	backup, err := os.iaas.GetBackupExecute(ctxWithHTTPResp, os.projectID, os.region, backupID)
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)

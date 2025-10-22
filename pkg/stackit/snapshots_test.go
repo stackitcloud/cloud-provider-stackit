@@ -2,6 +2,7 @@ package stackit
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,14 +21,18 @@ var _ = Describe("Snapshot", func() {
 		stackitClient IaasClient
 		config        *Config
 	)
+	const projectID = "project-id"
+	const region = "eu01"
 
 	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
+		t := GinkgoT()
+		mockCtrl = gomock.NewController(t)
 		mockAPI = mock.NewMockDefaultApi(mockCtrl)
+		t.Setenv("STACKIT_REGION", region)
+		Expect(os.Getenv("STACKIT_REGION")).To(Equal(region))
 	})
 
 	Context("ListSnapshot", func() {
-		const projectID = "project-id"
 
 		snapShotListResponse := iaas.SnapshotListResponse{
 			Items: &[]iaas.Snapshot{
@@ -64,9 +69,9 @@ var _ = Describe("Snapshot", func() {
 
 		DescribeTable("should return a filtered list of snapshots",
 			func(filters map[string]string, expectedSnaps []iaas.Snapshot) {
-				listRequest := mock.NewMockApiListSnapshotsRequest(mockCtrl)
+				listRequest := mock.NewMockApiListSnapshotsInProjectRequest(mockCtrl)
 				listRequest.EXPECT().Execute().Return(&snapShotListResponse, nil)
-				mockAPI.EXPECT().ListSnapshots(gomock.Any(), config.Global.ProjectID).Return(listRequest)
+				mockAPI.EXPECT().ListSnapshotsInProject(gomock.Any(), config.Global.ProjectID, region).Return(listRequest)
 
 				snaps, _, err := stackitClient.ListSnapshots(context.Background(), filters)
 				Expect(err).ToNot(HaveOccurred())
