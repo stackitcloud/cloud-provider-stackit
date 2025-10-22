@@ -40,11 +40,10 @@ import (
 )
 
 type nodeServer struct {
-	Driver     *Driver
-	Mount      mount.IMount
-	Metadata   metadata.IMetadata
-	Opts       stackit.BlockStorageOpts
-	Topologies map[string]string
+	Driver   *Driver
+	Mount    mount.IMount
+	Metadata metadata.IMetadata
+	Opts     stackit.BlockStorageOpts
 	csi.UnimplementedNodeServer
 }
 
@@ -322,12 +321,13 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] Unable to retrieve availability zone of node %v", err)
 	}
-	topologyMap := make(map[string]string, len(ns.Topologies)+1)
-	topologyMap[topologyKey] = zone
-	for k, v := range ns.Topologies {
-		topologyMap[k] = v
+
+	//TODO: support well-known topology key "topology.kubernetes.io/zone"
+	segments := map[string]string{
+		topologyKey: zone,
 	}
-	nodeInfo.AccessibleTopology = &csi.Topology{Segments: topologyMap}
+
+	nodeInfo.AccessibleTopology = &csi.Topology{Segments: segments}
 
 	return nodeInfo, nil
 }

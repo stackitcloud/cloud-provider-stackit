@@ -21,6 +21,9 @@ const (
 	snapReadyFactor     = 1.2
 	snapReadySteps      = 10
 
+	//TODO: needs implementation, don't remove it
+	snapshotDescription = "Created by STACKIT CSI driver"
+
 	SnapshotType             = "type"
 	SnapshotAvailabilityZone = "availability"
 )

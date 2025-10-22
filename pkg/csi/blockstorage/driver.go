@@ -138,9 +138,9 @@ func (d *Driver) SetupControllerService(instance stackit.IaasClient) {
 	d.cs = NewControllerServer(d, instance)
 }
 
-func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts, topologies map[string]string) {
+func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts) {
 	klog.Info("Providing node service")
-	d.ns = NewNodeServer(d, mountProvider, metadataProvider, opts, topologies)
+	d.ns = NewNodeServer(d, mountProvider, metadataProvider, opts)
 }
 
 func (d *Driver) Run() {

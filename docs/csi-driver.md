@@ -89,7 +89,7 @@ storageClass:
   volumeBindingMode: WaitForFirstConsumer
   allowedTopologies:
     - matchLabelExpressions:
-        - key: topology.kubernetes.io/zone
+        - key: topology.block-storage.csi.stackit.cloud/zone
           values:
             - zone1
             - zone2
