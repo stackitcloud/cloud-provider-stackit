@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: kube-system
-  name: cloud-provider-stackit
+  name: stackit-cloud-controller-manager
   labels:
-    app: cloud-provider-stackit
+    app: stackit-cloud-controller-manager
 spec:
   replicas: 2
   strategy:
@@ -14,38 +14,36 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: cloud-provider-stackit
+      app: stackit-cloud-controller-manager
   template:
     metadata:
       labels:
-        app: cloud-provider-stackit
+        app: stackit-cloud-controller-manager
     spec:
-      serviceAccountName: cloud-provider-stackit
+      serviceAccountName: stackit-cloud-controller-manager
       terminationGracePeriodSeconds: 30
       containers:
-      - name: cloud-provider-stackit
+      - name: stackit-cloud-controller-manager
         image: registry.ske.stackit.cloud/stackitcloud/cloud-provider-stackit/cloud-provider-stackit:latest
         args:
-        - --allow-untagged-cloud
         - --cloud-provider=stackit
-        - --route-reconciliation-period=30s
         - --webhook-secure-port=0
-        - --leader-elect=true
-        - --leader-elect-resource-name=stackit-cloud-controller-manager # Must not collide with the lease for OpenStack's cloud controller manager.
         - --concurrent-service-syncs=3
         - --controllers=service-lb-controller
         - --authorization-always-allow-paths=/metrics
+        - --leader-elect=true
+        - --leader-elect-resource-name=stackit-cloud-controller-manager
         # - --cloud-config=cloud-config.yaml
         # - --cluster-name=<cluster-id>
         ports:
-        - containerPort: 10258
-          hostPort: 10258
-          name: https
-          protocol: TCP
-        - containerPort: 9090
-          hostPort: 9090
-          name: metrics
-          protocol: TCP
+          - containerPort: 10258
+            hostPort: 10258
+            name: https
+            protocol: TCP
+          - containerPort: 9090
+            hostPort: 9090
+            name: metrics
+            protocol: TCP
         resources:
           limits:
             cpu: "0.5"

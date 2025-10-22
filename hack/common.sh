@@ -62,7 +62,7 @@ prepare_access() {
     kubectl config set-credentials token --token="$token"
     kubectl config set-context --current --user token
 
-    kubectl config rename-context "$(kubectl config current-context)" ske-prow-trusted
+    kubectl config rename-context "$(kubectl config current-context)" ske-prow-build
   )
 
   color-green "done"
