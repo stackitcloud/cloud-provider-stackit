@@ -318,10 +318,6 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		MaxVolumesPerNode: maxVolumesPerNode,
 	}
 
-	if !ns.Driver.withTopology {
-		return nodeInfo, nil
-	}
-
 	zone, err := ns.Metadata.GetAvailabilityZone(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] Unable to retrieve availability zone of node %v", err)
