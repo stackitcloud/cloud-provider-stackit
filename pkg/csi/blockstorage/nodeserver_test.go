@@ -28,7 +28,7 @@ var _ = Describe("NodeServer", func() {
 	)
 
 	BeforeEach(func() {
-		d := NewDriver(&DriverOpts{Endpoint: fakeEndpoint, ClusterID: fakeCluster, WithTopology: true})
+		d := NewDriver(&DriverOpts{Endpoint: fakeEndpoint, ClusterID: fakeCluster})
 
 		ctrl := gomock.NewController(GinkgoT())
 
@@ -43,7 +43,6 @@ var _ = Describe("NodeServer", func() {
 			mountMock,
 			metadataMock,
 			stackit.BlockStorageOpts{},
-			map[string]string{}, // topologies
 		)
 	})
 

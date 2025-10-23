@@ -138,7 +138,7 @@ type Config struct {
 	BlockStorage BlockStorageOpts
 }
 
-func GetConfigForFile(path string) (Config, error) {
+func GetConfigFromFile(path string) (Config, error) {
 	var cfg Config
 
 	config, err := os.Open(path)
@@ -173,7 +173,7 @@ func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, err
 	return instance, nil
 }
 
-func CreateIAASClient(cfg *Config) (iaas.DefaultApi, error) {
+func CreateIaaSClient(cfg *Config) (iaas.DefaultApi, error) {
 	var userAgent []string
 	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))

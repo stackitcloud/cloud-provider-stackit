@@ -3,27 +3,29 @@
 # See https://misc.flogisoft.com/bash/tip_colors_and_formatting
 
 color-green() { # Green
-  echo -e "\x1B[1;32m${@}\x1B[0m"
+  echo -e "\x1B[1;32m${*}\x1B[0m"
 }
 
 color-step() { # Yellow
-  echo -e "\x1B[1;33m${@}\x1B[0m"
+  echo -e "\x1B[1;33m${*}\x1B[0m"
 }
 
 color-context() { # Bold blue
-  echo -e "\x1B[1;34m${@}\x1B[0m"
+  echo -e "\x1B[1;34m${*}\x1B[0m"
 }
 
 color-missing() { # Yellow
-  echo -e "\x1B[1;33m${@}\x1B[0m"
+  echo -e "\x1B[1;33m${*}\x1B[0m"
 }
 
 prepare_token() {
   local namespace="$1"
   local name="$2"
-  local rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
   local role="$4"
   local duration="${5:-10m}"
+
+  local rolekind
+  rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
 
   result="$(kubectl -n "$namespace" create serviceaccount "$name" 2>&1)"
   # ignore "already exists" errors
@@ -44,9 +46,11 @@ prepare_token() {
 prepare_access() {
   local namespace="$1"
   local name="$2"
-  local rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
   local role="$4"
   local tmp_kubeconfig="$5"
+
+  local rolekind
+  rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
 
   color-step "Preparing access for $name"
 
@@ -71,9 +75,11 @@ prepare_access() {
 cleanup_access() {
   local namespace="$1"
   local name="$2"
-  local rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
   local role="$4"
   local tmp_kubeconfig="$5"
+
+  local rolekind
+  rolekind="$(echo "$3" | tr '[:upper:]' '[:lower:]')"
 
   color-step "Cleaning up cluster access for $name"
 
