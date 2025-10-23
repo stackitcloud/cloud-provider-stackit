@@ -94,7 +94,164 @@ var _ = Describe("Backup", func() {
 				},
 			),
 		)
+	})
 
+	Context("CreateBackup error cases", func() {
+		const projectID = "project-id"
+
+		BeforeEach(func() {
+			config = &Config{
+				Global: GlobalOpts{
+					ProjectID: projectID,
+				},
+			}
+			openStack, err = CreateSTACKITProvider(mockAPI, config)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return error when API fails", func() {
+			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(nil).Times(1)
+
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
+			Expect(err).To(HaveOccurred())
+			Expect(backup).To(BeNil())
+		})
+
+		It("should return error when both volID and snapshotID are empty", func() {
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "", "", nil)
+			Expect(err).To(HaveOccurred())
+			Expect(backup).To(BeNil())
+		})
+
+		It("should return error when name is empty", func() {
+			backup, err := openStack.CreateBackup(context.Background(), "", "volume-id", "", nil)
+			Expect(err).To(HaveOccurred())
+			Expect(backup).To(BeNil())
+		})
+	})
+
+	Context("CreateBackup validation cases", func() {
+		const projectID = "project-id"
+
+		BeforeEach(func() {
+			config = &Config{
+				Global: GlobalOpts{
+					ProjectID: projectID,
+				},
+			}
+			openStack, err = CreateSTACKITProvider(mockAPI, config)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return error when source type is invalid", func() {
+			// Test with an invalid source type
+			// Mock the API call to return nil, which will trigger our validation
+			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(nil).Times(1)
+
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to create backup request"))
+			Expect(backup).To(BeNil())
+		})
+
+		It("should handle special characters in tags", func() {
+			tags := map[string]string{
+				"special": "tag with spaces and !@#$%^&*()",
+				"normal":  "value",
+			}
+
+			expectedPayload := iaas.CreateBackupPayload{
+				Name: ptr.To("expected-name"),
+				Source: &iaas.BackupSource{
+					Type: ptr.To("volume"),
+					Id:   ptr.To("volume-id"),
+				},
+				Labels: ptr.To(map[string]any{
+					"special": "tag with spaces and !@#$%^&*()",
+					"normal":  "value",
+				}),
+			}
+
+			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", tags)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(backup).ToNot(BeNil())
+			Expect(backup.Id).ToNot(BeNil())
+			Expect(*backup.Id).To(Equal("expected backup"))
+		})
+	})
+
+	Context("CreateBackup edge cases", func() {
+		const projectID = "project-id"
+
+		BeforeEach(func() {
+			config = &Config{
+				Global: GlobalOpts{
+					ProjectID: projectID,
+				},
+			}
+			openStack, err = CreateSTACKITProvider(mockAPI, config)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should handle nil tags", func() {
+			expectedPayload := iaas.CreateBackupPayload{
+				Name: ptr.To("expected-name"),
+				Source: &iaas.BackupSource{
+					Type: ptr.To("volume"),
+					Id:   ptr.To("volume-id"),
+				},
+				Labels: nil,
+			}
+
+			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(backup).ToNot(BeNil())
+			Expect(backup.Id).ToNot(BeNil())
+			Expect(*backup.Id).To(Equal("expected backup"))
+		})
+
+		It("should handle empty tags map", func() {
+			expectedPayload := iaas.CreateBackupPayload{
+				Name: ptr.To("expected-name"),
+				Source: &iaas.BackupSource{
+					Type: ptr.To("volume"),
+					Id:   ptr.To("volume-id"),
+				},
+				Labels: ptr.To(map[string]any{}),
+			}
+
+			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+
+			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(backup).ToNot(BeNil())
+			Expect(backup.Id).ToNot(BeNil())
+			Expect(*backup.Id).To(Equal("expected backup"))
+		})
+
+		It("should handle long backup name", func() {
+			longName := "very-long-backup-name-" + string(make([]byte, 200))
+
+			expectedPayload := iaas.CreateBackupPayload{
+				Name: ptr.To(longName),
+				Source: &iaas.BackupSource{
+					Type: ptr.To("volume"),
+					Id:   ptr.To("volume-id"),
+				},
+			}
+
+			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+
+			backup, err := openStack.CreateBackup(context.Background(), longName, "volume-id", "", nil)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(backup).ToNot(BeNil())
+			Expect(backup.Id).ToNot(BeNil())
+			Expect(*backup.Id).To(Equal("expected backup"))
+		})
 	})
 })
 
