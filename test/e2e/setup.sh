@@ -212,7 +212,7 @@ main() {
   log "VM Name:       $VM_NAME"
   log "Machine Type:  $MACHINE_TYPE"
   log "K8s Version:   $K8S_VERSION"
-  
+
   # 1. Prepare prerequisites in STACKIT
   setup_ssh_key
   local network_id
@@ -263,61 +263,121 @@ main() {
     log_success "Create command accepted. VM '$VM_NAME' is provisioning with ID: $server_id."
   fi
 
-  # 3. Wait for the server to be "active" and get its IP
-  local vm_status="CREATING"
-  local public_ip=""
-  log "Waiting for VM to become 'active'..."
+  # Check if any NIC has a public IP, if not create one
+  local current_server_details
+  current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
+  local public_ip
 
+  # Find the first NIC with a public IP
+  local existing_ip
+  existing_ip=$(echo "$current_server_details" | jq -r '.nics[] | select(.publicIp != null) | .publicIp' | head -n 1)
+
+  if [[ -n "$existing_ip" && "$existing_ip" != "null" ]]; then
+    # Use the existing public IP
+    public_ip="$existing_ip"
+    log "Using existing Public IP $public_ip from server '$VM_NAME'."
+  else
+    # No public IP found, create a new one
+    log "Creating a Public IP..."
+    local public_ip_json
+    public_ip_json=$(stackit public-ip create -y --project-id "$PROJECT_ID" --output-format json)
+    local pip_create_exit_code=$?
+    if [[ $pip_create_exit_code -ne 0 ]]; then
+        log_error "Failed to execute 'stackit public-ip create'. Exit code: $pip_create_exit_code. Output: $public_ip_json"
+    fi
+    public_ip=$(echo "$public_ip_json" | jq -r '.ip')
+    if [[ -z "$public_ip" || "$public_ip" == "null" ]]; then
+        log_error "Failed to extract IP from public IP creation output: $public_ip_json"
+    fi
+    log_success "Created Public IP: $public_ip"
+  fi
+
+  # Check if the public IP is already attached to the server
+  local attached_ip
+  attached_ip=$(echo "$current_server_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .publicIp' | head -n 1)
+
+  if [[ "$attached_ip" == "$public_ip" ]]; then
+    log "Public IP $public_ip already attached to server '$VM_NAME'."
+  elif [[ -n "$attached_ip" && "$attached_ip" != "null" ]]; then
+    # A *different* IP is attached. This is unexpected. Error out.
+    log_error "Server '$VM_NAME' already has a different Public IP attached $attached_ip. Cannot attach $public_ip."
+  else
+    # No IP or expected IP not attached, proceed with attach
+    log "Attaching Public IP $public_ip to server $server_id..."
+
+    public_ip_id=$(stackit public-ip list --project-id "$PROJECT_ID" --output-format json | \
+      jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .id')
+
+    stackit server public-ip attach "$public_ip_id" --server-id "$server_id" --project-id "$PROJECT_ID" -y
+    local attach_exit_code=$?
+    if [[ $attach_exit_code -ne 0 ]]; then
+        log_error "Failed to attach Public IP $public_ip_id to server $server_id. Exit code: $attach_exit_code."
+    fi
+    log_success "Public IP attach command sent."
+  fi
+
+  # 3. Wait for the server to be "ACTIVE" and get its IP address value
+  local vm_status="" # Reset status before loop
+  local public_ip=""
+  log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
+
+  # --- MODIFIED: Status check changed to ACTIVE ---
   while [[ "$vm_status" != "ACTIVE" || "$public_ip" == "null" || -z "$public_ip" ]]; do
     sleep 10
-    echo -n "."
-    
-    local vm_details
+    echo -n "." >&2 # Progress to stderr
+
+    # Re-fetch details in the loop
     vm_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
-    
+
     vm_status=$(echo "$vm_details" | jq -r '.status')
-    public_ip=$(echo "$vm_details" | jq -r '.publicIp')
+    public_ip=$(echo "$vm_details" | jq -r '.nics[] | select(.publicIp != null) | .publicIp')
+
+    # Add a check for failure states
+    if [[ "$vm_status" == "ERROR" || "$vm_status" == "FAILED" ]]; then
+        log_error "VM '$VM_NAME' entered status '$vm_status'. Aborting."
+    fi
   done
+  echo
 
-  log_success "VM is active! Public IP: $public_ip"
+  log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
-  # # 4. Wait for SSH to be ready
-  # log "Waiting for SSH server to be ready on $public_ip..."
-  # local ssh_ready=false
-  # for _ in {1..30}; do # 5-minute timeout (30 * 10s)
-  #   # Using 'ssh-keyscan' is a more robust check than just trying to connect
-  #   if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
-  #     if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
-  #       ssh_ready=true
-  #       break
-  #     fi
-  #   fi
-  #   echo -n "."
-  #   sleep 10
-  # done
+  # 4. Wait for SSH to be ready
+   log "Waiting for SSH server to be ready on $public_ip..."
+   local ssh_ready=false
+   for _ in {1..30}; do # 5-minute timeout (30 * 10s)
+     # Using 'ssh-keyscan' is a more robust check than just trying to connect
+     if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
+       if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
+         ssh_ready=true
+         break
+       fi
+     fi
+     echo -n "." >&2 # Progress to stderr
+     sleep 10
+   done
 
-  # if [[ "$ssh_ready" != "true" ]]; then
-  #   log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
-  # fi
-  # log_success "SSH is ready."
+   if [[ "$ssh_ready" != "true" ]]; then
+     log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
+   fi
+   log_success "SSH is ready."
 
-  # # 5. Copy and execute the Kubeadm setup script
-  # log "Copying and executing Kubeadm setup script on the VM..."
-  # local setup_script
-  # setup_script=$(get_kubeadm_script)
-  
-  # # Pass the K8S_VERSION into the remote script
-  # ssh -o "StrictHostKeyChecking=no" "$SSH_USER@$public_ip" "export K8S_VERSION=$K8S_VERSION; $setup_script"
+  #  # 5. Copy and execute the Kubeadm setup script
+  #  log "Copying and executing Kubeadm setup script on the VM..."
+  #  local setup_script
+  #  setup_script=$(get_kubeadm_script) # No output, just returns script content
 
-  # log_success "All done!"
-  # log "You can now access your cluster:"
-  # echo
-  # echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME"
-  # echo "  (Once inside: kubectl get nodes)"
-  # echo
-  # echo "To get the kubeconfig for local use:"
-  # echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME 'cat .kube/config' > ./$VM_NAME.kubeconfig"
-  # echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes"
+  #  # Pass the K8S_VERSION into the remote script
+  #  ssh -o "StrictHostKeyChecking=no" "$SSH_USER@$public_ip" "export K8S_VERSION=$K8S_VERSION; $setup_script"
+
+  #  log_success "All done!"
+  #  log "You can now access your cluster:"
+  #  echo >&2 # Empty line to stderr
+  #  echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME" >&2
+  #  echo "  (Once inside: kubectl get nodes)" >&2
+  #  echo >&2 # Empty line to stderr
+  #  echo "To get the kubeconfig for local use:" >&2
+  #  echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME 'cat .kube/config' > ./$VM_NAME.kubeconfig" # Kubeconfig to stdout/file
+  #  echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
 }
 
 main "$@"
