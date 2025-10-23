@@ -50,6 +50,9 @@ type Config struct {
 	LoadBalancerAPI struct {
 		URL string `yaml:"url"`
 	} `yaml:"loadBalancerApi"`
+	LoadBalancer struct {
+		Class string `yaml:"class"`
+	} `yaml:"loadbalancer"`
 }
 
 func init() {
@@ -168,7 +171,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.ExtraLabels, obs)
+	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.ExtraLabels, obs, cfg.LoadBalancer.Class)
 	if err != nil {
 		return nil, err
 	}

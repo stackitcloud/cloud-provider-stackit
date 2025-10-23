@@ -46,11 +46,12 @@ type LoadBalancer struct {
 	extraLabels map[string]string
 	// metricsRemoteWrite setting this enables remote writing of metrics and nil means it is disabled
 	metricsRemoteWrite *MetricsRemoteWrite
+	class              string
 }
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID string, extraLabels map[string]string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
+func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID string, extraLabels map[string]string, metricsRemoteWrite *MetricsRemoteWrite, class string) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
 	// LoadBalancer.recorder is set in CloudControllerManager.Initialize
 	return &LoadBalancer{
 		client:             client,
@@ -58,6 +59,7 @@ func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID str
 		networkID:          networkID,
 		metricsRemoteWrite: metricsRemoteWrite,
 		extraLabels:        extraLabels,
+		class:              class,
 	}, nil
 }
 
@@ -112,6 +114,10 @@ func (l *LoadBalancer) EnsureLoadBalancer(
 	service *corev1.Service,
 	nodes []*corev1.Node,
 ) (*corev1.LoadBalancerStatus, error) {
+	if !l.shouldReconcileService(service) {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
+
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
 	if err != nil && !stackit.IsNotFound(err) {
@@ -233,6 +239,9 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 //
 // It is not called on controller start-up. EnsureLoadBalancer must also ensure to update targets.
 func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) error {
+	if !l.shouldReconcileService(service) {
+		return cloudprovider.ImplementedElsewhere
+	}
 	// only TargetPools are used from spec
 	spec, events, err := lbSpecFromService(service, nodes, l.networkID, nil)
 	if err != nil {
@@ -264,6 +273,10 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 	ctx context.Context, clusterName string, service *corev1.Service,
 ) error {
+	if !l.shouldReconcileService(service) {
+		return cloudprovider.ImplementedElsewhere
+	}
+
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 
 	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
@@ -412,6 +425,11 @@ func (l *LoadBalancer) cleanUpCredentials(ctx context.Context, name string) erro
 		}
 	}
 	return nil
+}
+
+func (l *LoadBalancer) shouldReconcileService(svc *corev1.Service) bool {
+	className := svc.Annotations[classNameAnnotation]
+	return className == l.class
 }
 
 func loadBalancerStatus(lb *loadbalancer.LoadBalancer, svc *corev1.Service) *corev1.LoadBalancerStatus {

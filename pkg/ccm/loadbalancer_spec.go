@@ -50,6 +50,9 @@ const (
 	// The value must be a network ID, not a subnet.
 	// The annotation can neither be changed nor be added or removed after service creation.
 	listenerNetworkAnnotation = "lb.stackit.cloud/listener-network"
+
+	// classNameAnnotation defines a loadbalancer class
+	classNameAnnotation = "lb.stackit.cloud/class-name"
 )
 
 const (

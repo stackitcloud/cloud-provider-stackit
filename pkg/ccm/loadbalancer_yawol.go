@@ -4,13 +4,6 @@ package ccm
 // Some of them are supported by the cloud controller manager to simplify the transition.
 
 const (
-	// yawolClassNameAnnotation defines the load balancer class for the service, and therefore which controller provisions the load balancer.
-	// It must be set to "stackit" for the cloud controller manager to handle this load balancer.
-	// To avoid collisions while being backwards-compatible, yawol handles the service if this annotation is not set.
-	// service.spec.loadBalancerClass is not supported because yawol as well as the cloud controller manager handle the empty class name.
-	// There is no successor for this annotation because both controllers need to understand it.
-	//nolint:unused // Should stay here for documentation purposes
-	yawolClassNameAnnotation = "yawol.stackit.cloud/className"
 	// yawolInternalLBAnnotation defines whether the load balancer should be exposed via a public IP.
 	// Deprecated: use lb.stackit.cloud/internal-lb instead.
 	yawolInternalLBAnnotation = "yawol.stackit.cloud/internalLB"
