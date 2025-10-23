@@ -46,7 +46,7 @@ var _ = Describe("Errors", func() {
 		Context("when error is a NotFound error", func() {
 			It("should return nil", func() {
 				err := &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound}
-				Expect(IgnoreNotFound(err)).To(BeNil())
+				Expect(IgnoreNotFound(err)).To(Succeed())
 			})
 		})
 
@@ -66,7 +66,7 @@ var _ = Describe("Errors", func() {
 
 		Context("when error is nil", func() {
 			It("should return nil", func() {
-				Expect(IgnoreNotFound(nil)).To(BeNil())
+				Expect(IgnoreNotFound(nil)).To(Succeed())
 			})
 		})
 	})
@@ -90,7 +90,7 @@ var _ = Describe("Errors", func() {
 
 		Context("when error is nil", func() {
 			It("should return nil", func() {
-				Expect(WrapErrorWithResponseID(nil, "12345")).To(BeNil())
+				Expect(WrapErrorWithResponseID(nil, "12345")).To(Succeed())
 			})
 		})
 	})

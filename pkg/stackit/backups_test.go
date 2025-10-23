@@ -53,8 +53,6 @@ var _ = Describe("Backup", func() {
 				mockCreateBackup(
 					mockCtrl,
 					mockAPI,
-					projectID,
-					region,
 					expectedPayload,
 				)
 
@@ -172,7 +170,7 @@ var _ = Describe("Backup", func() {
 				}),
 			}
 
-			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
 
 			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", tags)
 			Expect(err).ToNot(HaveOccurred())
@@ -205,7 +203,7 @@ var _ = Describe("Backup", func() {
 				Labels: nil,
 			}
 
-			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
 
 			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -224,7 +222,7 @@ var _ = Describe("Backup", func() {
 				Labels: ptr.To(map[string]any{}),
 			}
 
-			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
 
 			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", map[string]string{})
 			Expect(err).ToNot(HaveOccurred())
@@ -244,7 +242,7 @@ var _ = Describe("Backup", func() {
 				},
 			}
 
-			mockCreateBackup(mockCtrl, mockAPI, projectID, region, expectedPayload)
+			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
 
 			backup, err := openStack.CreateBackup(context.Background(), longName, "volume-id", "", nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -255,7 +253,11 @@ var _ = Describe("Backup", func() {
 	})
 })
 
-func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi, projectID, region string, expectedPayload iaas.CreateBackupPayload) {
+func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi, expectedPayload iaas.CreateBackupPayload) {
+	const (
+		projectID = "project-id"
+		region    = "eu01"
+	)
 	createRequest := mock.NewMockApiCreateBackupRequest(mockCtrl)
 	createRequest.EXPECT().CreateBackupPayload(expectedPayload).Return(createRequest)
 	createRequest.EXPECT().Execute().Return(&iaas.Backup{Id: ptr.To("expected backup")}, nil)
