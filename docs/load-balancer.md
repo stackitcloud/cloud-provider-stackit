@@ -9,7 +9,8 @@
    - [STACKIT Annotations](#stackit-annotations)
    - [Supported yawol Annotations](#supported-yawol-annotations)
    - [Unsupported yawol Annotations](#unsupported-yawol-annotations)
-5. [Node Labels](#node-labels)
+5. [Loadbalancer class](#loadbalancer-class)
+6. [Node Labels](#node-labels)
 
 ## Overview
 
@@ -51,6 +52,8 @@ Values for boolean annotations are parsed according to [ParseBool](https://pkg.g
 | lb.stackit.cloud/session-persistence-with-source-ip | false      | When set to true, all connections from the same source IP are consistently routed to the same target. This setting changes the load balancing algorithm to Maglev. Note, this only works reliably when `externalTrafficPolicy: Local` is set on the Service, and each node has exactly one backing pod. Otherwise, session persistence may break.                                                                        |
 | lb.stackit.cloud/listener-network                   | _none_     | When set, defines the network in which the load balancer should listen. If not set, the SKE network is used for listening. The value must be a network ID, not a subnet. The annotation can neither be changed nor be added or removed after service creation.                                                                                                                                                           |
 
+| lb.stackit.cloud/class-name                   | _none_     | When set, the cloud controller manager will only reconcile the service if it's configured to reconcile this class                                                                                                                                                           |
+
 ### Supported yawol Annotations
 
 To simplify the transition from a yawol load balancer, some yawol annotations are supported on STACKIT load balancers.
@@ -60,7 +63,7 @@ A load balancer contain both annotations as long as their values are compatible.
 | Name                                            | Description                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | yawol.stackit.cloud/internalLB                  | If true, the load balancer is not exposed via a floating IP. Default is false (i.e. exposed). Deprecated: Use lb.stackit.cloud/internal-lb instead.                                                                                                                                                                                                 |
-| yawol.stackit.cloud/existingFloatingIP          | References an OpenStack floating IP that should be used by the load balancer. If set, it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. Deprecated: Use lb.stackit.cloud/external-address instead. |
+| yawol.stackit.cloud/existingFloatingIP          | References an OpenStack floating IP that should be used by the lload balancer. If set, it will be used instead of an ephemeral IP. The IP must be created by the user. When the service is deleted, the floating IP will not be deleted. The IP is ignored if the load balancer internal. Deprecated: Use lb.stackit.cloud/external-address instead. |
 | yawol.stackit.cloud/loadBalancerSourceRanges    | Specify the `loadBalancerSourceRanges` for the load balancer like `service.spec.loadBalancerSourceRanges` (comma separated list). Deprecated: Use `service.spec.loadBalancerSourceRanges` instead.                                                                                                                                                  |
 | yawol.stackit.cloud/tcpProxyProtocol            | Enables the TCP proxy protocol. Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol instead.                                                                                                                                                                                                                                                        |
 | yawol.stackit.cloud/tcpProxyProtocolPortsFilter | Defines which ports should use the TCP proxy protocol. Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol-ports-filter instead.                                                                                                                                                                                                                    |
@@ -87,6 +90,15 @@ They are ignored for provisioning, but an event is logged on the Kubernetes serv
 | yawol.stackit.cloud/logForwardLokiURL                   |       |
 | yawol.stackit.cloud/serverGroupPolicy                   |       |
 | yawol.stackit.cloud/additionalNetworks                  |       |
+
+## Loadbalancer class
+
+To support multiple running cloud controller managers, we support classes via annotatons.
+This can be configured via the config yaml using key `loadbalancer.class`.
+When set, services with the annotation `lb.stackit.cloud/class-name` will be matched against this value to determine if it should reconcile the service.
+
+> [!CAUTION]
+> This does not work with the field `spec.loadbalancerClass` of a service, as this is not usable with the Kubernetes cloud-provider framework.
 
 ## Node Labels
 
