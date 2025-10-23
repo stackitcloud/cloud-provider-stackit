@@ -56,13 +56,12 @@ func NewIdentityServer(d *Driver) *identityServer {
 	}
 }
 
-func NewNodeServer(d *Driver, mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts, topologies map[string]string) *nodeServer { //nolint:lll // looks weird when shortened
+func NewNodeServer(d *Driver, mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts) *nodeServer { //nolint:lll // looks weird when shortened
 	return &nodeServer{
-		Driver:     d,
-		Mount:      mountProvider,
-		Metadata:   metadataProvider,
-		Topologies: topologies,
-		Opts:       opts,
+		Driver:   d,
+		Mount:    mountProvider,
+		Metadata: metadataProvider,
+		Opts:     opts,
 	}
 }
 
