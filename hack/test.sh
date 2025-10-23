@@ -24,4 +24,4 @@ else
   timeout_flag="-timeout=2m"
 fi
 
-go test "${timeout_flag:-}" "$@" "${test_flags[@]}"
+go test ${timeout_flag:+"$timeout_flag"} "$@" "${test_flags[@]}"
