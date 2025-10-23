@@ -21,8 +21,6 @@ const (
 	snapReadyFactor     = 1.2
 	snapReadySteps      = 10
 
-	snapshotDescription = "Created by STACKIT CSI driver" //nolint:unused // needs implementation, don't remove it
-
 	SnapshotType             = "type"
 	SnapshotAvailabilityZone = "availability"
 )
