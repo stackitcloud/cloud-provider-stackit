@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stackit-cloud-controller-manager
+data:
+  cloud-config.yaml: |
+    projectId: "<PROJECT_ID>"
+    networkId" "<NETWORK_ID>"
+    region: eu01
+    # extraLabels: 
+    #   key: value
+    # loadBalancerApi:
+    #   url: ""
+    # loadbalancer:
+    #   class: "my-class"
