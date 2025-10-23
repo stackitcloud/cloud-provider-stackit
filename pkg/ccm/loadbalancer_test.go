@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 	"k8s.io/utils/ptr"
 
@@ -23,16 +24,18 @@ var notYetReadyError = api.NewRetryError("waiting for load balancer to become re
 const (
 	sampleLBName         = "k8s-svc-89ec9a0e-6b00-4e2f-b57b-02e89193093d-echo"
 	sampleCredentialsRef = "credentials-12345"
+	testClass            = "test"
 )
 
 var _ = Describe("LoadBalancer", func() {
 	var (
-		mockClient           *stackit.MockLoadbalancerClient
-		lbInModeIgnoreAndObs *LoadBalancer
-		loadBalancer         *LoadBalancer
-		clusterName          string
-		projectID            string
-		networkID            string
+		mockClient            *stackit.MockLoadbalancerClient
+		lbInModeIgnoreAndObs  *LoadBalancer
+		loadBalancer          *LoadBalancer
+		loadBalancerWithClass *LoadBalancer
+		clusterName           string
+		projectID             string
+		networkID             string
 	)
 
 	BeforeEach(func() {
@@ -47,9 +50,11 @@ var _ = Describe("LoadBalancer", func() {
 			endpoint: "test-endpoint",
 			username: "test-username",
 			password: "test-password",
-		})
+		}, "")
 		Expect(err).NotTo(HaveOccurred())
-		loadBalancer, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nil)
+		loadBalancer, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nil, "")
+		Expect(err).NotTo(HaveOccurred())
+		loadBalancerWithClass, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nil, testClass)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -386,6 +391,33 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect UpdateLoadBalancer to have been called.
 			// Expect DeleteCredentials to have been called.
 		})
+		Context("with class", func() {
+			It("should ensure the loadbalancer if class matches", func(ctx SpecContext) {
+				mockClient.EXPECT().GetLoadBalancer(ctx, projectID, gomock.Any()).Return(nil, stackit.ErrorNotFound)
+				mockClient.EXPECT().CreateLoadBalancer(ctx, projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = testClass
+				_, err := loadBalancerWithClass.EnsureLoadBalancer(ctx, clusterName, svc, []*corev1.Node{})
+				if err != nil {
+					Expect(err).NotTo(MatchError(cloudprovider.ImplementedElsewhere))
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+			It("should skip if class does not match", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = "foobar"
+				_, err := loadBalancerWithClass.EnsureLoadBalancer(ctx, clusterName, svc, []*corev1.Node{})
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
+
+			It("should skip if class annotation is missing", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				_, err := loadBalancerWithClass.EnsureLoadBalancer(ctx, clusterName, svc, []*corev1.Node{})
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
+		})
 	})
 
 	Describe("EnsureLoadBalancerDeleted", func() {
@@ -507,6 +539,37 @@ var _ = Describe("LoadBalancer", func() {
 			err := loadBalancer.EnsureLoadBalancerDeleted(context.Background(), clusterName, svc)
 			Expect(err).NotTo(HaveOccurred())
 		})
+		Context("with class", func() {
+			It("should ensure deletion of the loadbalancer if class matches", func(ctx SpecContext) {
+				mockClient.EXPECT().GetLoadBalancer(ctx, projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
+				mockClient.EXPECT().ListCredentials(ctx, projectID).Return(&loadbalancer.ListCredentialsResponse{
+					Credentials: &[]loadbalancer.CredentialsResponse{},
+				}, nil)
+				mockClient.EXPECT().DeleteLoadBalancer(ctx, projectID, gomock.Any()).MinTimes(1).Return(nil)
+
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = testClass
+
+				err := loadBalancerWithClass.EnsureLoadBalancerDeleted(ctx, clusterName, svc)
+				if err != nil {
+					Expect(err).NotTo(MatchError(cloudprovider.ImplementedElsewhere))
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+			It("should skip if class does not match", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = "foobar"
+				err := loadBalancerWithClass.EnsureLoadBalancerDeleted(ctx, clusterName, svc)
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
+
+			It("should skip if class annotation is missing", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				err := loadBalancerWithClass.EnsureLoadBalancerDeleted(ctx, clusterName, svc)
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
+		})
 	})
 
 	Describe("UpdateLoadBalancer", func() {
@@ -534,6 +597,31 @@ var _ = Describe("LoadBalancer", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			// Expect UpdateTargetPool to have been called.
+		})
+		Context("with class", func() {
+			It("should update the loadbalancer if class matches", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = testClass
+
+				err := loadBalancerWithClass.UpdateLoadBalancer(ctx, clusterName, svc, []*corev1.Node{})
+				if err != nil {
+					Expect(err).NotTo(MatchError(cloudprovider.ImplementedElsewhere))
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+			It("should skip if class does not match", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				svc.Annotations[classNameAnnotation] = "foobar"
+				err := loadBalancerWithClass.EnsureLoadBalancerDeleted(ctx, clusterName, svc)
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
+
+			It("should skip if class annotation is missing", func(ctx SpecContext) {
+				svc := minimalLoadBalancerService()
+				_, err := loadBalancerWithClass.EnsureLoadBalancer(ctx, clusterName, svc, []*corev1.Node{})
+				Expect(err).To(MatchError(cloudprovider.ImplementedElsewhere))
+			})
 		})
 	})
 
