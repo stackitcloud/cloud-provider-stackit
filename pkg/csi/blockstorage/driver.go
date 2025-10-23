@@ -28,11 +28,10 @@ var (
 )
 
 type Driver struct {
-	name         string
-	fqVersion    string // Fully qualified version in format {Version}@{CPO version}
-	endpoint     string
-	clusterID    string
-	withTopology bool
+	name      string
+	fqVersion string // Fully qualified version in format {Version}@{CPO version}
+	endpoint  string
+	clusterID string
 
 	ids *identityServer
 	cs  *controllerServer
@@ -47,27 +46,24 @@ type Driver struct {
 }
 
 type DriverOpts struct {
-	ClusterID    string
-	Endpoint     string
-	WithTopology bool
+	ClusterID string
+	Endpoint  string
 
 	PVCLister corev1.PersistentVolumeClaimLister
 }
 
 func NewDriver(o *DriverOpts) *Driver {
 	d := &Driver{
-		name:         driverName,
-		fqVersion:    fmt.Sprintf("%s@%s", Version, version.Version),
-		endpoint:     o.Endpoint,
-		clusterID:    o.ClusterID,
-		withTopology: o.WithTopology,
-		pvcLister:    o.PVCLister,
+		name:      driverName,
+		fqVersion: fmt.Sprintf("%s@%s", Version, version.Version),
+		endpoint:  o.Endpoint,
+		clusterID: o.ClusterID,
+		pvcLister: o.PVCLister,
 	}
 
 	klog.Info("Driver: ", d.name)
 	klog.Info("Driver version: ", d.fqVersion)
 	klog.Info("CSI Spec version: ", specVersion)
-	klog.Infof("Topology awareness: %t", d.withTopology)
 
 	d.AddControllerServiceCapabilities(
 		[]csi.ControllerServiceCapability_RPC_Type{
@@ -142,9 +138,9 @@ func (d *Driver) SetupControllerService(instance stackit.IaasClient) {
 	d.cs = NewControllerServer(d, instance)
 }
 
-func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts, topologies map[string]string) {
+func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts) {
 	klog.Info("Providing node service")
-	d.ns = NewNodeServer(d, mountProvider, metadataProvider, opts, topologies)
+	d.ns = NewNodeServer(d, mountProvider, metadataProvider, opts)
 }
 
 func (d *Driver) Run() {

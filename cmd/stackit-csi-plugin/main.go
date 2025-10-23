@@ -20,12 +20,10 @@ import (
 var (
 	endpoint                 string
 	cloudConfig              string
-	additionalTopologies     map[string]string
 	cluster                  string
 	httpEndpoint             string
 	provideControllerService bool
 	provideNodeService       bool
-	withTopology             bool
 )
 
 func main() {
@@ -65,12 +63,6 @@ func main() {
 
 	cmd.Flags().StringVar(&cloudConfig, "cloud-config", "", "CSI driver cloud config. This option can be given multiple times")
 
-	cmd.PersistentFlags().BoolVar(&withTopology, "with-topology", true, "cluster is topology-aware")
-
-	cmd.PersistentFlags().StringToStringVar(&additionalTopologies, "additional-topology", map[string]string{},
-		"Additional CSI driver topology keys, for example topology.kubernetes.io/region=REGION1."+
-			"This option can be specified multiple times to add multiple additional topology keys.")
-
 	cmd.PersistentFlags().StringVar(&cluster, "cluster", "", "The identifier of the cluster that the plugin is running in.")
 	cmd.PersistentFlags().StringVar(&httpEndpoint, "http-endpoint", "",
 		"The TCP network address where the HTTP server for providing metrics for diagnostics, will listen (example: `:8080`)."+
@@ -90,20 +82,19 @@ func main() {
 func handle() {
 	// Initialize cloud
 	d := blockstorage.NewDriver(&blockstorage.DriverOpts{
-		Endpoint:     endpoint,
-		ClusterID:    cluster,
-		PVCLister:    csi.GetPVCLister(),
-		WithTopology: withTopology,
+		Endpoint:  endpoint,
+		ClusterID: cluster,
+		PVCLister: csi.GetPVCLister(),
 	})
 
 	if provideControllerService {
 		var err error
-		cfg, err := stackit.GetConfigForFile(cloudConfig)
+		cfg, err := stackit.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIAASClient(&cfg)
+		iaasClient, err := stackit.CreateIaaSClient(&cfg)
 		if err != nil {
 			klog.Fatalf("Failed to create IaaS client: %v", err)
 		}
@@ -120,7 +111,7 @@ func handle() {
 		// Initialize mount
 		mountProvider := mount.GetMountProvider()
 
-		cfg, err := stackit.GetConfigForFile(cloudConfig)
+		cfg, err := stackit.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -128,7 +119,7 @@ func handle() {
 		// Initialize Metadata
 		metadataProvider := metadata.GetMetadataProvider(fmt.Sprintf("%s,%s", metadata.MetadataID, metadata.ConfigDriveID))
 
-		d.SetupNodeService(mountProvider, metadataProvider, cfg.BlockStorage, additionalTopologies)
+		d.SetupNodeService(mountProvider, metadataProvider, cfg.BlockStorage)
 	}
 
 	d.Run()

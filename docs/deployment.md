@@ -11,7 +11,6 @@
 5. [Example Deployment](#example-deployment)
 6. [Configuration Options](#configuration-options)
    - [Cloud Configuration](#cloud-configuration)
-   - [Topology Configuration](#topology-configuration)
 7. [Monitoring and Logging](#monitoring-and-logging)
    - [Metrics](#metrics)
    - [Logs](#logs)
@@ -46,8 +45,6 @@ The deployment can be customized using the following flags:
 
 - `--endpoint`: CSI endpoint URL
 - `--cloud-config`: Path to cloud configuration file
-- `--with-topology`: Enable topology awareness (default: true)
-- `--additional-topology`: Additional topology keys for volume placement
 - `--cluster`: Cluster identifier
 - `--http-endpoint`: HTTP server endpoint for metrics
 - `--provide-controller-service`: Enable controller service (default: true)
@@ -84,7 +81,7 @@ spec:
       serviceAccountName: stackit-cloud-controller-manager
       containers:
       - name: stackit-cloud-controller-manager
-        image: ghcr.io/stackitcloud/cloud-provider-stackit:latest
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controller-manager:release-v1.33
         args:
         # CCM flags
         - --cloud-provider=stackit
@@ -97,8 +94,6 @@ spec:
         # CSI flags
         - --endpoint=unix:///csi/csi.sock
         - --cloud-config=/etc/stackit/cloud-config.yaml
-        - --with-topology=true
-        - --additional-topology=topology.kubernetes.io/region=REGION1
         - --cluster=my-cluster-id
         - --provide-controller-service=true
         - --provide-node-service=true
@@ -135,17 +130,6 @@ networkId: your-network-id
 region: eu01
 loadBalancerApi:
   url: https://load-balancer.api.eu01.stackit.cloud
-```
-
-### Topology Configuration
-
-The driver supports topology-aware volume placement. Configure topology using the `--with-topology` and `--additional-topology` flags.
-
-Example with multiple topology keys:
-
-```bash
---with-topology=true
---additional-topology=topology.kubernetes.io/region=REGION1,topology.kubernetes.io/zone=ZONE1
 ```
 
 ## Monitoring and Logging
