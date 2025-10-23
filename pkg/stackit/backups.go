@@ -26,6 +26,14 @@ const (
 )
 
 func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+	if name == "" {
+		return nil, errors.New("backup name cannot be empty")
+	}
+
+	if volID == "" && snapshotID == "" {
+		return nil, errors.New("either volID or snapshotID must be provided")
+	}
+
 	var backupSource VolumeSourceTypes
 	var backupSourceID string
 	if volID != "" {
@@ -49,7 +57,12 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region).CreateBackupPayload(opts).Execute()
+	createBackupRequest := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region)
+	if createBackupRequest == nil {
+		return nil, errors.New("failed to create backup request")
+	}
+
+	backup, err := createBackupRequest.CreateBackupPayload(opts).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
