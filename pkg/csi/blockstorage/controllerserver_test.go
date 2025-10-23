@@ -49,7 +49,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 	)
 
 	BeforeEach(func() {
-		d := NewDriver(&DriverOpts{Endpoint: FakeEndpoint, ClusterID: FakeCluster, WithTopology: true})
+		d := NewDriver(&DriverOpts{Endpoint: FakeEndpoint, ClusterID: FakeCluster})
 
 		mockCtrl := gomock.NewController(GinkgoT())
 		iaasClient = stackit.NewMockIaasClient(mockCtrl)
