@@ -15,9 +15,9 @@ K8S_VERSION="$3" # Example: "1.29.0"
 INVENTORY_FILE="stackit_inventory_$PROJECT_ID.json"
 
 # --- Script Configuration ---
-VM_NAME="kube-single-node"
+VM_NAME="cp-stackit-e2e"
 # Can be overridden by environment variable (e.g. SSH_KEY_NAME="my-key" ./script.sh ...)
-SSH_KEY_NAME="${SSH_KEY_NAME:-"kube-automation-key"}"
+SSH_KEY_NAME="${SSH_KEY_NAME:-"cp-stackit-e2e"}"
 # Can be overridden by environment variable
 NETWORK_NAME="${NETWORK_NAME:-}"
 # This script uses a 2-vCPU, 4GB-RAM machine type.
@@ -341,7 +341,46 @@ create_resources() {
   local image_id
   image_id=$(find_image_id)
 
-  # 2. Check if server already exists
+  # 2. Setup security group for SSH
+  log "Checking for security group '$VM_NAME'..."
+  local security_group_id
+  local security_group_name=$VM_NAME
+
+  # Check if security group already exists
+  security_group_id=$(stackit security-group list --project-id "$PROJECT_ID" --output-format json | \
+    jq -r --arg name "$security_group_name" 'map(select(.name == $name)) | .[0].id')
+
+  if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
+    log "Security group '$security_group_id' not found. Creating..."
+    security_group_id=$(stackit security-group create --name "$security_group_id" \
+      --project-id "$PROJECT_ID" --output-format json -y | jq -r '.id')
+
+    if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
+      log_error "Failed to create security group '$security_group_id'."
+    fi
+    log_success "Created security group '$security_group_id' with ID: $security_group_id"
+    update_inventory "security_group" "$security_group_id" "$security_group_name"
+  else
+    log_success "Security group '$security_group_name' already exists with ID: $security_group_id"
+  fi
+
+  # Check if SSH rule exists in the security group
+  local ssh_rule_exists
+  ssh_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
+    --project-id "$PROJECT_ID" --output-format json | \
+    jq -r 'map(select(.portRange.min == 22 and .portRange.max == 22 and .protocol.name == "tcp" and .direction == "ingress")) | length')
+
+  if [[ "$ssh_rule_exists" -eq 0 ]]; then
+    log "Adding SSH rule to security group '$security_group_name'..."
+    stackit security-group rule create --security-group-id "$security_group_id" \
+      --direction ingress --protocol-name tcp --port-range-max 22 --port-range-min 22 \
+      --description "SSH Access" --project-id "$PROJECT_ID" -y
+    log_success "Added SSH rule to security group '$security_group_name'"
+  else
+    log_success "SSH rule already exists in security group '$security_group_name'"
+  fi
+
+  # 3. Check if server already exists
   log "Checking if server '$VM_NAME' already exists..."
   local server_id=""
   server_id=$(stackit server list --project-id "$PROJECT_ID" --output-format json | \
@@ -378,7 +417,7 @@ create_resources() {
     update_inventory "server" "$server_id" "$VM_NAME"
   fi
 
-  # 3. Check for Public IP and attach if missing
+  # 4. Check for Public IP and attach if missing
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
   local public_ip
@@ -425,7 +464,7 @@ create_resources() {
     local public_ip_id
     public_ip_id=$(stackit public-ip list --project-id "$PROJECT_ID" --output-format json | \
       jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .[0].id')
-      
+
     if [[ -z "$public_ip_id" || "$public_ip_id" == "null" ]]; then
         log_error "Could not find Public IP ID for IP $public_ip."
     fi
@@ -438,7 +477,7 @@ create_resources() {
     log_success "Public IP attach command sent."
   fi
 
-  # 4. Wait for the server to be "ACTIVE" and get its IP address value
+  # 5. Wait for the server to be "ACTIVE" and get its IP address value
   local vm_status="" # Reset status before loop
   local ip_attached=""
   local security_group_id=""
@@ -476,30 +515,6 @@ create_resources() {
 
   log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
-  # 5. Setup security group for SSH
-  if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
-    log_error "Could not determine security group ID for the VM's NIC."
-  fi
-  
-  local security_group_name
-  security_group_name=$(stackit security-group describe "$security_group_id" --project-id "$PROJECT_ID" --output-format json | jq -r '.name')
-    
-  # Check if SSH rule exists in the security group
-  local ssh_rule_exists
-  ssh_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
-    --project-id "$PROJECT_ID" --output-format json | \
-    jq -r 'map(select(.portRange.min == 22 and .portRange.max == 22 and .protocol.name == "tcp" and .direction == "ingress")) | length')
-
-  if [[ "$ssh_rule_exists" -eq 0 ]]; then
-    log "Adding SSH rule to security group '$security_group_name'..."
-    stackit security-group rule create --security-group-id "$security_group_id" \
-      --direction ingress --protocol-name tcp --port-range-max 22 --port-range-min 22 \
-      --description "SSH Access" --project-id "$PROJECT_ID" -y
-    log_success "Added SSH rule to security group '$security_group_name'"
-  else
-    log_success "SSH rule already exists in security group '$security_group_name'"
-  fi
-
   # 6. Wait for SSH to be ready
   log "Waiting for SSH server to be ready on $public_ip..."
   local ssh_ready=false
@@ -524,23 +539,23 @@ create_resources() {
   fi
   log_success "SSH is ready."
 
-   # 7. Copy and execute the Kubeadm setup script
-   log "Copying and executing Kubeadm setup script on the VM..."
-   local setup_script
-   setup_script=$(get_kubeadm_script)
+  # 7. Copy and execute the Kubeadm setup script
+  log "Copying and executing Kubeadm setup script on the VM..."
+  local setup_script
+  setup_script=$(get_kubeadm_script)
 
-   # Pass the script content as a command to SSH
-   ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
+  # Pass the script content as a command to SSH
+  ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
 
-   log_success "All done!"
-   log "You can now access your cluster:"
-   echo >&2
-   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip" >&2
-   echo "  (Once inside: kubectl get nodes)" >&2
-   echo >&2
-   echo "To get the kubeconfig for local use:" >&2
-   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" >&2
-   echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
+  log_success "All done!"
+  log "You can now access your cluster:"
+  echo >&2
+  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip" >&2
+  echo "  (Once inside: kubectl get nodes)" >&2
+  echo >&2
+  echo "To get the kubeconfig for local use:" >&2
+  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" >&2
+  echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
 }
 
 # --- Cleanup Functions ---
