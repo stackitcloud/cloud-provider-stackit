@@ -169,7 +169,7 @@ sudo systemctl restart containerd
 log "Installing Kubernetes components (v$K8S_VERSION)..."
 sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl gpg
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v\${K8S_VERSION%.*}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION%.*}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v\${K8S_VERSION%.*}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 sudo apt-get update
@@ -306,7 +306,7 @@ main() {
     log "Attaching Public IP $public_ip to server $server_id..."
 
     public_ip_id=$(stackit public-ip list --project-id "$PROJECT_ID" --output-format json | \
-      jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .id')
+      jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .[0].id')
 
     stackit server public-ip attach "$public_ip_id" --server-id "$server_id" --project-id "$PROJECT_ID" -y
     local attach_exit_code=$?
@@ -339,7 +339,7 @@ main() {
         log_error "VM '$VM_NAME' entered status '$vm_status'. Aborting."
     fi
   done
-  echo
+  echo >&2
 
   log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
@@ -350,7 +350,7 @@ main() {
     jq -r '.name')
   ssh_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
     --project-id "$PROJECT_ID" --output-format json | \
-    jq -r 'map(select(.portRangeMin == 22 and .portRangeMax == 22 and .protocolName == "tcp" and .direction == "ingress")) | length')
+    jq -r 'map(select(.portRange.min == 22 and .portRange.max == 22 and .protocol.name == "tcp" and .direction == "ingress")) | length')
 
   if [[ "$ssh_rule_exists" -eq 0 ]]; then
     log "Adding SSH rule to security group '$security_group_name'..."
@@ -368,7 +368,7 @@ main() {
   for _ in {1..30}; do # 5-minute timeout (30 * 10s)
     # Using 'ssh-keyscan' is a more robust check than just trying to connect
     if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
-      if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
+      if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
         ssh_ready=true
         break
       fi
@@ -382,23 +382,23 @@ main() {
   fi
   log_success "SSH is ready."
 
-  #  # 5. Copy and execute the Kubeadm setup script
-  #  log "Copying and executing Kubeadm setup script on the VM..."
-  #  local setup_script
-  #  setup_script=$(get_kubeadm_script) # No output, just returns script content
+   # 5. Copy and execute the Kubeadm setup script
+   log "Copying and executing Kubeadm setup script on the VM..."
+   local setup_script
+   setup_script=$(get_kubeadm_script) # No output, just returns script content
 
-  #  # Pass the K8S_VERSION into the remote script
-  #  ssh -o "StrictHostKeyChecking=no" "$SSH_USER@$public_ip" "export K8S_VERSION=$K8S_VERSION; $setup_script"
+   # Pass the K8S_VERSION into the remote script
+   ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
 
-  #  log_success "All done!"
-  #  log "You can now access your cluster:"
-  #  echo >&2 # Empty line to stderr
-  #  echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME" >&2
-  #  echo "  (Once inside: kubectl get nodes)" >&2
-  #  echo >&2 # Empty line to stderr
-  #  echo "To get the kubeconfig for local use:" >&2
-  #  echo "  ssh $SSH_USER@$public_ip -i $HOME/.ssh/$SSH_KEY_NAME 'cat .kube/config' > ./$VM_NAME.kubeconfig" # Kubeconfig to stdout/file
-  #  echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
+   log_success "All done!"
+   log "You can now access your cluster:"
+   echo >&2
+   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip" >&2
+   echo "  (Once inside: kubectl get nodes)" >&2
+   echo >&2
+   echo "To get the kubeconfig for local use:" >&2
+   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" # Kubeconfig to stdout/file
+   echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
 }
 
 main "$@"
