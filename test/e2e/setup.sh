@@ -24,17 +24,16 @@ IMAGE_NAME_FILTER="Ubuntu 22.04"
 SSH_USER="ubuntu"
 
 # --- Helper Functions ---
-
 log() {
-  printf "🔷 [$(date +'%T')] %s\n" "$*" >&2
+  printf "[$(date +'%T')] 🔷 %s\n" "$*" >&2
 }
 
 log_success() {
-  printf "✅ [$(date +'%T')] %s\n" "$*" >&2
+  printf "[$(date +'%T')] ✅ %s\n" "$*" >&2
 }
 
 log_error() {
-  printf "❌ [$(date +'%T')] %s\n" "$*" >&2
+  printf "[$(date +'%T')] ❌ %s\n" "$*" >&2
   exit 1
 }
 
@@ -129,11 +128,11 @@ cat << EOF
 set -eo pipefail # Exit on error
 
 log() {
-  # Use \$* (escaped) to print all remote arguments as a single string
-  printf "--- [KUBE] %s\n" "\$*"
+  # MODIFIED: Moved '---' to prevent printf from parsing the format string as an option
+  printf "[KUBE] --- %s\n" "\$*"
 }
 
-log "--- RUNNING REMOTE KUBEADM SETUP ---"
+log "RUNNING REMOTE KUBEADM SETUP"
 log "Starting Kubernetes single-node setup..."
 export K8S_VERSION="$K8S_VERSION"
 
@@ -208,7 +207,7 @@ fi
 if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
   log "Installing Calico CNI..."
   # Using Calico v3.28.0. You may want to update this URL in the future.
-  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+  kubectl create -f https://raw.githubusercontent/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
   kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
 else
   log "Calico operator (tigera-operator) already exists. Skipping CNI installation."
