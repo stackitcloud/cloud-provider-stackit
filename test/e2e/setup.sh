@@ -113,9 +113,9 @@ setup_ssh_key() {
 find_network_id() {
   log "Finding a network..."
   local network_id
-  local default_net_name="kube-net-default" # Stable default name
-  # Use NETWORK_NAME if set, otherwise fall back to default_net_name
-  local target_network_name="${NETWORK_NAME:-$default_net_name}"
+  local default_network_name=$VM_NAME
+  # Use NETWORK_NAME if set, otherwise fall back to default_network_name
+  local target_network_name="${NETWORK_NAME:-$default_network_name}"
 
   log "Target network name: '$target_network_name'"
 
@@ -133,7 +133,7 @@ find_network_id() {
       log "Network '$target_network_name' not found. Creating it..."
       network_id=$(stackit network create --name "$target_network_name" \
         --project-id "$PROJECT_ID" \
-        --output-format json -y | jq -r ".id") # .id is the correct field for the create output
+        --output-format json -y | jq -r ".networkId")
 
       [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$target_network_name'."
       log_success "Created network '$target_network_name' with ID: $network_id"
@@ -335,6 +335,7 @@ create_resources() {
   log "Project: $PROJECT_ID, VM: $VM_NAME, K8s: $K8S_VERSION"
 
   # 1. Prepare prerequisites in STACKIT
+  log "Setting up prerequisites in STACKIT..."
   setup_ssh_key
   local network_id
   network_id=$(find_network_id)
@@ -342,7 +343,7 @@ create_resources() {
   image_id=$(find_image_id)
 
   # 2. Setup security group for SSH
-  log "Checking for security group '$VM_NAME'..."
+  log "Setting up security group for SSH..."
   local security_group_id
   local security_group_name=$VM_NAME
 
@@ -351,14 +352,14 @@ create_resources() {
     jq -r --arg name "$security_group_name" 'map(select(.name == $name)) | .[0].id')
 
   if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
-    log "Security group '$security_group_id' not found. Creating..."
-    security_group_id=$(stackit security-group create --name "$security_group_id" \
+    log "Security group '$security_group_name' not found. Creating..."
+    security_group_id=$(stackit security-group create --name "$security_group_name" \
       --project-id "$PROJECT_ID" --output-format json -y | jq -r '.id')
 
     if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
-      log_error "Failed to create security group '$security_group_id'."
+      log_error "Failed to create security group '$security_group_name'."
     fi
-    log_success "Created security group '$security_group_id' with ID: $security_group_id"
+    log_success "Created security group '$security_group_name' with ID: $security_group_id"
     update_inventory "security_group" "$security_group_id" "$security_group_name"
   else
     log_success "Security group '$security_group_name' already exists with ID: $security_group_id"
@@ -390,14 +391,15 @@ create_resources() {
     log_success "Server '$VM_NAME' already exists with ID: $server_id. Using existing server."
   else
     # Server does not exist, create it
-    log "Server '$VM_NAME' not found. Sending 'stackit server create' command..."
+    log "Server '$VM_NAME' not found. Creating server..."
     local creation_output_json
     creation_output_json=$(stackit server create -y --name "$VM_NAME" \
       --project-id "$PROJECT_ID" \
       --machine-type "$MACHINE_TYPE" \
       --network-id "$network_id" \
       --keypair-name "$SSH_KEY_NAME" \
-      --boot-volume-delete-on-termination "true" \
+      --security-groups "$security_group_id" \
+      --boot-volume-delete-on-termination \
       --boot-volume-source-id "$image_id" \
       --boot-volume-source-type image \
       --boot-volume-size "100" \
@@ -418,6 +420,7 @@ create_resources() {
   fi
 
   # 4. Check for Public IP and attach if missing
+  log "Setting up Public IP for server '$VM_NAME'..."
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
   local public_ip
@@ -429,7 +432,7 @@ create_resources() {
     log "Using existing Public IP $public_ip from server '$VM_NAME'."
   else
     # No public IP found, create a new one
-    log "Creating a Public IP..."
+    log "Creating a new Public IP..."
     local public_ip_json
     public_ip_json=$(stackit public-ip create -y --project-id "$PROJECT_ID" --output-format json)
 
@@ -478,10 +481,10 @@ create_resources() {
   fi
 
   # 5. Wait for the server to be "ACTIVE" and get its IP address value
+  log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
   local vm_status="" # Reset status before loop
   local ip_attached=""
   local security_group_id=""
-  log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
 
   # Loop until status is ACTIVE AND the target IP is reported in the NICs
   local elapsed_time=0
@@ -540,14 +543,14 @@ create_resources() {
   log_success "SSH is ready."
 
   # 7. Copy and execute the Kubeadm setup script
-  log "Copying and executing Kubeadm setup script on the VM..."
+  log "Setting up Kubernetes on the VM..."
   local setup_script
   setup_script=$(get_kubeadm_script)
 
   # Pass the script content as a command to SSH
   ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
 
-  log_success "All done!"
+  log_success "Kubernetes setup completed!"
   log "You can now access your cluster:"
   echo >&2
   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip" >&2
