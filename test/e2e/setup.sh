@@ -318,11 +318,12 @@ main() {
 
   # 3. Wait for the server to be "ACTIVE" and get its IP address value
   local vm_status="" # Reset status before loop
-  local public_ip=""
+  local ip_attached=""
+  local security_group_id=""
   log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
 
   # --- MODIFIED: Status check changed to ACTIVE ---
-  while [[ "$vm_status" != "ACTIVE" || "$public_ip" == "null" || -z "$public_ip" ]]; do
+  while [[ "$vm_status" != "ACTIVE" || "$ip_attached" == "null" || -z "$ip_attached" ]]; do
     sleep 10
     echo -n "." >&2 # Progress to stderr
 
@@ -330,7 +331,8 @@ main() {
     vm_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
 
     vm_status=$(echo "$vm_details" | jq -r '.status')
-    public_ip=$(echo "$vm_details" | jq -r '.nics[] | select(.publicIp != null) | .publicIp')
+    ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .publicIp' | head -n 1)
+    security_group_id=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .securityGroups[]' | head -n 1)
 
     # Add a check for failure states
     if [[ "$vm_status" == "ERROR" || "$vm_status" == "FAILED" ]]; then
@@ -341,25 +343,44 @@ main() {
 
   log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
-  # 4. Wait for SSH to be ready
-   log "Waiting for SSH server to be ready on $public_ip..."
-   local ssh_ready=false
-   for _ in {1..30}; do # 5-minute timeout (30 * 10s)
-     # Using 'ssh-keyscan' is a more robust check than just trying to connect
-     if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
-       if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
-         ssh_ready=true
-         break
-       fi
-     fi
-     echo -n "." >&2 # Progress to stderr
-     sleep 10
-   done
+  # 4. Setup security group for SSH
+  # Check if SSH rule exists in the security group
+  local ssh_rule_exists
+  security_group_name=$(stackit security-group describe "$security_group_id" --project-id "$PROJECT_ID" --output-format json | \
+    jq -r '.name')
+  ssh_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
+    --project-id "$PROJECT_ID" --output-format json | \
+    jq -r 'map(select(.portRangeMin == 22 and .portRangeMax == 22 and .protocolName == "tcp" and .direction == "ingress")) | length')
 
-   if [[ "$ssh_ready" != "true" ]]; then
-     log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
-   fi
-   log_success "SSH is ready."
+  if [[ "$ssh_rule_exists" -eq 0 ]]; then
+    log "Adding SSH rule to security group '$security_group_name'..."
+    stackit security-group rule create --security-group-id "$security_group_id" \
+      --direction ingress --protocol-name tcp --port-range-max 22 --port-range-min 22 \
+      --description "SSH Access" --project-id "$PROJECT_ID" -o json -y | jq -r
+    log_success "Added SSH rule to security group '$security_group_name'"
+  else
+    log_success "SSH rule already exists in security group '$security_group_name'"
+  fi
+
+  # 5. Wait for SSH to be ready
+  log "Waiting for SSH server to be ready on $public_ip..."
+  local ssh_ready=false
+  for _ in {1..30}; do # 5-minute timeout (30 * 10s)
+    # Using 'ssh-keyscan' is a more robust check than just trying to connect
+    if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
+      if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
+        ssh_ready=true
+        break
+      fi
+    fi
+    echo -n "." >&2 # Progress to stderr
+    sleep 10
+  done
+
+  if [[ "$ssh_ready" != "true" ]]; then
+    log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
+  fi
+  log_success "SSH is ready."
 
   #  # 5. Copy and execute the Kubeadm setup script
   #  log "Copying and executing Kubeadm setup script on the VM..."
