@@ -602,7 +602,39 @@ cleanup_resources() {
     log "No SSH key found in inventory. Skipping SSH key deletion."
   fi
 
-  # 3. Delete the network (only if it's the default one we created)
+  # 3. Delete the public IP
+  local public_ip_id
+  public_ip_id=$(echo "$inventory" | jq -r '.public_ip?.id')
+  public_ip=$(echo "$inventory" | jq -r '.public_ip?.name')
+
+  if [[ -n "$public_ip_id" && "$public_ip_id" != "null" ]]; then
+    log "Found public IP '$public_ip' (ID: $public_ip_id) in inventory. Deleting..."
+    if ! stackit public-ip delete "$public_ip_id" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete public IP '$public_ip'. You may need to delete it manually."
+    else
+      log_success "Public IP '$public_ip' deleted successfully."
+    fi
+  else
+    log "No public IP ID found in inventory. Skipping public IP deletion."
+  fi
+
+  # 4. Delete the security group
+  local security_group_id
+  security_group_id=$(echo "$inventory" | jq -r '.security_group?.id')
+  security_group_name=$(echo "$inventory" | jq -r '.security_group?.name')
+
+  if [[ -n "$security_group_id" && "$security_group_id" != "null" ]]; then
+    log "Found security group '$security_group_name' (ID: $security_group_id) in inventory. Deleting..."
+    if ! stackit security-group delete "$security_group_id" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete security group '$security_group_name'. You may need to delete it manually."
+    else
+      log_success "Security group '$security_group_name' deleted successfully."
+    fi
+  else
+    log "No security group ID found in inventory. Skipping security group deletion."
+  fi
+
+  # 5. Delete the network (only if it's the default one we created)
   if [[ -z "$NETWORK_NAME" ]]; then
     local network_id
     network_id=$(echo "$inventory" | jq -r '.network?.id')
