@@ -3,11 +3,16 @@ set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 # --- Configuration ---
 # !! SCRIPT PARAMETERS:
-#    $1: Your STACKIT Project ID
-#    $2: The Kubernetes version to install (e.g., "1.29.0")
+#    $1: Action (create|destroy)
+#    $2: Your STACKIT Project ID
+#    $3: The Kubernetes version to install (e.g., "1.29.0")
 
-PROJECT_ID="$1"
-K8S_VERSION="$2" # Example: "1.29.0"
+ACTION="$1"
+PROJECT_ID="$2"
+K8S_VERSION="$3" # Example: "1.29.0"
+
+# Inventory file to track created resources
+INVENTORY_FILE="stackit_inventory_$PROJECT_ID.json"
 
 # --- Script Configuration ---
 VM_NAME="kube-single-node"
@@ -95,6 +100,9 @@ setup_ssh_key() {
       log_error "Failed to create SSH key '$SSH_KEY_NAME' in STACKIT."
     fi
     log_success "SSH key '$SSH_KEY_NAME' created."
+    
+    # Update inventory with SSH key
+    update_inventory "ssh_key" "$SSH_KEY_NAME" "$SSH_KEY_NAME"
   else
     log_success "SSH key '$SSH_KEY_NAME' already exists."
   fi
@@ -129,6 +137,9 @@ find_network_id() {
 
       [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$target_network_name'."
       log_success "Created network '$target_network_name' with ID: $network_id"
+
+      # Update inventory with network
+      update_inventory "network" "$network_id" "$target_network_name"
     fi
   else
     # Network was found
@@ -275,11 +286,51 @@ log "Wait a minute for pods to come up, then check with 'kubectl get nodes -o wi
 EOF
 }
 
-# --- Main Execution ---
+# --- Inventory Management ---
 
-main() {
-  check_deps
+# Load inventory from file
+load_inventory() {
+  if [[ -f "$INVENTORY_FILE" ]]; then
+    cat "$INVENTORY_FILE" 2>/dev/null || echo "{}"
+  else
+    echo "{}"
+  fi
+}
 
+# Save inventory to file
+save_inventory() {
+  local inventory_content="$1"
+  echo "$inventory_content" > "$INVENTORY_FILE"
+}
+
+# Update inventory with a new resource
+update_inventory() {
+  local resource_type="$1"
+  local resource_id="$2"
+  local resource_name="$3"
+
+  local inventory
+  inventory=$(load_inventory)
+
+  # Use jq to add or update the resource
+  local updated_inventory
+  updated_inventory=$(echo "$inventory" | jq --arg type "$resource_type" --arg id "$resource_id" --arg name "$resource_name" \
+    '.[$type] = {id: $id, name: $name}')
+
+  save_inventory "$updated_inventory"
+}
+
+# Get resource ID from inventory
+get_from_inventory() {
+  local resource_type="$1"
+  local inventory
+  inventory=$(load_inventory)
+  echo "$inventory" | jq -r --arg type "$resource_type" '.[$type]?.id'
+}
+
+# --- Resource Creation ---
+
+create_resources() {
   log "Starting STACKIT VM & Kubeadm setup..."
   log "Project: $PROJECT_ID, VM: $VM_NAME, K8s: $K8S_VERSION"
 
@@ -307,6 +358,7 @@ main() {
       --machine-type "$MACHINE_TYPE" \
       --network-id "$network_id" \
       --keypair-name "$SSH_KEY_NAME" \
+      --boot-volume-delete-on-termination "true" \
       --boot-volume-source-id "$image_id" \
       --boot-volume-source-type image \
       --boot-volume-size "100" \
@@ -322,6 +374,8 @@ main() {
       log_error "Failed to extract server ID from creation output: $creation_output_json"
     fi
     log_success "Create command accepted. VM '$VM_NAME' is provisioning with ID: $server_id."
+    # Update inventory with new server
+    update_inventory "server" "$server_id" "$VM_NAME"
   fi
 
   # 3. Check for Public IP and attach if missing
@@ -345,10 +399,13 @@ main() {
         log_error "Failed to execute 'stackit public-ip create'. Exit code: $pip_create_exit_code. Output: $public_ip_json"
     fi
     public_ip=$(echo "$public_ip_json" | jq -r '.ip')
+    public_ip_id=$(echo "$public_ip_json" | jq -r '.id')
     if [[ -z "$public_ip" || "$public_ip" == "null" ]]; then
         log_error "Failed to extract IP from public IP creation output: $public_ip_json"
     fi
     log_success "Created Public IP: $public_ip"
+    # Update inventory with public IP
+    update_inventory "public_ip" "$public_ip_id" "$public_ip"
   fi
 
   # Check if the public IP is already attached to the server
@@ -484,6 +541,93 @@ main() {
    echo "To get the kubeconfig for local use:" >&2
    echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" >&2
    echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
+}
+
+# --- Cleanup Functions ---
+
+# Deletes all resources created by this script
+cleanup_resources() {
+  log "Starting cleanup of resources for project $PROJECT_ID..."
+
+  # Load inventory to get resource IDs
+  local inventory
+  inventory=$(load_inventory)
+
+  # 1. Delete the VM
+  local server_id
+  server_id=$(echo "$inventory" | jq -r '.server?.id')
+  server_name=$(echo "$inventory" | jq -r '.server?.name')
+
+  if [[ -n "$server_id" && "$server_id" != "null" ]]; then
+    log "Found server '$server_name' (ID: $server_id) in inventory. Deleting..."
+    if ! stackit server delete "$server_id" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete server '$server_name'. You may need to delete it manually."
+    else
+      log_success "Server '$server_name' deleted successfully."
+    fi
+  else
+    log "No server ID found in inventory. Skipping server deletion."
+  fi
+
+  # 2. Delete the SSH key
+  local ssh_key_name
+  ssh_key_name=$(echo "$inventory" | jq -r '.ssh_key?.name')
+
+  if [[ -n "$ssh_key_name" && "$ssh_key_name" != "null" ]]; then
+    log "Found SSH key '$ssh_key_name' in inventory. Deleting..."
+    if ! stackit key-pair delete "$ssh_key_name" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete SSH key '$ssh_key_name'. You may need to delete it manually."
+    else
+      log_success "SSH key '$ssh_key_name' deleted successfully."
+    fi
+  else
+    log "No SSH key found in inventory. Skipping SSH key deletion."
+  fi
+
+  # 3. Delete the network (only if it's the default one we created)
+  if [[ -z "$NETWORK_NAME" ]]; then
+    local network_id
+    network_id=$(echo "$inventory" | jq -r '.network?.id')
+
+    if [[ -n "$network_id" && "$network_id" != "null" ]]; then
+      log "Found network in inventory (ID: $network_id). Deleting..."
+      if ! stackit network delete "$network_id" --project-id "$PROJECT_ID" -y; then
+        log_warn "Failed to delete network. You may need to delete it manually."
+      else
+        log_success "Network deleted successfully."
+      fi
+    else
+      log "No network ID found in inventory. Skipping network deletion."
+    fi
+  else
+    log "Custom network name provided. Skipping network deletion to avoid deleting user networks."
+  fi
+
+  # Clean up inventory file
+  if [[ -f "$INVENTORY_FILE" ]]; then
+    rm "$INVENTORY_FILE"
+    log_success "Removed inventory file."
+  fi
+
+  log_success "Cleanup process completed."
+}
+
+# --- Main Execution ---
+
+main() {
+  case "$ACTION" in
+    create)
+      check_deps
+      create_resources
+      ;;
+    destroy)
+      check_deps
+      cleanup_resources
+      ;;
+    *)
+      log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
+      ;;
+  esac
 }
 
 main "$@"
