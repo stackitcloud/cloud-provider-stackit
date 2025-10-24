@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 # --- Configuration ---
@@ -23,6 +23,12 @@ IMAGE_NAME_FILTER="Ubuntu 22.04"
 # SSH User for Ubuntu
 SSH_USER="ubuntu"
 
+# --- Constants ---
+MAX_WAIT_TIME=300  # 5 minutes for operations
+WAIT_INTERVAL=10   # seconds between checks
+SSH_TIMEOUT=300    # 5 minutes for SSH readiness
+SSH_CHECK_INTERVAL=10 # seconds between SSH checks
+
 # --- Helper Functions ---
 log() {
   printf "[$(date +'%T')] 🔷 %s\n" "$*" >&2
@@ -30,6 +36,10 @@ log() {
 
 log_success() {
   printf "[$(date +'%T')] ✅ %s\n" "$*" >&2
+}
+
+log_warn() {
+  printf "[$(date +'%T')] ⚠️  %s\n" "$*" >&2
 }
 
 log_error() {
@@ -42,26 +52,48 @@ check_deps() {
   command -v stackit >/dev/null 2>&1 || log_error "STACKIT CLI ('stackit') not found. Please install it."
   command -v jq >/dev/null 2>&1 || log_error "jq not found. Please install it."
   command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
-  
+
+  # Validate SSH key pair
   local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
+  local ssh_priv_key_path="$HOME/.ssh/$SSH_KEY_NAME"
+
   [[ -f "$ssh_pub_key_path" ]] || log_error "Public SSH key not found at $ssh_pub_key_path. Please generate one with 'ssh-keygen -f $HOME/.ssh/$SSH_KEY_NAME'."
-  
+  [[ -f "$ssh_priv_key_path" ]] || log_error "Private SSH key not found at $ssh_priv_key_path."
+
+  # Check key permissions
+  [[ $(stat -c %a "$ssh_priv_key_path") == "600" ]] || log_warn "Private key permissions should be 600. Current: $(stat -c %a "$ssh_priv_key_path")"
+
+  # Validate parameters
   [[ -n "$PROJECT_ID" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
   [[ -n "$K8S_VERSION" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
+
+  # Validate Kubernetes version format (must be like 1.31.13)
+  if ! [[ "$K8S_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    log_error "Invalid Kubernetes version format. Must be in format X.Y.Z (e.g., 1.31.13)"
+  fi
 }
 
 # --- STACKIT API Functions ---
 
 # Creates an SSH key in STACKIT or confirms it exists
+# Globals:
+#   PROJECT_ID
+#   SSH_KEY_NAME
+# Arguments:
+#   None
+# Outputs:
+#   Creates SSH key in STACKIT if it doesn't exist
 setup_ssh_key() {
   log "Checking for SSH key '$SSH_KEY_NAME'..."
-  
+
   if ! stackit key-pair describe "$SSH_KEY_NAME" --project-id "$PROJECT_ID" &>/dev/null; then
     log "No existing key found. Creating..."
     # The '@' prefix tells the CLI to read the content from the file
-    stackit key-pair create "$SSH_KEY_NAME" -y \
+    if ! stackit key-pair create "$SSH_KEY_NAME" -y \
       --project-id "$PROJECT_ID" \
-      --public-key "@$HOME/.ssh/$SSH_KEY_NAME.pub"
+      --public-key "@$HOME/.ssh/$SSH_KEY_NAME.pub"; then
+      log_error "Failed to create SSH key '$SSH_KEY_NAME' in STACKIT."
+    fi
     log_success "SSH key '$SSH_KEY_NAME' created."
   else
     log_success "SSH key '$SSH_KEY_NAME' already exists."
@@ -126,7 +158,6 @@ get_kubeadm_script() {
 cat << EOF
 #!/bin/bash
 set -eo pipefail # Exit on error
-set -x
 
 log() {
   # Use \$* (escaped) to print all remote arguments as a single string
@@ -357,9 +388,15 @@ main() {
   log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
 
   # Loop until status is ACTIVE AND the target IP is reported in the NICs
+  local elapsed_time=0
   while [[ "$vm_status" != "ACTIVE" || "$ip_attached" == "null" || -z "$ip_attached" ]]; do
-    # sleep 10
+    sleep $WAIT_INTERVAL
+    elapsed_time=$((elapsed_time + WAIT_INTERVAL))
     echo -n "." >&2 # Progress to stderr
+
+    if [[ $elapsed_time -ge $MAX_WAIT_TIME ]]; then
+      log_error "Timeout waiting for VM to become active (max $MAX_WAIT_TIME seconds)"
+    fi
 
     # Re-fetch details in the loop
     local vm_details
@@ -367,7 +404,7 @@ main() {
 
     vm_status=$(echo "$vm_details" | jq -r '.status')
     ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
-    
+
     # Also grab the security group ID while we're at it
     if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
       security_group_id=$(echo "$vm_details" | jq -r '.nics[] | .securityGroups[]' | head -n 1)
@@ -409,18 +446,24 @@ main() {
   # 6. Wait for SSH to be ready
   log "Waiting for SSH server to be ready on $public_ip..."
   local ssh_ready=false
-  for _ in {1..30}; do # 5-minute timeout (30 * 10s)
+  local elapsed_time=0
+
+  while [[ $elapsed_time -lt $SSH_TIMEOUT ]]; do
     if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
       ssh_ready=true
       break
     fi
     echo -n "." >&2
-    sleep 10
+    sleep $SSH_CHECK_INTERVAL
+    elapsed_time=$((elapsed_time + SSH_CHECK_INTERVAL))
   done
   echo >&2
 
   if [[ "$ssh_ready" != "true" ]]; then
-    log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
+    log_error "SSH connection timed out after $SSH_TIMEOUT seconds. Please check:
+1. Security group rules in the STACKIT Portal
+2. The VM is running and accessible
+3. Your SSH key is correctly configured"
   fi
   log_success "SSH is ready."
 
