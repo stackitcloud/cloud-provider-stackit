@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail # Exit on error
+set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 # --- Configuration ---
 # !! SCRIPT PARAMETERS:
@@ -26,15 +26,15 @@ SSH_USER="ubuntu"
 # --- Helper Functions ---
 
 log() {
-  echo "🔷 [$(date +'%T')] $*" >&2
+  printf "🔷 [$(date +'%T')] %s\n" "$*" >&2
 }
 
 log_success() {
-  echo "✅ [$(date +'%T')] $*" >&2
+  printf "✅ [$(date +'%T')] %s\n" "$*" >&2
 }
 
 log_error() {
-  echo "❌ [$(date +'%T')] $*" >&2
+  printf "❌ [$(date +'%T')] %s\n" "$*" >&2
   exit 1
 }
 
@@ -43,7 +43,10 @@ check_deps() {
   command -v stackit >/dev/null 2>&1 || log_error "STACKIT CLI ('stackit') not found. Please install it."
   command -v jq >/dev/null 2>&1 || log_error "jq not found. Please install it."
   command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
-  [[ -f "$HOME/.ssh/$SSH_KEY_NAME.pub" ]] || log_error "Public SSH key not found at $HOME/.ssh/$SSH_KEY_NAME.pub. Please generate one with 'ssh-keygen -f $HOME/.ssh/$SSH_KEY_NAME'."
+  
+  local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
+  [[ -f "$ssh_pub_key_path" ]] || log_error "Public SSH key not found at $ssh_pub_key_path. Please generate one with 'ssh-keygen -f $HOME/.ssh/$SSH_KEY_NAME'."
+  
   [[ -n "$PROJECT_ID" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
   [[ -n "$K8S_VERSION" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
 }
@@ -54,7 +57,6 @@ check_deps() {
 setup_ssh_key() {
   log "Checking for SSH key '$SSH_KEY_NAME'..."
   
-  # Check if a key with the same name exists
   if ! stackit key-pair describe "$SSH_KEY_NAME" --project-id "$PROJECT_ID" &>/dev/null; then
     log "No existing key found. Creating..."
     # The '@' prefix tells the CLI to read the content from the file
@@ -94,7 +96,7 @@ find_network_id() {
         --project-id "$PROJECT_ID" \
         --output-format json -y | jq -r ".id") # .id is the correct field for the create output
 
-      [[ -n "$network_id" ]] || log_error "Failed to create new network '$target_network_name'."
+      [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$target_network_name'."
       log_success "Created network '$target_network_name' with ID: $network_id"
     fi
   else
@@ -111,7 +113,7 @@ find_image_id() {
   local image_id
   image_id=$(stackit image list --project-id "$PROJECT_ID" --output-format json | \
     jq -r --arg f "$IMAGE_NAME_FILTER" \
-    '[.[] | select(.name | test($f; "i")) | select(.name | test("^" + $f + "$"; "i"))] | sort_by(.version) | .[-1].id')
+    '[.[] | select(.name | test("^" + $f + "$"; "i"))] | sort_by(.version) | .[-1].id')
 
   [[ -n "$image_id" && "$image_id" != "null" ]] || log_error "No image found matching '$IMAGE_NAME_FILTER'."
   log_success "Found image ID: $image_id"
@@ -127,9 +129,11 @@ cat << EOF
 set -eo pipefail # Exit on error
 
 log() {
-  echo "--- [KUBE] $*"
+  # Use \$* (escaped) to print all remote arguments as a single string
+  printf "--- [KUBE] %s\n" "\$*"
 }
 
+log "--- RUNNING REMOTE KUBEADM SETUP ---"
 log "Starting Kubernetes single-node setup..."
 export K8S_VERSION="$K8S_VERSION"
 
@@ -137,7 +141,7 @@ export K8S_VERSION="$K8S_VERSION"
 log "Disabling swap..."
 sudo swapoff -a
 # And comment out swap in fstab
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+sudo sed -i -e '/ swap /s/^#*\(.*\)$/#\1/g' /etc/fstab
 
 # 2. Set up kernel modules and sysctl
 log "Configuring kernel modules and sysctl..."
@@ -177,27 +181,40 @@ sudo apt-get update
 sudo apt-get install -y kubelet="\${K8S_VERSION}-*" kubeadm="\${K8S_VERSION}-*" kubectl="\${K8S_VERSION}-*"
 sudo apt-mark hold kubelet kubeadm kubectl
 
-# 5. Initialize the cluster
-log "Initializing cluster with kubeadm..."
-# Note: Using Calico's default CIDR
-sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --kubernetes-version="$K8S_VERSION"
+# 5. Initialize the cluster (IDEMPOTENCY CHECK)
+if [ ! -f /etc/kubernetes/admin.conf ]; then
+  log "Initializing cluster with kubeadm..."
+  # Note: Using Calico's default CIDR
+  sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --kubernetes-version="$K8S_VERSION"
 
-# 6. Configure kubectl for the ubuntu user
-log "Configuring kubectl for $USER user..."
-mkdir -p \$HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
-sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config
+  # 6. Configure kubectl for the ubuntu user
+  # Use \$USER to get the remote user (e.g., 'ubuntu')
+  log "Configuring kubectl for \$USER user..."
+  mkdir -p \$HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
+  sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config
 
-# 7. Untaint the node to allow pods to run on the control-plane
-log "Untainting control-plane node..."
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+  # 7. Untaint the node to allow pods to run on the control-plane
+  log "Untainting control-plane node..."
+  # Wait for node to be ready before untainting
+  kubectl wait --for=condition=Ready node --all --timeout=60s
+  kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+else
+  log "Cluster already initialized (admin.conf exists). Skipping init, user config, and untaint."
+fi
 
-# 8. Install Calico CNI
-log "Installing Calico CNI..."
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
+# 8. Install Calico CNI (IDEMPOTENCY CHECK)
+# Check if operator is already there
+if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
+  log "Installing Calico CNI..."
+  # Using Calico v3.28.0. You may want to update this URL in the future.
+  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
+else
+  log "Calico operator (tigera-operator) already exists. Skipping CNI installation."
+fi
 
-log "✅ Kubernetes single-node cluster setup is complete!"
+log "✅ Kubernetes single-node cluster setup script finished."
 log "Wait a minute for pods to come up, then check with 'kubectl get nodes -o wide' and 'kubectl get pods -A'."
 EOF
 }
@@ -208,10 +225,7 @@ main() {
   check_deps
 
   log "Starting STACKIT VM & Kubeadm setup..."
-  log "Project:       $PROJECT_ID"
-  log "VM Name:       $VM_NAME"
-  log "Machine Type:  $MACHINE_TYPE"
-  log "K8s Version:   $K8S_VERSION"
+  log "Project: $PROJECT_ID, VM: $VM_NAME, K8s: $K8S_VERSION"
 
   # 1. Prepare prerequisites in STACKIT
   setup_ssh_key
@@ -220,22 +234,18 @@ main() {
   local image_id
   image_id=$(find_image_id)
 
-  # 2. Check if server already exists using list and jq, otherwise create it
+  # 2. Check if server already exists
   log "Checking if server '$VM_NAME' already exists..."
   local server_id=""
-  local creation_output_json # Define here for broader scope if needed
-
-  # Fetch the list of servers and try to find the specific one by exact name
   server_id=$(stackit server list --project-id "$PROJECT_ID" --output-format json | \
     jq -r --arg name "$VM_NAME" '.[] | select(.name == $name) | .id')
 
   if [[ -n "$server_id" && "$server_id" != "null" ]]; then
-    # Server exists
     log_success "Server '$VM_NAME' already exists with ID: $server_id. Using existing server."
   else
     # Server does not exist, create it
     log "Server '$VM_NAME' not found. Sending 'stackit server create' command..."
-    # Capture the JSON output of the create command
+    local creation_output_json
     creation_output_json=$(stackit server create -y --name "$VM_NAME" \
       --project-id "$PROJECT_ID" \
       --machine-type "$MACHINE_TYPE" \
@@ -246,34 +256,26 @@ main() {
       --boot-volume-size "100" \
       --output-format json)
 
-    # Check if the create command itself failed
     local create_exit_code=$?
     if [[ $create_exit_code -ne 0 ]]; then
         log_error "Failed to execute 'stackit server create' for '$VM_NAME'. Exit code: $create_exit_code. Output: $creation_output_json"
     fi
 
-    # Extract the ID from the creation output JSON
     server_id=$(echo "$creation_output_json" | jq -r '.id')
-
-    # Validate the extracted ID
     if [[ -z "$server_id" || "$server_id" == "null" ]]; then
       log_error "Failed to extract server ID from creation output: $creation_output_json"
     fi
-
     log_success "Create command accepted. VM '$VM_NAME' is provisioning with ID: $server_id."
   fi
 
-  # Check if any NIC has a public IP, if not create one
+  # 3. Check for Public IP and attach if missing
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
   local public_ip
-
-  # Find the first NIC with a public IP
   local existing_ip
   existing_ip=$(echo "$current_server_details" | jq -r '.nics[] | select(.publicIp != null) | .publicIp' | head -n 1)
 
   if [[ -n "$existing_ip" && "$existing_ip" != "null" ]]; then
-    # Use the existing public IP
     public_ip="$existing_ip"
     log "Using existing Public IP $public_ip from server '$VM_NAME'."
   else
@@ -281,6 +283,7 @@ main() {
     log "Creating a Public IP..."
     local public_ip_json
     public_ip_json=$(stackit public-ip create -y --project-id "$PROJECT_ID" --output-format json)
+
     local pip_create_exit_code=$?
     if [[ $pip_create_exit_code -ne 0 ]]; then
         log_error "Failed to execute 'stackit public-ip create'. Exit code: $pip_create_exit_code. Output: $public_ip_json"
@@ -294,7 +297,7 @@ main() {
 
   # Check if the public IP is already attached to the server
   local attached_ip
-  attached_ip=$(echo "$current_server_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .publicIp' | head -n 1)
+  attached_ip=$(echo "$current_server_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
 
   if [[ "$attached_ip" == "$public_ip" ]]; then
     log "Public IP $public_ip already attached to server '$VM_NAME'."
@@ -305,8 +308,14 @@ main() {
     # No IP or expected IP not attached, proceed with attach
     log "Attaching Public IP $public_ip to server $server_id..."
 
+    # We need the ID of the public IP to attach it
+    local public_ip_id
     public_ip_id=$(stackit public-ip list --project-id "$PROJECT_ID" --output-format json | \
       jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .[0].id')
+      
+    if [[ -z "$public_ip_id" || "$public_ip_id" == "null" ]]; then
+        log_error "Could not find Public IP ID for IP $public_ip."
+    fi
 
     stackit server public-ip attach "$public_ip_id" --server-id "$server_id" --project-id "$PROJECT_ID" -y
     local attach_exit_code=$?
@@ -316,38 +325,48 @@ main() {
     log_success "Public IP attach command sent."
   fi
 
-  # 3. Wait for the server to be "ACTIVE" and get its IP address value
+  # 4. Wait for the server to be "ACTIVE" and get its IP address value
   local vm_status="" # Reset status before loop
   local ip_attached=""
   local security_group_id=""
   log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
 
-  # --- MODIFIED: Status check changed to ACTIVE ---
+  # Loop until status is ACTIVE AND the target IP is reported in the NICs
   while [[ "$vm_status" != "ACTIVE" || "$ip_attached" == "null" || -z "$ip_attached" ]]; do
     sleep 10
     echo -n "." >&2 # Progress to stderr
 
     # Re-fetch details in the loop
+    local vm_details
     vm_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
 
     vm_status=$(echo "$vm_details" | jq -r '.status')
-    ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .publicIp' | head -n 1)
-    security_group_id=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null) | select(.publicIp == $target_ip) | .securityGroups[]' | head -n 1)
+    ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
+    
+    # Also grab the security group ID while we're at it
+    if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
+      security_group_id=$(echo "$vm_details" | jq -r '.nics[] | .securityGroups[]' | head -n 1)
+    fi
 
     # Add a check for failure states
     if [[ "$vm_status" == "ERROR" || "$vm_status" == "FAILED" ]]; then
         log_error "VM '$VM_NAME' entered status '$vm_status'. Aborting."
     fi
   done
-  echo >&2
+  echo >&2 # Newline after progress dots
 
   log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
-  # 4. Setup security group for SSH
+  # 5. Setup security group for SSH
+  if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
+    log_error "Could not determine security group ID for the VM's NIC."
+  fi
+  
+  local security_group_name
+  security_group_name=$(stackit security-group describe "$security_group_id" --project-id "$PROJECT_ID" --output-format json | jq -r '.name')
+    
   # Check if SSH rule exists in the security group
   local ssh_rule_exists
-  security_group_name=$(stackit security-group describe "$security_group_id" --project-id "$PROJECT_ID" --output-format json | \
-    jq -r '.name')
   ssh_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
     --project-id "$PROJECT_ID" --output-format json | \
     jq -r 'map(select(.portRange.min == 22 and .portRange.max == 22 and .protocol.name == "tcp" and .direction == "ingress")) | length')
@@ -356,38 +375,36 @@ main() {
     log "Adding SSH rule to security group '$security_group_name'..."
     stackit security-group rule create --security-group-id "$security_group_id" \
       --direction ingress --protocol-name tcp --port-range-max 22 --port-range-min 22 \
-      --description "SSH Access" --project-id "$PROJECT_ID" -o json -y | jq -r
+      --description "SSH Access" --project-id "$PROJECT_ID" -y
     log_success "Added SSH rule to security group '$security_group_name'"
   else
     log_success "SSH rule already exists in security group '$security_group_name'"
   fi
 
-  # 5. Wait for SSH to be ready
+  # 6. Wait for SSH to be ready
   log "Waiting for SSH server to be ready on $public_ip..."
   local ssh_ready=false
   for _ in {1..30}; do # 5-minute timeout (30 * 10s)
-    # Using 'ssh-keyscan' is a more robust check than just trying to connect
-    if ssh-keyscan -T 5 "$public_ip" &>/dev/null; then
-      if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
-        ssh_ready=true
-        break
-      fi
+    if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
+      ssh_ready=true
+      break
     fi
-    echo -n "." >&2 # Progress to stderr
+    echo -n "." >&2
     sleep 10
   done
+  echo >&2
 
   if [[ "$ssh_ready" != "true" ]]; then
     log_error "SSH connection timed out. Please check firewall rules in the STACKIT Portal."
   fi
   log_success "SSH is ready."
 
-   # 5. Copy and execute the Kubeadm setup script
+   # 7. Copy and execute the Kubeadm setup script
    log "Copying and executing Kubeadm setup script on the VM..."
    local setup_script
-   setup_script=$(get_kubeadm_script) # No output, just returns script content
+   setup_script=$(get_kubeadm_script)
 
-   # Pass the K8S_VERSION into the remote script
+   # Pass the script content as a command to SSH
    ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
 
    log_success "All done!"
@@ -397,7 +414,7 @@ main() {
    echo "  (Once inside: kubectl get nodes)" >&2
    echo >&2
    echo "To get the kubeconfig for local use:" >&2
-   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" # Kubeconfig to stdout/file
+   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" >&2
    echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
 }
 
