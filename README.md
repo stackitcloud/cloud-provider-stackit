@@ -22,8 +22,10 @@ Does not include:
 # cloud-config.yaml
 projectId:
 networkId:
-nonStackitClassNames: # If not set, defaults to "updateAndCreate" (see: Non-STACKIT class names).
 region: eu01
+# extraLabels to add to loadbalancer instances
+extraLabels:
+  key: value
 loadBalancerApi:
   # If not set, defaults to production.
   url: https://load-balancer-dev.api.qa.stackit.cloud
