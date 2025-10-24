@@ -126,9 +126,10 @@ get_kubeadm_script() {
 cat << EOF
 #!/bin/bash
 set -eo pipefail # Exit on error
+set -x
 
 log() {
-  # MODIFIED: Moved '---' to prevent printf from parsing the format string as an option
+  # Use \$* (escaped) to print all remote arguments as a single string
   printf "[KUBE] --- %s\n" "\$*"
 }
 
@@ -171,13 +172,33 @@ sudo systemctl restart containerd
 # 4. Install kubeadm, kubelet, kubectl
 log "Installing Kubernetes components (v$K8S_VERSION)..."
 sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gpg
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION%.*}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v\${K8S_VERSION%.*}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg jq
+
+# Create a stable path for the key
+K8S_APT_KEYRING="/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+# Extract major and minor version for repository URL (e.g., 1.29 from 1.29.0)
+K8S_MAJOR_MINOR="${K8S_VERSION%.*}"
+K8S_KEY_URL="https://pkgs.k8s.io/core:/stable:/v\${K8S_MAJOR_MINOR}/deb/Release.key"
+K8S_REPO_URL="https://pkgs.k8s.io/core:/stable:/v\${K8S_MAJOR_MINOR}/deb/"
+K8S_TEMP_KEY_PATH="/tmp/k8s-release.key"
+
+log "Downloading K8s signing key from \${K8S_KEY_URL}..."
+# Download to a temp file first.
+curl -fL "\${K8S_KEY_URL}" -o "\${K8S_TEMP_KEY_PATH}"
+
+log "Dearmoring key and adding to \${K8S_APT_KEYRING}..."
+sudo gpg --dearmor --batch --yes --output "\${K8S_APT_KEYRING}" "\${K8S_TEMP_KEY_PATH}"
+
+# Clean up temp file
+rm "\${K8S_TEMP_KEY_PATH}"
+
+log "Adding K8s apt repository..."
+echo "deb [signed-by=\${K8S_APT_KEYRING}] \${K8S_REPO_URL} /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+# --- END MODIFIED SECTION ---
 
 sudo apt-get update
 # Pin the version
-sudo apt-get install -y kubelet="\${K8S_VERSION}-*" kubeadm="\${K8S_VERSION}-*" kubectl="\${K8S_VERSION}-*"
+sudo apt-get install -y kubelet="${K8S_VERSION}-*" kubeadm="${K8S_VERSION}-*" kubectl="${K8S_VERSION}-*"
 sudo apt-mark hold kubelet kubeadm kubectl
 
 # 5. Initialize the cluster (IDEMPOTENCY CHECK)
@@ -192,25 +213,30 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
   mkdir -p \$HOME/.kube
   sudo cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
   sudo chown \$(id -u):\$(id -g) \$HOME/.kube/config
-
-  # 7. Untaint the node to allow pods to run on the control-plane
-  log "Untainting control-plane node..."
-  # Wait for node to be ready before untainting
-  kubectl wait --for=condition=Ready node --all --timeout=60s
-  kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 else
-  log "Cluster already initialized (admin.conf exists). Skipping init, user config, and untaint."
+  log "Cluster already initialized (admin.conf exists). Skipping init and user config."
 fi
 
-# 8. Install Calico CNI (IDEMPOTENCY CHECK)
+# 7. Install Calico CNI (IDEMPOTENCY CHECK)
 # Check if operator is already there
 if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
   log "Installing Calico CNI..."
   # Using Calico v3.28.0. You may want to update this URL in the future.
-  kubectl create -f https://raw.githubusercontent/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
   kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
 else
   log "Calico operator (tigera-operator) already exists. Skipping CNI installation."
+fi
+
+# 8. Untaint the node to allow pods to run on the control-plane (IDEMPOTENCY CHECK)
+# Wait for node to be ready before untainting (after CNI is installed)
+log "Waiting for node to be ready after CNI installation..."
+kubectl wait --for=condition=Ready node --all --timeout=60s
+
+# Check if the node has the control-plane taint before trying to remove it
+if kubectl get nodes -o json | jq -e '.items[0].spec.taints[] | select(.key == "node-role.kubernetes.io/control-plane")' >/dev/null 2>&1; then
+  log "Untainting control-plane node..."
+  kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 fi
 
 log "✅ Kubernetes single-node cluster setup script finished."
@@ -332,7 +358,7 @@ main() {
 
   # Loop until status is ACTIVE AND the target IP is reported in the NICs
   while [[ "$vm_status" != "ACTIVE" || "$ip_attached" == "null" || -z "$ip_attached" ]]; do
-    sleep 10
+    # sleep 10
     echo -n "." >&2 # Progress to stderr
 
     # Re-fetch details in the loop
