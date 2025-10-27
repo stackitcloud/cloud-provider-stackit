@@ -97,6 +97,9 @@ spec:
         - --cluster=my-cluster-id
         - --provide-controller-service=true
         - --provide-node-service=true
+        env:
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
         ports:
         - containerPort: 10258
           hostPort: 10258
@@ -113,6 +116,18 @@ spec:
           requests:
             cpu: "0.1"
             memory: 100Mi
+        volumeMounts:
+        - mountPath: /etc/config
+          name: cloud-config
+        - mountPath: /etc/serviceaccount
+          name: cloud-secret
+      volumes:
+      - name: cloud-config
+        configMap:
+          name: stackit-cloud-config
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret
 ```
 
 ## Configuration Options
@@ -128,8 +143,6 @@ Example cloud configuration:
 projectId: your-project-id
 networkId: your-network-id
 region: eu01
-loadBalancerApi:
-  url: https://load-balancer.api.eu01.stackit.cloud
 ```
 
 ## Monitoring and Logging
