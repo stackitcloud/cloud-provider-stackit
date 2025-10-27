@@ -34,6 +34,10 @@ WAIT_INTERVAL=10   # seconds between checks
 SSH_TIMEOUT=300    # 5 minutes for SSH readiness
 SSH_CHECK_INTERVAL=10 # seconds between SSH checks
 
+DEPLOY_REPO_URL=https://github.com/stackitcloud/cloud-provider-stackit
+# Can be overridden by environment variable to force a specific branch
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-}"
+
 # --- Helper Functions ---
 log() {
   printf "[$(date +'%T')] 🔷 %s\n" "$*" >&2
@@ -225,7 +229,7 @@ sudo systemctl restart containerd
 # 4. Install kubeadm, kubelet, kubectl
 log "Installing Kubernetes components (v$K8S_VERSION)..."
 sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gpg jq
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg jq git
 
 # Create a stable path for the key
 K8S_APT_KEYRING="/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
@@ -247,7 +251,6 @@ rm "\${K8S_TEMP_KEY_PATH}"
 
 log "Adding K8s apt repository..."
 echo "deb [signed-by=\${K8S_APT_KEYRING}] \${K8S_REPO_URL} /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-# --- END MODIFIED SECTION ---
 
 sudo apt-get update
 # Pin the version
@@ -288,7 +291,6 @@ if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
 
   log "Waiting for Tigera Operator deployment to be ready..."
   kubectl wait deployment/tigera-operator -n tigera-operator --for=condition=available --timeout=120s
-  # --- END FIX ---
 
   log "Installing Calico CNI (Custom Resources) from \${CALICO_RESOURCES_URL}..."
   kubectl create -f "\${CALICO_RESOURCES_URL}"
@@ -306,6 +308,32 @@ if kubectl get nodes -o json | jq -e '.items[0].spec.taints[] | select(.key == "
   log "Untainting control-plane node..."
   kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 fi
+
+# 9. Apply Kustomization
+log "Installing cloud-provider-stackit..."
+TARGET_BRANCH=""
+RELEASE_BRANCH="release-v\${K8S_MAJOR_MINOR}"
+
+if [ -n "${DEPLOY_BRANCH}" ]; then
+  log "Using override branch from DEPLOY_BRANCH: ${DEPLOY_BRANCH}"
+  TARGET_BRANCH="${DEPLOY_BRANCH}"
+else
+  log "Checking for release branch: \${RELEASE_BRANCH}..."
+  # Use 'git ls-remote' to check if the branch exists on the remote
+  # Exit code 0 = exists, 2 = not found
+  if git ls-remote --exit-code --heads "${DEPLOY_REPO_URL}" "\${RELEASE_BRANCH}" &>/dev/null; then
+    log "Found release branch: \${RELEASE_BRANCH}"
+    TARGET_BRANCH="\${RELEASE_BRANCH}"
+  else
+    log "Release branch \${RELEASE_BRANCH} not found. Defaulting to 'main' branch."
+    TARGET_BRANCH="main"
+  fi
+fi
+
+log "Applying kustomization from branch: \${TARGET_BRANCH}"
+# Use the -k URL with the ?ref= query parameter
+kubectl apply -k "${DEPLOY_REPO_URL}/deploy?ref=\${TARGET_BRANCH}"
+log "Kustomization applied successfully."
 
 log "✅ Kubernetes single-node cluster setup script finished."
 log "Wait a minute for pods to come up, then check with 'kubectl get nodes -o wide' and 'kubectl get pods -A'."
