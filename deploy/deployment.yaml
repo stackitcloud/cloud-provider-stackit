@@ -35,15 +35,18 @@ spec:
         - --leader-elect-resource-name=stackit-cloud-controller-manager
         - --cloud-config=/etc/config/cloud-config.yaml
         # - --cluster-name=<cluster-id>
+        env:
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
         ports:
-          - containerPort: 10258
-            hostPort: 10258
-            name: https
-            protocol: TCP
-          - containerPort: 9090
-            hostPort: 9090
-            name: metrics
-            protocol: TCP
+        - containerPort: 10258
+          hostPort: 10258
+          name: https
+          protocol: TCP
+        - containerPort: 9090
+          hostPort: 9090
+          name: metrics
+          protocol: TCP
         resources:
           limits:
             cpu: "0.5"
@@ -54,8 +57,12 @@ spec:
         volumeMounts:
         - mountPath: /etc/config
           name: cloud-config
+        - mountPath: /etc/serviceaccount
+          name: cloud-secret
       volumes:
-      - configMap:
-          defaultMode: 420
-          name: stackit-cloud-controller-manager
-        name: cloud-config
+      - name: cloud-config
+        configMap:
+          name: stackit-cloud-config
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret
