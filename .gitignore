@@ -18,3 +18,5 @@ hmac
 
 cloud-config.yaml
 __debug_*
+
+test/e2e/stackit_inventory*
