@@ -12,7 +12,7 @@ PROJECT_ID="$2"
 K8S_VERSION="$3" # Example: "1.29.0"
 
 # Inventory file to track created resources
-INVENTORY_FILE="stackit_inventory_$PROJECT_ID.json"
+INVENTORY_FILE="test/e2e/stackit_inventory_$PROJECT_ID.json"
 
 # --- Script Configuration ---
 VM_NAME="cp-stackit-e2e"
@@ -50,6 +50,18 @@ log_warn() {
 log_error() {
   printf "[$(date +'%T')] ❌ %s\n" "$*" >&2
   exit 1
+}
+
+check_auth() {
+  log "Checking STACKIT authentication..."
+  # We redirect stdin from /dev/null to prevent the interactive login prompt.
+  # We redirect stdout and stderr to /dev/null to silence the command.
+  if stackit project list < /dev/null &> /dev/null; then
+    log_success "Session is active."
+  else
+    log_error "Authentication is required. Please run 'stackit auth login' manually."
+    exit 1
+  fi
 }
 
 check_deps() {
@@ -175,7 +187,6 @@ log() {
   printf "[KUBE] --- %s\n" "\$*"
 }
 
-log "RUNNING REMOTE KUBEADM SETUP"
 log "Starting Kubernetes single-node setup..."
 export K8S_VERSION="$K8S_VERSION"
 
@@ -247,7 +258,9 @@ sudo apt-mark hold kubelet kubeadm kubectl
 if [ ! -f /etc/kubernetes/admin.conf ]; then
   log "Initializing cluster with kubeadm..."
   # Note: Using Calico's default CIDR
-  sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --kubernetes-version="$K8S_VERSION"
+  sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --kubernetes-version="$K8S_VERSION" \
+    --skip-certificate-key-print \
+    --skip-token-print
 
   # 6. Configure kubectl for the ubuntu user
   # Use \$USER to get the remote user (e.g., 'ubuntu')
@@ -262,10 +275,23 @@ fi
 # 7. Install Calico CNI (IDEMPOTENCY CHECK)
 # Check if operator is already there
 if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
-  log "Installing Calico CNI..."
-  # Using Calico v3.28.0. You may want to update this URL in the future.
-  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
-  kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml
+  CALICO_OPERATOR_URL="https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml"
+  CALICO_RESOURCES_URL="https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/custom-resources.yaml"
+  
+  log "Installing Calico CNI (Operator) from \${CALICO_OPERATOR_URL}..."
+  kubectl create -f "\${CALICO_OPERATOR_URL}"
+
+  log "Waiting for CRDs to be established..."
+  kubectl create -f "\${CALICO_OPERATOR_URL}" --dry-run=client -o json | \
+    jq -r 'select(.kind == "CustomResourceDefinition") | "crd/" + .metadata.name' | \
+    xargs kubectl wait --for=condition=established --timeout=60s
+
+  log "Waiting for Tigera Operator deployment to be ready..."
+  kubectl wait deployment/tigera-operator -n tigera-operator --for=condition=available --timeout=120s
+  # --- END FIX ---
+
+  log "Installing Calico CNI (Custom Resources) from \${CALICO_RESOURCES_URL}..."
+  kubectl create -f "\${CALICO_RESOURCES_URL}"
 else
   log "Calico operator (tigera-operator) already exists. Skipping CNI installation."
 fi
@@ -668,10 +694,12 @@ main() {
   case "$ACTION" in
     create)
       check_deps
+      check_auth
       create_resources
       ;;
     destroy)
       check_deps
+      check_auth
       cleanup_resources
       ;;
     *)
