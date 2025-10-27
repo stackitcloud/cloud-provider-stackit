@@ -54,8 +54,8 @@ spec:
         volumeMounts:
         - mountPath: /etc/config
           name: cloud-config
-  volumes:
-  - configMap:
-      defaultMode: 420
-      name: stackit-cloud-controller-manager
-    name: cloud-config
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: stackit-cloud-controller-manager
+        name: cloud-config
