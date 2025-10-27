@@ -9,18 +9,16 @@ set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 ACTION="$1"
 PROJECT_ID="$2"
-NETWORK_ID=""
+NETWORK_ID=""    # Will be populated by find_network_id
+SA_KEY_B64=""    # Will be populated by create_resources
 K8S_VERSION="$3" # Example: "1.29.0"
 
-# Inventory file to track created resources
-INVENTORY_FILE="test/e2e/stackit_inventory_$PROJECT_ID.json"
-
 # --- Script Configuration ---
-VM_NAME="cp-stackit-e2e"
+VM_NAME="stackit-ccm-test"
 # Can be overridden by environment variable (e.g. SSH_KEY_NAME="my-key" ./script.sh ...)
-SSH_KEY_NAME="${SSH_KEY_NAME:-"cp-stackit-e2e"}"
+SSH_KEY_NAME="${SSH_KEY_NAME:-$VM_NAME}"
 # Can be overridden by environment variable
-NETWORK_NAME="${NETWORK_NAME:-}"
+NETWORK_NAME="${NETWORK_NAME:-$VM_NAME}"
 # This script uses a 2-vCPU, 4GB-RAM machine type.
 # You can find other types in the STACKIT Portal or documentation.
 MACHINE_TYPE="c2i.2"
@@ -28,6 +26,11 @@ MACHINE_TYPE="c2i.2"
 IMAGE_NAME_FILTER="Ubuntu 22.04"
 # SSH User for Ubuntu
 SSH_USER="ubuntu"
+
+# Inventory file to track created resources
+INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
+# Path to store the Service Account key
+SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
 
 # --- Constants ---
 MAX_WAIT_TIME=300  # 5 minutes for operations
@@ -65,7 +68,6 @@ check_auth() {
     log_success "Session is active."
   else
     log_error "Authentication is required. Please run 'stackit auth login' manually."
-    exit 1
   fi
 }
 
@@ -74,6 +76,7 @@ check_deps() {
   command -v stackit >/dev/null 2>&1 || log_error "STACKIT CLI ('stackit') not found. Please install it."
   command -v jq >/dev/null 2>&1 || log_error "jq not found. Please install it."
   command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
+  command -v base64 >/dev/null 2>&1 || log_error "base64 not found. Please install it."
 
   # Validate SSH key pair
   local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
@@ -86,12 +89,17 @@ check_deps() {
   [[ $(stat -c %a "$ssh_priv_key_path") == "600" ]] || log_warn "Private key permissions should be 600. Current: $(stat -c %a "$ssh_priv_key_path")"
 
   # Validate parameters
-  [[ -n "$PROJECT_ID" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
-  [[ -n "$K8S_VERSION" ]] || log_error "Usage: $0 <PROJECT_ID> <K8S_VERSION>"
+  [[ -n "$PROJECT_ID" ]] || log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
+  [[ -n "$K8S_VERSION" ]] || log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
 
   # Validate Kubernetes version format (must be like 1.31.13)
   if ! [[ "$K8S_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     log_error "Invalid Kubernetes version format. Must be in format X.Y.Z (e.g., 1.31.13)"
+  fi
+
+  # Validate VM_NAME format (must only contain letters and hyphens)
+  if ! [[ "$VM_NAME" =~ ^[a-zA-Z-]+$ ]]; then
+    log_error "Invalid VM name format. Must only contain letters and hyphens (e.g., 'my-vm-name')"
   fi
 }
 
@@ -130,37 +138,26 @@ setup_ssh_key() {
 find_network_id() {
   log "Finding a network..."
   local network_id
-  local default_network_name=$VM_NAME
-  # Use NETWORK_NAME if set, otherwise fall back to default_network_name
-  local target_network_name="${NETWORK_NAME:-$default_network_name}"
-
-  log "Target network name: '$target_network_name'"
 
   # Check if the target network exists
   network_id=$(stackit network list --project-id "$PROJECT_ID" --output-format json | \
-    jq -r --arg name "$target_network_name" 'map(select(.name == $name)) | .[0].networkId')
+    jq -r --arg name "$NETWORK_NAME" 'map(select(.name == $name)) | .[0].networkId')
 
   if [[ -z "$network_id" || "$network_id" == "null" ]]; then
-    # Network does not exist
-    if [[ -n "$NETWORK_NAME" && "$target_network_name" == "$NETWORK_NAME" ]]; then
-      # If a specific NETWORK_NAME was provided and not found, error out.
-      log_error "Specified network '$target_network_name' not found in project."
-    else
-      # If no NETWORK_NAME was provided (or it was empty), and the default network wasn't found, create it.
-      log "Network '$target_network_name' not found. Creating it..."
-      network_id=$(stackit network create --name "$target_network_name" \
-        --project-id "$PROJECT_ID" \
-        --output-format json -y | jq -r ".networkId")
+    # If no NETWORK_NAME was provided (or it was empty), and the default network wasn't found, create it.
+    log "Network '$NETWORK_NAME' not found. Creating it..."
+    network_id=$(stackit network create --name "$NETWORK_NAME" \
+      --project-id "$PROJECT_ID" \
+      --output-format json -y | jq -r ".networkId")
 
-      [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$target_network_name'."
-      log_success "Created network '$target_network_name' with ID: $network_id"
+    [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$NETWORK_NAME'."
+    log_success "Created network '$NETWORK_NAME' with ID: $network_id"
 
-      # Update inventory with network
-      update_inventory "network" "$network_id" "$target_network_name"
-    fi
+    # Update inventory with network
+    update_inventory "network" "$network_id" "$NETWORK_NAME"
   else
     # Network was found
-    log_success "Found network '$target_network_name' with ID: $network_id"
+    log_success "Found network '$NETWORK_NAME' with ID: $network_id"
   fi
 
   echo "$network_id"
@@ -182,7 +179,12 @@ find_image_id() {
 # --- Kubeadm Setup Function ---
 
 # This function defines the setup script that will be run on the remote VM
+# It reads globals: $K8S_VERSION, $PROJECT_ID, $NETWORK_ID, $SA_KEY_B64, $DEPLOY_BRANCH, $DEPLOY_REPO_URL
 get_kubeadm_script() {
+  # This check runs locally, ensuring globals are set before generating the script
+  [[ -n "$NETWORK_ID" ]] || log_error "Internal script error: NETWORK_ID is not set."
+  [[ -n "$SA_KEY_B64" ]] || log_error "Internal script error: SA_KEY_B64 is not set."
+
 cat << EOF
 #!/bin/bash
 set -eo pipefail # Exit on error
@@ -310,19 +312,19 @@ if kubectl get nodes -o json | jq -e '.items[0].spec.taints[] | select(.key == "
   kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 fi
 
-# 9. Create ConfigMap for cloud-provider-stackit
-log "Creating stackit-cloud-controller-manager ConfigMap..."
-# Ensure kube-system namespace exists, as this is where the CCM will run
+# 9. Create ConfigMap and Secret for cloud-provider-stackit
+log "Ensuring kube-system namespace exists..."
 kubectl create namespace kube-system --dry-run=client -o yaml | kubectl apply -f -
 
+log "Creating stackit-cloud-controller-manager ConfigMap..."
 # Use a Here-Document *inside* the remote script to create the ConfigMap
 # The variables $PROJECT_ID and $NETWORK_ID are expanded by the *local*
-# script's 'cat' command before being sent to the remote VM.
+# script's 'cat' command and embedded *as static values* here.
 cat <<EOT_CM | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: stackit-cloud-controller-manager
+  name: stackit-cloud-config
   namespace: kube-system
 data:
   cloud-config.yaml: |-
@@ -331,6 +333,21 @@ data:
     region: eu01
 EOT_CM
 log "ConfigMap stackit-cloud-controller-manager created in kube-system."
+
+log "Creating stackit-cloud-provider-credentials secret..."
+# The $SA_KEY_B64 is expanded by the *local* script's 'cat'
+# and embedded *as a static value* here.
+cat <<EOT_SECRET | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stackit-cloud-secret
+  namespace: kube-system
+type: Opaque
+data:
+  sa_key.json: $SA_KEY_B64
+EOT_SECRET
+log "Secret stackit-cloud-provider-credentials created."
 
 # 10. Apply Kustomization
 log "Installing cloud-provider-stackit..."
@@ -418,7 +435,52 @@ create_resources() {
   local image_id
   image_id=$(find_image_id)
 
-  # 2. Setup security group for SSH
+  # 2. Setup Service Account and Key
+  local sa_name=$VM_NAME
+  sa_json=$(stackit service-account list --project-id "$PROJECT_ID" --output-format json)
+  sa_email=$(echo "$sa_json" | jq -r --arg name "$sa_name" '.[] | select(.email | startswith($name)) | .email')
+
+  if [[ -z "$sa_email" || "$sa_email" == "null" ]]; then
+    log "Service account not found. Creating '$sa_name'..."
+    sa_email=$(stackit service-account create --name "$sa_name" --project-id "$PROJECT_ID" -y --output-format json | jq -r '.email')
+    if [[ -z "$sa_email" || "$sa_email" == "null" ]]; then
+      log_error "Failed to create service account '$sa_name'."
+    fi
+
+    log_success "Created service account '$sa_name' with ID: $sa_email"
+    update_inventory "service_account" "$sa_email" "$sa_name"
+    sleep 1 # Yes, thats required because the sa is not really ready yet
+  else
+    log_success "Service account '$sa_name' already exists with ID: $sa_email"
+  fi
+
+  # Create key if it doesn't exist locally
+  if [[ -f "$SA_KEY_PATH" ]]; then
+    log_success "Service account key file already exists: $SA_KEY_PATH"
+  else
+    log "Creating service account key for $sa_name..."
+    if ! stackit service-account key create --email "$sa_email" --project-id "$PROJECT_ID" -y --output-format json | jq . > "$SA_KEY_PATH"; then
+      rm -f "$SA_KEY_PATH" # Clean up empty file on failure
+      log_error "Failed to create service account key for $sa_email."
+    fi
+
+    if [[ ! -s "$SA_KEY_PATH" ]]; then
+        log_error "Failed to save service account key to $SA_KEY_PATH (file is empty)."
+    fi
+    log_success "Service Account key saved to $SA_KEY_PATH"
+  fi
+
+  # Read and Base64-encode the key for the K8s secret
+  local sa_key_json
+  sa_key_json=$(cat "$SA_KEY_PATH")
+  [[ -n "$sa_key_json" ]] || log_error "Failed to read SA key from $SA_KEY_PATH"
+  
+  # Assign to global SA_KEY_B64. Use -w 0 for no line wraps.
+  SA_KEY_B64=$(echo -n "$sa_key_json" | base64 -w 0)
+  [[ -n "$SA_KEY_B64" ]] || log_error "Failed to base64 encode SA key."
+  log "Service account key encoded."
+
+  # 3. Setup security group for SSH
   log "Setting up security group for SSH..."
   local security_group_id
   local security_group_name=$VM_NAME
@@ -457,7 +519,7 @@ create_resources() {
     log_success "SSH rule already exists in security group '$security_group_name'"
   fi
 
-  # 3. Check if server already exists
+  # 4. Check if server already exists
   log "Checking if server '$VM_NAME' already exists..."
   local server_id=""
   server_id=$(stackit server list --project-id "$PROJECT_ID" --output-format json | \
@@ -495,7 +557,7 @@ create_resources() {
     update_inventory "server" "$server_id" "$VM_NAME"
   fi
 
-  # 4. Check for Public IP and attach if missing
+  # 5. Check for Public IP and attach if missing
   log "Setting up Public IP for server '$VM_NAME'..."
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
@@ -556,7 +618,7 @@ create_resources() {
     log_success "Public IP attach command sent."
   fi
 
-  # 5. Wait for the server to be "ACTIVE" and get its IP address value
+  # 6. Wait for the server to be "ACTIVE"
   log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP to appear..."
   local vm_status="" # Reset status before loop
   local ip_attached=""
@@ -594,7 +656,7 @@ create_resources() {
 
   log_success "VM is ACTIVE! Public IP Address: $public_ip"
 
-  # 6. Wait for SSH to be ready
+  # 7. Wait for SSH to be ready
   log "Waiting for SSH server to be ready on $public_ip..."
   local ssh_ready=false
   local elapsed_time=0
@@ -618,7 +680,7 @@ create_resources() {
   fi
   log_success "SSH is ready."
 
-  # 7. Copy and execute the Kubeadm setup script
+  # 8. Copy and execute the Kubeadm setup script
   log "Setting up Kubernetes on the VM..."
   local setup_script
   setup_script=$(get_kubeadm_script)
@@ -694,7 +756,23 @@ cleanup_resources() {
     log "No public IP ID found in inventory. Skipping public IP deletion."
   fi
 
-  # 4. Delete the security group
+  # 4. Delete the Service Account
+  local sa_email
+  # The email is stored in the 'id' field of the inventory
+  sa_email=$(echo "$inventory" | jq -r '.service_account?.id')
+
+  if [[ -n "$sa_email" && "$sa_email" != "null" ]]; then
+    log "Found service account '$sa_email' in inventory. Deleting..."
+    if ! stackit service-account delete "$sa_email" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete service account '$sa_email'. You may need to delete it manually."
+    else
+      log_success "Service account '$sa_email' deleted successfully."
+    fi
+  else
+    log "No service account found in inventory. Skipping service account deletion."
+  fi
+
+  # 5. Delete the security group
   local security_group_id
   security_group_id=$(echo "$inventory" | jq -r '.security_group?.id')
   security_group_name=$(echo "$inventory" | jq -r '.security_group?.name')
@@ -710,26 +788,27 @@ cleanup_resources() {
     log "No security group ID found in inventory. Skipping security group deletion."
   fi
 
-  # 5. Delete the network (only if it's the default one we created)
-  if [[ -z "$NETWORK_NAME" ]]; then
-    local network_id
-    network_id=$(echo "$inventory" | jq -r '.network?.id')
+  # 6. Delete the network
+  local network_id
+  network_id=$(echo "$inventory" | jq -r '.network?.id')
 
-    if [[ -n "$network_id" && "$network_id" != "null" ]]; then
-      log "Found network in inventory (ID: $network_id). Deleting..."
-      if ! stackit network delete "$network_id" --project-id "$PROJECT_ID" -y; then
-        log_warn "Failed to delete network. You may need to delete it manually."
-      else
-        log_success "Network deleted successfully."
-      fi
+  if [[ -n "$network_id" && "$network_id" != "null" ]]; then
+    log "Found network in inventory (ID: $network_id). Deleting..."
+    if ! stackit network delete "$network_id" --project-id "$PROJECT_ID" -y; then
+      log_warn "Failed to delete network. You may need to delete it manually."
     else
-      log "No network ID found in inventory. Skipping network deletion."
+      log_success "Network deleted successfully."
     fi
   else
-    log "Custom network name provided. Skipping network deletion to avoid deleting user networks."
+    log "No network ID found in inventory. Skipping network deletion."
   fi
 
-  # Clean up inventory file
+  # 7. Clean up local files
+  if [[ -f "$SA_KEY_PATH" ]]; then
+    rm "$SA_KEY_PATH"
+    log_success "Removed local service account key file."
+  fi
+
   if [[ -f "$INVENTORY_FILE" ]]; then
     rm "$INVENTORY_FILE"
     log_success "Removed inventory file."
