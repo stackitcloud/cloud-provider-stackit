@@ -93,7 +93,7 @@ spec:
         - --leader-elect-resource-name=stackit-cloud-controller-manager
         # CSI flags
         - --endpoint=unix:///csi/csi.sock
-        - --cloud-config=/etc/stackit/cloud-config.yaml
+        - --cloud-config=/etc/config/cloud-config.yaml
         - --cluster=my-cluster-id
         - --provide-controller-service=true
         - --provide-node-service=true
@@ -119,7 +119,7 @@ spec:
 
 ### Cloud Configuration
 
-The cloud configuration file should be mounted at `/etc/stackit/cloud-config.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
+The cloud configuration file should be mounted at `/etc/config/cloud-config.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
 
 Example cloud configuration:
 

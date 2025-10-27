@@ -9,6 +9,7 @@ set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 ACTION="$1"
 PROJECT_ID="$2"
+NETWORK_ID=""
 K8S_VERSION="$3" # Example: "1.29.0"
 
 # Inventory file to track created resources
@@ -309,7 +310,29 @@ if kubectl get nodes -o json | jq -e '.items[0].spec.taints[] | select(.key == "
   kubectl taint nodes --all node-role.kubernetes.io/control-plane-
 fi
 
-# 9. Apply Kustomization
+# 9. Create ConfigMap for cloud-provider-stackit
+log "Creating stackit-cloud-controller-manager ConfigMap..."
+# Ensure kube-system namespace exists, as this is where the CCM will run
+kubectl create namespace kube-system --dry-run=client -o yaml | kubectl apply -f -
+
+# Use a Here-Document *inside* the remote script to create the ConfigMap
+# The variables $PROJECT_ID and $NETWORK_ID are expanded by the *local*
+# script's 'cat' command before being sent to the remote VM.
+cat <<EOT_CM | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stackit-cloud-controller-manager
+  namespace: kube-system
+data:
+  cloud-config.yaml: |-
+    projectId: $PROJECT_ID
+    networkId: $NETWORK_ID
+    region: eu01
+EOT_CM
+log "ConfigMap stackit-cloud-controller-manager created in kube-system."
+
+# 10. Apply Kustomization
 log "Installing cloud-provider-stackit..."
 TARGET_BRANCH=""
 RELEASE_BRANCH="release-v\${K8S_MAJOR_MINOR}"
@@ -391,8 +414,7 @@ create_resources() {
   # 1. Prepare prerequisites in STACKIT
   log "Setting up prerequisites in STACKIT..."
   setup_ssh_key
-  local network_id
-  network_id=$(find_network_id)
+  NETWORK_ID=$(find_network_id)
   local image_id
   image_id=$(find_image_id)
 
@@ -450,7 +472,7 @@ create_resources() {
     creation_output_json=$(stackit server create -y --name "$VM_NAME" \
       --project-id "$PROJECT_ID" \
       --machine-type "$MACHINE_TYPE" \
-      --network-id "$network_id" \
+      --network-id "$NETWORK_ID" \
       --keypair-name "$SSH_KEY_NAME" \
       --security-groups "$security_group_id" \
       --boot-volume-delete-on-termination \

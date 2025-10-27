@@ -33,7 +33,7 @@ spec:
         - --authorization-always-allow-paths=/metrics
         - --leader-elect=true
         - --leader-elect-resource-name=stackit-cloud-controller-manager
-        # - --cloud-config=cloud-config.yaml
+        - --cloud-config=/etc/config/cloud-config.yaml
         # - --cluster-name=<cluster-id>
         ports:
           - containerPort: 10258
@@ -51,3 +51,11 @@ spec:
           requests:
             cpu: "0.1"
             memory: 100Mi
+        volumeMounts:
+        - mountPath: /etc/config
+          name: cloud-config
+  volumes:
+  - configMap:
+      defaultMode: 420
+      name: stackit-cloud-controller-manager
+    name: cloud-config
