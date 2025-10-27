@@ -23,12 +23,6 @@ Does not include:
 projectId:
 networkId:
 region: eu01
-# extraLabels to add to loadbalancer instances
-extraLabels:
-  key: value
-loadBalancerApi:
-  # If not set, defaults to production.
-  url: https://load-balancer-dev.api.qa.stackit.cloud
 ```
 
 - Required: STACKIT authentication for SDK
