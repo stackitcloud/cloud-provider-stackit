@@ -153,9 +153,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		return nil, err
 	}
 
-	iaasInnerClient, err := iaas.NewAPIClient(
-		sdkconfig.WithRegion(cfg.Region),
-	)
+	iaasInnerClient, err := iaas.NewAPIClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
