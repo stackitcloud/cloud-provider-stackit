@@ -11,6 +11,7 @@ ACTION="$1"
 PROJECT_ID="$2"
 NETWORK_ID=""    # Will be populated by find_network_id
 SA_KEY_B64=""    # Will be populated by create_resources
+PUBLIC_IP=""     # Will be populated by create_resources
 K8S_VERSION="$3" # Example: "1.29.0"
 
 # --- Script Configuration ---
@@ -31,6 +32,8 @@ SSH_USER="ubuntu"
 INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
 # Path to store the Service Account key
 SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
+
+KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$VM_NAME.yaml"
 
 # --- Constants ---
 MAX_WAIT_TIME=300  # 5 minutes for operations
@@ -265,6 +268,8 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
   log "Initializing cluster with kubeadm..."
   # Note: Using Calico's default CIDR
   sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --kubernetes-version="$K8S_VERSION" \
+    --control-plane-endpoint="$PUBLIC_IP" \
+    --apiserver-cert-extra-sans="$PUBLIC_IP" \
     --skip-certificate-key-print \
     --skip-token-print
 
@@ -449,7 +454,7 @@ create_resources() {
 
     log_success "Created service account '$sa_name' with ID: $sa_email"
     update_inventory "service_account" "$sa_email" "$sa_name"
-    sleep 1 # Yes, thats required because the sa is not really ready yet
+    sleep $WAIT_INTERVAL # Yes, thats required because the sa is not really ready yet
   else
     log_success "Service account '$sa_name' already exists with ID: $sa_email"
   fi
@@ -519,6 +524,22 @@ create_resources() {
     log_success "SSH rule already exists in security group '$security_group_name'"
   fi
 
+  # Check if API rule exists in the security group
+  local api_rule_exists
+  api_rule_exists=$(stackit security-group rule list --security-group-id "$security_group_id" \
+    --project-id "$PROJECT_ID" --output-format json | \
+    jq -r 'map(select(.portRange.min == 6443 and .portRange.max == 6443 and .protocol.name == "tcp" and .direction == "ingress")) | length')
+
+  if [[ "$api_rule_exists" -eq 0 ]]; then
+    log "Adding API rule to security group '$security_group_name'..."
+    stackit security-group rule create --security-group-id "$security_group_id" \
+      --direction ingress --protocol-name tcp --port-range-max 6443 --port-range-min 6443 \
+      --description "API Access" --project-id "$PROJECT_ID" -y
+    log_success "Added API rule to security group '$security_group_name'"
+  else
+    log_success "API rule already exists in security group '$security_group_name'"
+  fi
+
   # 4. Check if server already exists
   log "Checking if server '$VM_NAME' already exists..."
   local server_id=""
@@ -561,13 +582,12 @@ create_resources() {
   log "Setting up Public IP for server '$VM_NAME'..."
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
-  local public_ip
   local existing_ip
   existing_ip=$(echo "$current_server_details" | jq -r '.nics[] | select(.publicIp != null) | .publicIp' | head -n 1)
 
   if [[ -n "$existing_ip" && "$existing_ip" != "null" ]]; then
-    public_ip="$existing_ip"
-    log "Using existing Public IP $public_ip from server '$VM_NAME'."
+    PUBLIC_IP="$existing_ip"
+    log "Using existing Public IP $PUBLIC_IP from server '$VM_NAME'."
   else
     # No public IP found, create a new one
     log "Creating a new Public IP..."
@@ -578,36 +598,36 @@ create_resources() {
     if [[ $pip_create_exit_code -ne 0 ]]; then
         log_error "Failed to execute 'stackit public-ip create'. Exit code: $pip_create_exit_code. Output: $public_ip_json"
     fi
-    public_ip=$(echo "$public_ip_json" | jq -r '.ip')
+    PUBLIC_IP=$(echo "$public_ip_json" | jq -r '.ip')
     public_ip_id=$(echo "$public_ip_json" | jq -r '.id')
-    if [[ -z "$public_ip" || "$public_ip" == "null" ]]; then
+    if [[ -z "$PUBLIC_IP" || "$PUBLIC_IP" == "null" ]]; then
         log_error "Failed to extract IP from public IP creation output: $public_ip_json"
     fi
-    log_success "Created Public IP: $public_ip"
+    log_success "Created Public IP: $PUBLIC_IP"
     # Update inventory with public IP
-    update_inventory "public_ip" "$public_ip_id" "$public_ip"
+    update_inventory "public_ip" "$public_ip_id" "$PUBLIC_IP"
   fi
 
   # Check if the public IP is already attached to the server
   local attached_ip
-  attached_ip=$(echo "$current_server_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
+  attached_ip=$(echo "$current_server_details" | jq -r --arg target_ip "$PUBLIC_IP" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
 
-  if [[ "$attached_ip" == "$public_ip" ]]; then
-    log "Public IP $public_ip already attached to server '$VM_NAME'."
+  if [[ "$attached_ip" == "$PUBLIC_IP" ]]; then
+    log "Public IP $PUBLIC_IP already attached to server '$VM_NAME'."
   elif [[ -n "$attached_ip" && "$attached_ip" != "null" ]]; then
     # A *different* IP is attached. This is unexpected. Error out.
-    log_error "Server '$VM_NAME' already has a different Public IP attached $attached_ip. Cannot attach $public_ip."
+    log_error "Server '$VM_NAME' already has a different Public IP attached $attached_ip. Cannot attach $PUBLIC_IP."
   else
     # No IP or expected IP not attached, proceed with attach
-    log "Attaching Public IP $public_ip to server $server_id..."
+    log "Attaching Public IP $PUBLIC_IP to server $server_id..."
 
     # We need the ID of the public IP to attach it
     local public_ip_id
     public_ip_id=$(stackit public-ip list --project-id "$PROJECT_ID" --output-format json | \
-      jq -r --arg ip "$public_ip" 'map(select(.ip == $ip)) | .[0].id')
+      jq -r --arg ip "$PUBLIC_IP" 'map(select(.ip == $ip)) | .[0].id')
 
     if [[ -z "$public_ip_id" || "$public_ip_id" == "null" ]]; then
-        log_error "Could not find Public IP ID for IP $public_ip."
+        log_error "Could not find Public IP ID for IP $PUBLIC_IP."
     fi
 
     stackit server public-ip attach "$public_ip_id" --server-id "$server_id" --project-id "$PROJECT_ID" -y
@@ -640,7 +660,7 @@ create_resources() {
     vm_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
 
     vm_status=$(echo "$vm_details" | jq -r '.status')
-    ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$public_ip" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
+    ip_attached=$(echo "$vm_details" | jq -r --arg target_ip "$PUBLIC_IP" '.nics[] | select(.publicIp != null and .publicIp == $target_ip) | .publicIp' | head -n 1)
 
     # Also grab the security group ID while we're at it
     if [[ -z "$security_group_id" || "$security_group_id" == "null" ]]; then
@@ -654,15 +674,15 @@ create_resources() {
   done
   echo >&2 # Newline after progress dots
 
-  log_success "VM is ACTIVE! Public IP Address: $public_ip"
+  log_success "VM is ACTIVE! Public IP Address: $PUBLIC_IP"
 
   # 7. Wait for SSH to be ready
-  log "Waiting for SSH server to be ready on $public_ip..."
+  log "Waiting for SSH server to be ready on $PUBLIC_IP..."
   local ssh_ready=false
   local elapsed_time=0
 
   while [[ $elapsed_time -lt $SSH_TIMEOUT ]]; do
-    if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "echo 'SSH is up'" &>/dev/null; then
+    if ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$PUBLIC_IP" "echo 'SSH is up'" &>/dev/null; then
       ssh_ready=true
       break
     fi
@@ -686,17 +706,17 @@ create_resources() {
   setup_script=$(get_kubeadm_script)
 
   # Pass the script content as a command to SSH
-  ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
+  ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$PUBLIC_IP" "$setup_script"
 
   log_success "Kubernetes setup completed!"
   log "You can now access your cluster:"
   echo >&2
-  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip" >&2
+  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$PUBLIC_IP" >&2
   echo "  (Once inside: kubectl get nodes)" >&2
   echo >&2
   echo "To get the kubeconfig for local use:" >&2
-  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > ./$VM_NAME.kubeconfig" >&2
-  echo "  KUBECONFIG=./$VM_NAME.kubeconfig kubectl get nodes" >&2
+  echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$PUBLIC_IP 'cat .kube/config' > $KUBECONFIG_PATH" >&2
+  echo "  KUBECONFIG=$KUBECONFIG_PATH kubectl get nodes" >&2
 }
 
 # --- Cleanup Functions ---
@@ -742,6 +762,7 @@ cleanup_resources() {
 
   # 3. Delete the public IP
   local public_ip_id
+  local public_ip
   public_ip_id=$(echo "$inventory" | jq -r '.public_ip?.id')
   public_ip=$(echo "$inventory" | jq -r '.public_ip?.name')
 
