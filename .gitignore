@@ -16,7 +16,7 @@ junit.xml
 quotas*
 hmac
 
-cloud-config.yaml
+cloud.yaml
 __debug_*
 
 test/e2e/inventory*

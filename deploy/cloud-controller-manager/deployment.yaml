@@ -33,7 +33,7 @@ spec:
         - --authorization-always-allow-paths=/metrics
         - --leader-elect=true
         - --leader-elect-resource-name=stackit-cloud-controller-manager
-        - --cloud-config=/etc/config/cloud-config.yaml
+        - --cloud-config=/etc/config/cloud.yaml
         # - --cluster-name=<cluster-id>
         env:
         - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
