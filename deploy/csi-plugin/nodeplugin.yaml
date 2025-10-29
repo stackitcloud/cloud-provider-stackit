@@ -108,5 +108,5 @@ spec:
           path: /dev
           type: Directory
       - name: cloud-config
-        secret:
-          secretName: stackit-cloud-config
+        configMap:
+          name: stackit-cloud-config
