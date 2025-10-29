@@ -16,10 +16,10 @@ Does not include:
 
 ## Operations
 
-- Required: STACKIT-specific settings have to be set using a cloud config via `--cloud-config=cloud-config.yaml`.
+- Required: STACKIT-specific settings have to be set using a cloud config via `--cloud-config=config.yaml`.
 
 ```yaml
-# cloud-config.yaml
+# config.yaml
 projectId:
 networkId:
 region: eu01

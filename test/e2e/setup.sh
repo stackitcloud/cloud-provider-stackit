@@ -332,10 +332,16 @@ metadata:
   name: stackit-cloud-config
   namespace: kube-system
 data:
-  cloud-config.yaml: |-
+  cloud.yaml: |-
     projectId: $PROJECT_ID
     networkId: $NETWORK_ID
     region: eu01
+  cloud.conf: |-
+    [Global]
+    project-id = $PROJECT_ID
+    [BlockStorage]
+    node-volume-attach-limit = 20
+    rescan-on-resize = true
 EOT_CM
 log "ConfigMap stackit-cloud-controller-manager created in kube-system."
 
@@ -377,7 +383,8 @@ fi
 
 log "Applying kustomization from branch: \${TARGET_BRANCH}"
 # Use the -k URL with the ?ref= query parameter
-kubectl apply -k "${DEPLOY_REPO_URL}/deploy?ref=\${TARGET_BRANCH}"
+kubectl apply -k "${DEPLOY_REPO_URL}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
+kubectl apply -k "${DEPLOY_REPO_URL}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 log "Kustomization applied successfully."
 
 log "✅ Kubernetes single-node cluster setup script finished."

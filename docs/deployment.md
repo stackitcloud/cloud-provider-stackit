@@ -55,7 +55,7 @@ The deployment can be customized using the following flags:
 Apply the deployment using kustomize:
 
 ```bash
-kubectl apply -k deploy/
+kubectl apply -k deploy/cloud-controller-manager
 ```
 
 ## Example Deployment
@@ -93,7 +93,7 @@ spec:
         - --leader-elect-resource-name=stackit-cloud-controller-manager
         # CSI flags
         - --endpoint=unix:///csi/csi.sock
-        - --cloud-config=/etc/config/cloud-config.yaml
+        - --cloud-config=/etc/config/cloud.yaml
         - --cluster=my-cluster-id
         - --provide-controller-service=true
         - --provide-node-service=true
@@ -134,12 +134,12 @@ spec:
 
 ### Cloud Configuration
 
-The cloud configuration file should be mounted at `/etc/config/cloud-config.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
+The cloud configuration file should be mounted at `/etc/config/cloud.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
 
 Example cloud configuration:
 
 ```yaml
-# cloud-config.yaml
+# cloud.yaml
 projectId: your-project-id
 networkId: your-network-id
 region: eu01
