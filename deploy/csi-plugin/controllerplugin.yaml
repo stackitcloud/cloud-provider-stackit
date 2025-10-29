@@ -137,8 +137,8 @@ spec:
       - name: socket-dir
         emptyDir:
       - name: cloud-config
-        secret:
-          secretName: stackit-cloud-config
+        configMap:
+          name: stackit-cloud-config
       - name: cloud-secret
         secret:
           secretName: stackit-cloud-secret
