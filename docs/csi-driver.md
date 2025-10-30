@@ -33,11 +33,10 @@ The CSI driver enables dynamic provisioning and management of persistent volumes
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: stackit-block-storage
+  name: premium-perf4-stackit
 provisioner: block-storage.csi.stackit.cloud
 parameters:
-  type: "standard"  # or "premium" for higher performance
-  availability: "zone1"  # specify your availability zone
+  type: "storage_premium_perf4"
 ```
 
 ### Create a PersistentVolumeClaim
@@ -114,6 +113,7 @@ metadata:
   name: encrypted-storage
 provisioner: block-storage.csi.stackit.cloud
 parameters:
+  type: "storage_premium_perf4_encrypted"
   encrypted: "true"
   kmsKeyID: "your-kms-key-id"
   kmsKeyringID: "your-keyring-id"
