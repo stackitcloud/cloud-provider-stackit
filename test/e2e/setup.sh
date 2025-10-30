@@ -473,6 +473,11 @@ create_resources() {
     log_success "Service account '$sa_name' already exists with ID: $sa_email"
   fi
 
+  # Add roles
+  for role in alb.admin blockstorage.admin dns.admin nlb.admin; do
+    stackit project member add "$sa_email" --project-id "$PROJECT_ID" --role "$role" -y
+  done
+
   # Create key if it doesn't exist locally
   if [[ -f "$SA_KEY_PATH" ]]; then
     log_success "Service account key file already exists: $SA_KEY_PATH"
