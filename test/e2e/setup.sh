@@ -383,7 +383,13 @@ fi
 
 log "Applying kustomization from branch: \${TARGET_BRANCH}"
 # Use the -k URL with the ?ref= query parameter
+# Apply the cloud-controller-manager
 kubectl apply -k "${DEPLOY_REPO_URL}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
+# Patch the deployment to use Recreate strategy and set replicas to 1
+kubectl patch deployment stackit-cloud-controller-manager -n kube-system --type='json' -p='[
+  {"op": "replace", "path": "/spec/strategy/type", "value": "Recreate"},
+  {"op": "replace", "path": "/spec/replicas", "value": 1}
+]'
 kubectl apply -k "${DEPLOY_REPO_URL}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 log "Kustomization applied successfully."
 
