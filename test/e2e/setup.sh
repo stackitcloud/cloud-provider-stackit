@@ -761,8 +761,6 @@ if [ -n "${deploy_branch}" ]; then
   TARGET_BRANCH="${deploy_branch}"
 else
   log "Checking for release branch: \${RELEASE_BRANCH}..."
-  # Use 'git ls-remote' to check if the branch exists on the remote
-  # Use the $deploy_repo_url argument
   if git ls-remote --exit-code --heads "${deploy_repo_url}" "\${RELEASE_BRANCH}" &>/dev/null; then
     log "Found release branch: \${RELEASE_BRANCH}"
     TARGET_BRANCH="\${RELEASE_BRANCH}"
@@ -773,8 +771,6 @@ else
 fi
 
 log "Applying kustomization from branch: \${TARGET_BRANCH}"
-# Use the -k URL with the ?ref= query parameter
-# Use the $deploy_repo_url argument
 kubectl apply -k "${deploy_repo_url}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
 # Patch the deployment to use Recreate strategy and set replicas to 1
 kubectl patch deployment stackit-cloud-controller-manager -n kube-system --type='json' -p='[
@@ -786,8 +782,20 @@ kubectl patch deployment stackit-cloud-controller-manager -n kube-system --type=
 log "Waiting for cloud-controller-manager to be ready..."
 kubectl wait deployment/stackit-cloud-controller-manager -n kube-system --for=condition=available --timeout=300s
 
-# Use the $deploy_repo_url argument
 kubectl apply -k "${deploy_repo_url}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
+
+kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/client/config/crd
+log "Waiting for snapshot CRDs to be established..."
+kubectl wait crd/volumesnapshots.snapshot.storage.k8s.io --for=condition=established --timeout=300s
+kubectl wait crd/volumesnapshotclasses.snapshot.storage.k8s.io --for=condition=established --timeout=300s
+kubectl wait crd/volumesnapshotcontents.snapshot.storage.k8s.io --for=condition=established --timeout=300s
+
+kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/deploy/kubernetes/snapshot-controller
+log "Waiting for snapshot controller to be ready..."
+kubectl wait deployment/snapshot-controller -n kube-system --for=condition=available --timeout=300s
+
+kubectl apply -k "${deploy_repo_url}/test/e2e/csi-plugin/manifests?ref=\${TARGET_BRANCH}"
+
 log "Kustomization applied successfully."
 
 log "✅ Kubernetes single-node cluster setup script finished."
