@@ -20,9 +20,9 @@ VM_NAME="stackit-ccm-test"
 SSH_KEY_NAME="${SSH_KEY_NAME:-$VM_NAME}"
 # Can be overridden by environment variable
 NETWORK_NAME="${NETWORK_NAME:-$VM_NAME}"
-# This script uses a 2-vCPU, 4GB-RAM machine type.
+# This script uses a 4-vCPU, 8GB-RAM machine type.
 # You can find other types in the STACKIT Portal or documentation.
-MACHINE_TYPE="c2i.2"
+MACHINE_TYPE="c2i.4"
 # This script will look for an Ubuntu 22.04 image
 IMAGE_NAME_FILTER="Ubuntu 22.04"
 # SSH User for Ubuntu
@@ -287,10 +287,10 @@ if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
   log "Waiting for CRDs to be established..."
   kubectl create -f "\${CALICO_OPERATOR_URL}" --dry-run=client -o json | \
     jq -r 'select(.kind == "CustomResourceDefinition") | "crd/" + .metadata.name' | \
-    xargs kubectl wait --for=condition=established --timeout=60s
+    xargs kubectl wait --for=condition=established --timeout=300s
 
   log "Waiting for Tigera Operator deployment to be ready..."
-  kubectl wait deployment/tigera-operator -n tigera-operator --for=condition=available --timeout=120s
+  kubectl wait deployment/tigera-operator -n tigera-operator --for=condition=available --timeout=300s
 
   log "Installing Calico CNI (Custom Resources) from \${CALICO_RESOURCES_URL}..."
   kubectl create -f "\${CALICO_RESOURCES_URL}"
@@ -301,7 +301,7 @@ fi
 # 8. Untaint the node to allow pods to run on the control-plane (IDEMPOTENCY CHECK)
 # Wait for node to be ready before untainting (after CNI is installed)
 log "Waiting for node to be ready after CNI installation..."
-kubectl wait --for=condition=Ready node --all --timeout=60s
+kubectl wait --for=condition=Ready node --all --timeout=300s
 
 # Check if the node has the control-plane taint before trying to remove it
 if kubectl get nodes -o json | jq -e '.items[0].spec.taints[] | select(.key == "node-role.kubernetes.io/control-plane")' >/dev/null 2>&1; then
@@ -383,6 +383,10 @@ kubectl patch deployment stackit-cloud-controller-manager -n kube-system --type=
   {"op": "remove", "path": "/spec/strategy/rollingUpdate"},
   {"op": "replace", "path": "/spec/replicas", "value": 1}
 ]'
+
+log "Waiting for cloud-controller-manager to be ready..."
+kubectl wait deployment/stackit-cloud-controller-manager -n kube-system --for=condition=available --timeout=300s
+
 kubectl apply -k "${DEPLOY_REPO_URL}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 log "Kustomization applied successfully."
 
