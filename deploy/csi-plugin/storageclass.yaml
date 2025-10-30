@@ -1,0 +1,9 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: stackit-block-storage
+provisioner: block-storage.csi.stackit.cloud
+parameters:
+  type: "standard"  # or "premium" for higher performance
+  availability: "zone1"  # specify your availability zone
