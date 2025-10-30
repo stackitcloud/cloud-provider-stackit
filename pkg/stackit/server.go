@@ -31,7 +31,7 @@ func (cl nodeClient) UpdateServer(ctx context.Context, projectID, region, server
 }
 
 func (cl nodeClient) ListServers(ctx context.Context, projectID, region string) (*[]iaas.Server, error) {
-	resp, err := cl.client.ListServersExecute(ctx, projectID, region)
+	resp, err := cl.client.ListServers(ctx, projectID, region).Details(true).Execute()
 	if err != nil {
 		return nil, err
 	}
