@@ -135,7 +135,7 @@ spec:
           mountPath: /etc/serviceaccount
       volumes:
       - name: socket-dir
-        emptyDir:
+        emptyDir: {}
       - name: cloud-config
         configMap:
           name: stackit-cloud-config
