@@ -65,8 +65,6 @@ log_error() {
 
 check_auth() {
   log "Checking STACKIT authentication..."
-  # We redirect stdin from /dev/null to prevent the interactive login prompt.
-  # We redirect stdout and stderr to /dev/null to silence the command.
   if stackit project list < /dev/null &> /dev/null; then
     log_success "Session is active."
   else
@@ -128,8 +126,6 @@ setup_ssh_key() {
       log_error "Failed to create SSH key '$SSH_KEY_NAME' in STACKIT."
     fi
     log_success "SSH key '$SSH_KEY_NAME' created."
-    
-    # Update inventory with SSH key
     update_inventory "ssh_key" "$SSH_KEY_NAME" "$SSH_KEY_NAME"
   else
     log_success "SSH key '$SSH_KEY_NAME' already exists."
@@ -147,7 +143,6 @@ find_network_id() {
     jq -r --arg name "$NETWORK_NAME" 'map(select(.name == $name)) | .[0].networkId')
 
   if [[ -z "$network_id" || "$network_id" == "null" ]]; then
-    # If no NETWORK_NAME was provided (or it was empty), and the default network wasn't found, create it.
     log "Network '$NETWORK_NAME' not found. Creating it..."
     network_id=$(stackit network create --name "$NETWORK_NAME" \
       --project-id "$PROJECT_ID" \
@@ -155,11 +150,8 @@ find_network_id() {
 
     [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$NETWORK_NAME'."
     log_success "Created network '$NETWORK_NAME' with ID: $network_id"
-
-    # Update inventory with network
     update_inventory "network" "$network_id" "$NETWORK_NAME"
   else
-    # Network was found
     log_success "Found network '$NETWORK_NAME' with ID: $network_id"
   fi
 
@@ -474,8 +466,9 @@ create_resources() {
   fi
 
   # Add roles
+  log "Assigning required roles to service account $sa_name..."
   for role in alb.admin blockstorage.admin dns.admin nlb.admin; do
-    stackit project member add "$sa_email" --project-id "$PROJECT_ID" --role "$role" -y
+    stackit project member add "$sa_email" --project-id "$PROJECT_ID" --role "$role" -y &>/dev/null
   done
 
   # Create key if it doesn't exist locally
@@ -593,7 +586,6 @@ create_resources() {
       log_error "Failed to extract server ID from creation output: $creation_output_json"
     fi
     log_success "Create command accepted. VM '$VM_NAME' is provisioning with ID: $server_id."
-    # Update inventory with new server
     update_inventory "server" "$server_id" "$VM_NAME"
   fi
 
@@ -608,7 +600,6 @@ create_resources() {
     PUBLIC_IP="$existing_ip"
     log "Using existing Public IP $PUBLIC_IP from server '$VM_NAME'."
   else
-    # No public IP found, create a new one
     log "Creating a new Public IP..."
     local public_ip_json
     public_ip_json=$(stackit public-ip create -y --project-id "$PROJECT_ID" --output-format json)
@@ -623,7 +614,6 @@ create_resources() {
         log_error "Failed to extract IP from public IP creation output: $public_ip_json"
     fi
     log_success "Created Public IP: $PUBLIC_IP"
-    # Update inventory with public IP
     update_inventory "public_ip" "$public_ip_id" "$PUBLIC_IP"
   fi
 
@@ -668,13 +658,13 @@ create_resources() {
   while [[ "$vm_status" != "ACTIVE" || "$ip_attached" == "null" || -z "$ip_attached" ]]; do
     sleep $WAIT_INTERVAL
     elapsed_time=$((elapsed_time + WAIT_INTERVAL))
-    echo -n "." >&2 # Progress to stderr
+    echo -n "." >&2
 
     if [[ $elapsed_time -ge $MAX_WAIT_TIME ]]; then
       log_error "Timeout waiting for VM to become active (max $MAX_WAIT_TIME seconds)"
     fi
 
-    # Re-fetch details in the loop
+    # Re-fetch details
     local vm_details
     vm_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
 
