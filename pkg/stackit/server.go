@@ -7,7 +7,7 @@ import (
 )
 
 func (cl nodeClient) GetServer(ctx context.Context, projectID, region, serverID string) (*iaas.Server, error) {
-	server, err := cl.client.GetServerExecute(ctx, projectID, region, serverID)
+	server, err := cl.client.GetServer(ctx, projectID, region, serverID).Details(true).Execute()
 	if isOpenAPINotFound(err) {
 		return server, ErrorNotFound
 	}
