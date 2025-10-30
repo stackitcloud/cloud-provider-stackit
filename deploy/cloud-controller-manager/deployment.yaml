@@ -6,12 +6,9 @@ metadata:
   labels:
     app: stackit-cloud-controller-manager
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app: stackit-cloud-controller-manager
@@ -26,16 +23,18 @@ spec:
       - name: stackit-cloud-controller-manager
         image: ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controller-manager:release-v1.33
         args:
-        - --cloud-provider=stackit
-        - --webhook-secure-port=0
-        - --concurrent-service-syncs=3
-        - --controllers=service-lb-controller
-        - --authorization-always-allow-paths=/metrics
-        - --leader-elect=true
-        - --leader-elect-resource-name=stackit-cloud-controller-manager
-        - --cloud-config=/etc/config/cloud.yaml
-        # - --cluster-name=<cluster-id>
+        - "--cloud-provider=stackit"
+        - "--webhook-secure-port=0"
+        - "--concurrent-service-syncs=3"
+        - "--controllers=service-lb-controller"
+        - "--authorization-always-allow-paths=/metrics"
+        - "--leader-elect=true"
+        - "--leader-elect-resource-name=stackit-cloud-controller-manager"
+        - "--cloud-config=/etc/config/cloud.yaml"
+        - "--cluster-name=$(CLUSTER_NAME)"
         env:
+        - name: CLUSTER_NAME
+          value: kubernetes
         - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
           value: /etc/serviceaccount/sa_key.json
         ports:
