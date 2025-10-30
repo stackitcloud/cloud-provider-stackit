@@ -7,7 +7,7 @@ import (
 )
 
 func (cl nodeClient) GetServer(ctx context.Context, projectID, region, serverID string) (*iaas.Server, error) {
-	server, err := cl.client.GetServerExecute(ctx, projectID, region, serverID)
+	server, err := cl.client.GetServer(ctx, projectID, region, serverID).Details(true).Execute()
 	if isOpenAPINotFound(err) {
 		return server, ErrorNotFound
 	}
@@ -31,7 +31,7 @@ func (cl nodeClient) UpdateServer(ctx context.Context, projectID, region, server
 }
 
 func (cl nodeClient) ListServers(ctx context.Context, projectID, region string) (*[]iaas.Server, error) {
-	resp, err := cl.client.ListServersExecute(ctx, projectID, region)
+	resp, err := cl.client.ListServers(ctx, projectID, region).Details(true).Execute()
 	if err != nil {
 		return nil, err
 	}
