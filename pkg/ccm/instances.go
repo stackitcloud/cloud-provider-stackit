@@ -101,9 +101,12 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 		return nil, fmt.Errorf("failed to get instance: %w", err)
 	}
 
-	addresses := make([]corev1.NodeAddress, 0, len(server.GetNics()))
-	for _, v := range server.GetNics() {
-		if ipv4, ok := v.GetIpv4Ok(); ok {
+	var addresses []corev1.NodeAddress
+	if len(server.GetNics()) == 0 {
+		return nil, fmt.Errorf("server has no network interfaces")
+	}
+	for _, nic := range server.GetNics() {
+		if ipv4, ok := nic.GetIpv4Ok(); ok {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
 					Address: ipv4,
@@ -112,7 +115,7 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 		}
 
 		// TODO: where to find IPv6SupportDisabled
-		if ipv6, ok := v.GetIpv6Ok(); ok {
+		if ipv6, ok := nic.GetIpv6Ok(); ok {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
 					Address: ipv6,
@@ -120,7 +123,7 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 				})
 		}
 
-		if publicIP, ok := v.GetPublicIpOk(); ok {
+		if publicIP, ok := nic.GetPublicIpOk(); ok {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
 					Address: publicIP,
