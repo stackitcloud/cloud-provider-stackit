@@ -32,7 +32,7 @@ SSH_USER="ubuntu"
 INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
 # Path to store the Service Account key
 SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
-
+# Path to store the kubeadm cluster kubeconfig
 KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$VM_NAME.yaml"
 
 # --- Constants ---
@@ -842,6 +842,11 @@ cleanup_resources() {
   if [[ -f "$INVENTORY_FILE" ]]; then
     rm "$INVENTORY_FILE"
     log_success "Removed inventory file."
+  fi
+
+  if [[ -f "$KUBECONFIG_PATH" ]]; then
+    rm "$KUBECONFIG_PATH"
+    log_success "Remove kubeadm cluster kubeconfig."
   fi
 
   log_success "Cleanup process completed."
