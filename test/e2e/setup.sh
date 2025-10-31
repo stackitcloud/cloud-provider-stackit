@@ -5,11 +5,11 @@ set -eo pipefail # Exit on error, and exit on command failure in pipelines
 # !! SCRIPT PARAMETERS:
 #    $1: Action (create|destroy)
 #    $2: Your STACKIT Project ID
-#    $3: The Kubernetes version to install (e.g., "1.29.0")
+#    $3: The Kubernetes version to install (e.g., "1.34.1")
 
 ACTION="$1"
 PROJECT_ID="$2"
-K8S_VERSION="$3" # Example: "1.29.0"
+K8S_VERSION="$3" # Example: "1.34.1"
 
 # --- Script Configuration ---
 VM_NAME="stackit-ccm-test"
@@ -630,7 +630,7 @@ sudo apt-get install -y apt-transport-https ca-certificates curl gpg jq git
 
 # Create a stable path for the key
 K8S_APT_KEYRING="/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
-# Extract major and minor version for repository URL (e.g., 1.29 from 1.29.0)
+# Extract major and minor version for repository URL (e.g., 1.29 from 1.34.1)
 K8S_MAJOR_MINOR="${k8s_version%.*}"
 K8S_KEY_URL="https://pkgs.k8s.io/core:/stable:/v\${K8S_MAJOR_MINOR}/deb/Release.key"
 K8S_REPO_URL="https://pkgs.k8s.io/core:/stable:/v\${K8S_MAJOR_MINOR}/deb/"
