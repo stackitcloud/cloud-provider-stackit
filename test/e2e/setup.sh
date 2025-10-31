@@ -3,13 +3,14 @@ set -eo pipefail # Exit on error, and exit on command failure in pipelines
 
 # --- Configuration ---
 # !! SCRIPT PARAMETERS:
-#    $1: Action (create|destroy)
-#    $2: Your STACKIT Project ID
-#    $3: The Kubernetes version to install (e.g., "1.34.1")
+#    <create|destroy>               : Action to perform
+#    --project-id <ID>              : Your STACKIT Project ID
+#    --kubernetes-version <VERSION> : The Kubernetes version to install (e.g., "1.34.1")
 
-ACTION="$1"
-PROJECT_ID="$2"
-K8S_VERSION="$3" # Example: "1.34.1"
+# These will be populated by the 'main' function's parser
+ACTION=""
+PROJECT_ID=""
+K8S_VERSION="" # Example: "1.34.1"
 
 # --- Script Configuration ---
 VM_NAME="stackit-ccm-test"
@@ -24,12 +25,11 @@ IMAGE_NAME_FILTER="Ubuntu 22.04"
 # SSH User for Ubuntu
 SSH_USER="ubuntu"
 
-# Inventory file to track created resources
-INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
-# Path to store the Service Account key
-SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
-# Path to store the kubeadm cluster kubeconfig
-KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$VM_NAME.yaml"
+# --- Dynamic Paths ---
+# These paths are (re)defined in main() after PROJECT_ID is parsed.
+INVENTORY_FILE=""
+SA_KEY_PATH=""
+KUBECONFIG_PATH=""
 
 # --- Constants ---
 MAX_WAIT_TIME=300  # 5 minutes for operations
@@ -59,6 +59,17 @@ log_error() {
   exit 1
 }
 
+print_usage() {
+  printf "Usage: %s <create|destroy> [options]\n\n" "$0" >&2
+  printf "Actions:\n" >&2
+  printf "  create    Create a new Kubernetes test environment.\n" >&2
+  printf "  destroy   Destroy an existing Kubernetes test environment.\n\n" >&2
+  printf "Options:\n" >&2
+  printf "  --project-id <ID>              STACKIT Project ID. (Required for create & destroy)\n" >&2
+  printf "  --kubernetes-version <VERSION> Kubernetes version (e.g., 1.34.1). (Required for create)\n" >&2
+  printf "  --help                         Show this help message.\n" >&2
+}
+
 check_auth() {
   log "Checking STACKIT authentication..."
   if stackit project list < /dev/null &> /dev/null; then
@@ -68,35 +79,37 @@ check_auth() {
   fi
 }
 
+# Checks for tools, file dependencies, and value formats.
+# Assumes required flags (like $PROJECT_ID, $K8S_VERSION) are already present.
 check_deps() {
+  local action="$1" # "create" or "destroy"
+
   log "Checking dependencies..."
   command -v stackit >/dev/null 2>&1 || log_error "STACKIT CLI ('stackit') not found. Please install it."
   command -v jq >/dev/null 2>&1 || log_error "jq not found. Please install it."
-  command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
-  command -v base64 >/dev/null 2>&1 || log_error "base64 not found. Please install it."
-
-  # Validate SSH key pair
-  local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
-  local ssh_priv_key_path="$HOME/.ssh/$SSH_KEY_NAME"
-
-  [[ -f "$ssh_pub_key_path" ]] || log_error "Public SSH key not found at $ssh_pub_key_path. Please generate one with 'ssh-keygen -f $HOME/.ssh/$SSH_KEY_NAME'."
-  [[ -f "$ssh_priv_key_path" ]] || log_error "Private SSH key not found at $ssh_priv_key_path."
-
-  # Check key permissions
-  [[ $(stat -c %a "$ssh_priv_key_path") == "600" ]] || log_warn "Private key permissions should be 600. Current: $(stat -c %a "$ssh_priv_key_path")"
-
-  # Validate parameters
-  [[ -n "$PROJECT_ID" ]] || log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
-  [[ -n "$K8S_VERSION" ]] || log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
-
-  # Validate Kubernetes version format (must be like 1.31.13)
-  if ! [[ "$K8S_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log_error "Invalid Kubernetes version format. Must be in format X.Y.Z (e.g., 1.31.13)"
+  
+  # Validate VM_NAME format (used for inventory file path)
+  if ! [[ "$VM_NAME" =~ ^[a-zA-Z-]+$ ]]; then
+    log_error "Invalid VM name format: '$VM_NAME'. Must only contain letters and hyphens (e.g., 'my-vm-name')"
   fi
 
-  # Validate VM_NAME format (must only contain letters and hyphens)
-  if ! [[ "$VM_NAME" =~ ^[a-zA-Z-]+$ ]]; then
-    log_error "Invalid VM name format. Must only contain letters and hyphens (e.g., 'my-vm-name')"
+  if [[ "$action" == "create" ]]; then
+    # These are only needed for 'create'
+    command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
+    command -v base64 >/dev/null 2>&1 || log_error "base64 not found. Please install it."
+
+    # Validate SSH key pair
+    local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
+    local ssh_priv_key_path="$HOME/.ssh/$SSH_KEY_NAME"
+
+    [[ -f "$ssh_pub_key_path" ]] || log_error "Public SSH key not found at $ssh_pub_key_path. Please generate one with 'ssh-keygen -f $HOME/.ssh/$SSH_KEY_NAME'."
+    [[ -f "$ssh_priv_key_path" ]] || log_error "Private SSH key not found at $ssh_priv_key_path."
+    [[ $(stat -c %a "$ssh_priv_key_path") == "600" ]] || log_warn "Private key permissions should be 600. Current: $(stat -c %a "$ssh_priv_key_path")"
+    
+    # Validate K8S Version format (presence is checked in main)
+    if ! [[ "$K8S_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      log_error "Invalid Kubernetes version format: '$K8S_VERSION'. Must be in format X.Y.Z (e.g., 1.31.13)"
+    fi
   fi
 }
 
@@ -912,6 +925,11 @@ cleanup_resources() {
   # Load inventory to get resource IDs
   local inventory
   inventory=$(load_inventory)
+  
+  if [[ -z "$inventory" || "$inventory" == "{}" ]]; then
+      log_warn "Inventory file is empty or not found at $INVENTORY_FILE. Nothing to destroy."
+      return
+  fi
 
   # 1. Delete the VM
   local server_id
@@ -1032,19 +1050,82 @@ cleanup_resources() {
 # --- Main Execution ---
 
 main() {
+  # Parse all arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      create|destroy)
+        if [[ -n "$ACTION" ]]; then
+          echo "Only one action (create|destroy) can be specified."
+          exit 1
+        fi
+        ACTION="$1"
+        shift # consume the action
+        ;;
+      --project-id)
+        PROJECT_ID="$2"
+        shift 2
+        ;;
+      --kubernetes-version)
+        K8S_VERSION="$2"
+        shift 2
+        ;;
+      --help)
+        print_usage
+        exit 0
+        ;;
+      *)
+        # Handle unknown positional args or flags
+        if [[ -z "$ACTION" ]]; then
+           echo "Invalid action '$1'. Must be 'create' or 'destroy'."
+        else
+           echo "Unknown option: $1"
+        fi
+        print_usage
+        exit 1
+        ;;
+    esac
+  done
+
+  # --- Argument Validation ---
+  
+  # 1. Validate ACTION was given
+  if [[ -z "$ACTION" ]]; then
+    echo "No action specified. Use 'create' or 'destroy'."
+    print_usage
+    exit 1
+  fi
+
+  # 2. Validate PROJECT_ID (required for both actions)
+  if [[ -z "$PROJECT_ID" ]]; then
+    echo "Missing required flag: --project-id. See --help for usage."
+    print_usage
+    exit 1
+  fi
+  
+  # 3. Validate K8S_VERSION (required only for 'create')
+  if [[ "$ACTION" == "create" && -z "$K8S_VERSION" ]]; then
+    echo "Missing required flag for 'create': --kubernetes-version. See --help for usage."
+    print_usage
+    exit 1
+  fi
+
+  # --- Set Dynamic Paths ---
+  # Now that PROJECT_ID is validated, set the global paths
+  INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
+  SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
+  KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$VM_NAME.yaml"
+
+  # --- Execute Action ---
   case "$ACTION" in
     create)
-      check_deps
+      check_deps "create"
       check_auth
       create_resources
       ;;
     destroy)
-      check_deps
+      check_deps "destroy"
       check_auth
       cleanup_resources
-      ;;
-    *)
-      log_error "Usage: $0 <create|destroy> <PROJECT_ID> <K8S_VERSION>"
       ;;
   esac
 }
