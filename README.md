@@ -16,19 +16,13 @@ Does not include:
 
 ## Operations
 
-- Required: STACKIT-specific settings have to be set using a cloud config via `--cloud-config=cloud-config.yaml`.
+- Required: STACKIT-specific settings have to be set using a cloud config via `--cloud-config=config.yaml`.
 
 ```yaml
-# cloud-config.yaml
+# config.yaml
 projectId:
 networkId:
 region: eu01
-# extraLabels to add to loadbalancer instances
-extraLabels:
-  key: value
-loadBalancerApi:
-  # If not set, defaults to production.
-  url: https://load-balancer-dev.api.qa.stackit.cloud
 ```
 
 - Required: STACKIT authentication for SDK

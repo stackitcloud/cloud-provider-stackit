@@ -16,5 +16,9 @@ junit.xml
 quotas*
 hmac
 
-cloud-config.yaml
+cloud.yaml
 __debug_*
+
+test/e2e/inventory*
+test/e2e/sa-key*
+test/e2e/kubeconfig*

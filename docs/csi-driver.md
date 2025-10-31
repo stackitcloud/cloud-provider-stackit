@@ -33,11 +33,10 @@ The CSI driver enables dynamic provisioning and management of persistent volumes
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: stackit-block-storage
+  name: premium-perf4-stackit
 provisioner: block-storage.csi.stackit.cloud
 parameters:
-  type: "standard"  # or "premium" for higher performance
-  availability: "zone1"  # specify your availability zone
+  type: "storage_premium_perf4"
 ```
 
 ### Create a PersistentVolumeClaim
@@ -114,9 +113,27 @@ metadata:
   name: encrypted-storage
 provisioner: block-storage.csi.stackit.cloud
 parameters:
+  type: "storage_premium_perf4_encrypted"
   encrypted: "true"
   kmsKeyID: "your-kms-key-id"
   kmsKeyringID: "your-keyring-id"
   kmsKeyVersion: "1"
   kmsServiceAccount: "your-service-account"
+```
+
+### Volume Snapshots
+
+This feature enables creating volume snapshots and restoring volumes from snapshots. The corresponding CSI feature (VolumeSnapshotDataSource) has been generally available since Kubernetes v1.20.
+
+To use this feature, deploy the snapshot-controller and CRDs as part of your Kubernetes cluster management process (independent of any CSI Driver). For more information, refer to the [Snapshot Controller](https://kubernetes-csi.github.io/docs/snapshot-controller.html) documentation.
+
+It is also required to create a `SnapshotClass` for example:
+
+```Yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: stackit
+driver: block-storage.csi.stackit.cloud
+deletionPolicy: Delete
 ```

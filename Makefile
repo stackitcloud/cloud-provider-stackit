@@ -115,7 +115,7 @@ verify-e2e-csi: $(KUBERNETES_TEST)
   	-focus=$(FOCUS) \
 	-skip=$(SKIP) \
   	$(KUBERNETES_TEST) -- \
-    -storage.testdriver=$(PWD)/test/e2e/csi/block-storage.yaml
+    -storage.testdriver=$(PWD)/test/e2e/csi-plugin/block-storage.yaml
 
 verify-image-stackit-csi-plugin: LOCAL = true
 verify-image-stackit-csi-plugin: APKO_EXTRA_PACKAGES = busybox
