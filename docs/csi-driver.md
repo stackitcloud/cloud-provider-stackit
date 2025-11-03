@@ -113,7 +113,7 @@ metadata:
   name: encrypted-storage
 provisioner: block-storage.csi.stackit.cloud
 parameters:
-  type: "storage_premium_perf4_encrypted"
+  type: "storage_premium_perf4"
   encrypted: "true"
   kmsKeyID: "your-kms-key-id"
   kmsKeyringID: "your-keyring-id"
