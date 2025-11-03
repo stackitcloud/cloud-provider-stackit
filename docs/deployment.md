@@ -145,6 +145,15 @@ networkId: your-network-id
 region: eu01
 ```
 
+### Parameters
+
+- `projectId`: (Required) Your STACKIT Project ID. The CCM will manage resources within this project.
+- `networkId`: (Required) The STACKIT Network ID. This is used by the CCM to configure load balancers (Services of `type=LoadBalancer`) within the specified network.
+- `region`: (Required) The STACKIT region (e.g., `eu01`) where your cluster and resources are located.
+- `extraLabels`: (Optional) A map of key-value pairs to add as custom labels to the load balancer instances created by the CCM.
+- `loadBalancerApi`: (Optional) A map containing settings related to the Load Balancer API.
+  - `url`: (Optional) The URL of the STACKIT Load Balancer API. If not set, this defaults to the production API endpoint. This is typically used for development or testing purposes.
+
 ## Monitoring and Logging
 
 ### Metrics
