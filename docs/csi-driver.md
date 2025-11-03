@@ -136,4 +136,21 @@ metadata:
   name: stackit
 driver: block-storage.csi.stackit.cloud
 deletionPolicy: Delete
+parameters:
+  type: "snapshot"
 ```
+
+### Parameters
+
+- `type`: (Optional) Defines the Cinder backend operation to perform. If not specified, it defaults to `"snapshot"`.
+
+  - `type: "snapshot"` (Default)
+    This is a fast, point-in-time copy stored on the **same storage backend** as the original volume.
+
+    - **Best for:** Cloning volumes or fast, short-term rollbacks.
+    - **Warning:** This is **not** a true backup. Failure of the storage backend will result in the loss of both the volume and its snapshots.
+
+  - `type: "backup"`
+    This creates a full, independent copy of the volume's data in a **separate repository**.
+    - **Best for:** True disaster recovery and long-term data protection.
+    - **Note:** This operation is slower as it copies all data to a different location.

@@ -4,3 +4,5 @@ metadata:
   name: stackit
 driver: block-storage.csi.stackit.cloud
 deletionPolicy: Delete
+parameters:
+  type: "snapshot"
