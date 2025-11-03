@@ -12,27 +12,35 @@ const (
 	//nolint:unused // Should stay here for documentation purposes
 	yawolClassNameAnnotation = "yawol.stackit.cloud/className"
 	// yawolInternalLBAnnotation defines whether the load balancer should be exposed via a public IP.
+	//
 	// Deprecated: use lb.stackit.cloud/internal-lb instead.
 	yawolInternalLBAnnotation = "yawol.stackit.cloud/internalLB"
 	// yawolExistingFloatingIPAnnotation references an existing floating IP for the load balancer to use.
+	//
 	// Deprecated: Use lb.stackit.cloud/external-address instead.
 	yawolExistingFloatingIPAnnotation = "yawol.stackit.cloud/existingFloatingIP"
 	// Specify the loadBalancerSourceRanges for the LoadBalancer like service.spec.loadBalancerSourceRanges (comma separated list).
+	//
 	// Deprecated: Use service.spec.loadBalancerSourceRanges instead.
 	yawolLoadBalancerSourceRangesAnnotation = "yawol.stackit.cloud/loadBalancerSourceRanges"
 	// yawolTCPProxyProtocolEnabledAnnotation enables the TCP proxy protocol.
+	//
 	// Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol instead.
 	yawolTCPProxyProtocolEnabledAnnotation = "yawol.stackit.cloud/tcpProxyProtocol"
 	// yawolTCPProxyProtocolPortFilterAnnotation defines which ports should use the TCP proxy protocol.
+	//
 	// Deprecated: Use lb.stackit.cloud/tcp-proxy-protocol-ports-filter instead.
 	yawolTCPProxyProtocolPortFilterAnnotation = "yawol.stackit.cloud/tcpProxyProtocolPortsFilter"
 	// yawolTCPIdleTimeoutAnnotation defines the idle timeout for all TCP ports.
+	//
 	// Deprecated: Use lb.stackit.cloud/tcp-idle-timeout instead.
 	yawolTCPIdleTimeoutAnnotation = "yawol.stackit.cloud/tcpIdleTimeout"
 	// yawolUDPIdleTimeoutAnnotation defines the idle timeout for all UDP ports.
+	//
 	// Deprecated: Use lb.stackit.cloud/udp-idle-timeout instead.
 	yawolUDPIdleTimeoutAnnotation = "yawol.stackit.cloud/udpIdleTimeout"
 	// yawolFlavorID is used to select a plan ID that matches the selected flavor.
+	//
 	// Deprecated: Use lb.stackit.cloud/service-plan-id instead.
 	yawolFlavorIDAnnotation = "yawol.stackit.cloud/flavorId"
 )
