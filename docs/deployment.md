@@ -55,7 +55,7 @@ The deployment can be customized using the following flags:
 Apply the deployment using kustomize:
 
 ```bash
-kubectl apply -k deploy/
+kubectl apply -k deploy/cloud-controller-manager
 ```
 
 ## Example Deployment
@@ -93,10 +93,13 @@ spec:
         - --leader-elect-resource-name=stackit-cloud-controller-manager
         # CSI flags
         - --endpoint=unix:///csi/csi.sock
-        - --cloud-config=/etc/stackit/cloud-config.yaml
+        - --cloud-config=/etc/config/cloud.yaml
         - --cluster=my-cluster-id
         - --provide-controller-service=true
         - --provide-node-service=true
+        env:
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
         ports:
         - containerPort: 10258
           hostPort: 10258
@@ -113,24 +116,43 @@ spec:
           requests:
             cpu: "0.1"
             memory: 100Mi
+        volumeMounts:
+        - mountPath: /etc/config
+          name: cloud-config
+        - mountPath: /etc/serviceaccount
+          name: cloud-secret
+      volumes:
+      - name: cloud-config
+        configMap:
+          name: stackit-cloud-config
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret
 ```
 
 ## Configuration Options
 
 ### Cloud Configuration
 
-The cloud configuration file should be mounted at `/etc/stackit/cloud-config.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
+The cloud configuration file should be mounted at `/etc/config/cloud.yaml` and contain the necessary credentials and settings for accessing STACKIT services.
 
 Example cloud configuration:
 
 ```yaml
-# cloud-config.yaml
+# cloud.yaml
 projectId: your-project-id
 networkId: your-network-id
 region: eu01
-loadBalancerApi:
-  url: https://load-balancer.api.eu01.stackit.cloud
 ```
+
+### Parameters
+
+- `projectId`: (Required) Your STACKIT Project ID. The CCM will manage resources within this project.
+- `networkId`: (Required) The STACKIT Network ID. This is used by the CCM to configure load balancers (Services of `type=LoadBalancer`) within the specified network.
+- `region`: (Required) The STACKIT region (e.g., `eu01`) where your cluster and resources are located.
+- `extraLabels`: (Optional) A map of key-value pairs to add as custom labels to the load balancer instances created by the CCM.
+- `loadBalancerApi`: (Optional) A map containing settings related to the Load Balancer API.
+  - `url`: (Optional) The URL of the STACKIT Load Balancer API. If not set, this defaults to the production API endpoint. This is typically used for development or testing purposes.
 
 ## Monitoring and Logging
 
