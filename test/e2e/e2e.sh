@@ -13,15 +13,15 @@ PROJECT_ID=""
 K8S_VERSION="" # Example: "1.34.1"
 
 # --- Script Configuration ---
-VM_NAME="stackit-ccm-test"
-# Can be overridden by environment variable (e.g. SSH_KEY_NAME="my-key" ./script.sh ...)
-SSH_KEY_NAME="${SSH_KEY_NAME:-$VM_NAME}"
-# Can be overridden by environment variable
-NETWORK_NAME="${NETWORK_NAME:-$VM_NAME}"
+MACHINE_NAME="${E2E_MACHINE_NAME:-"stackit-ccm-test"}"
 # This script uses a 4-vCPU, 8GB-RAM machine type.
-MACHINE_TYPE="c2i.4"
+MACHINE_TYPE="${E2E_MACHINE_TYPE:-"c2i.4"}"
+# Can be overridden by environment variable (e.g. SSH_KEY_NAME="my-key" ./script.sh ...)
+SSH_KEY_NAME="${E2E_SSH_KEY_NAME:-$MACHINE_NAME}"
+# Can be overridden by environment variable
+NETWORK_NAME="${E2E_NETWORK_NAME:-$MACHINE_NAME}"
 # This script will look for an Ubuntu 22.04 image
-IMAGE_NAME_FILTER="Ubuntu 22.04"
+IMAGE_NAME="Ubuntu 22.04"
 # SSH User for Ubuntu
 SSH_USER="ubuntu"
 
@@ -39,7 +39,8 @@ SSH_CHECK_INTERVAL=10 # seconds between SSH checks
 
 DEPLOY_REPO_URL=https://github.com/stackitcloud/cloud-provider-stackit
 # Can be overridden by environment variable to force a specific branch
-DEPLOY_BRANCH="${DEPLOY_BRANCH:-}"
+DEPLOY_BRANCH="${E2E_DEPLOY_BRANCH:-}"
+DEPLOY_CCM_IMAGE="${E2E_DEPLOY_CCM_IMAGE:-}"
 
 # --- Helper Functions ---
 log() {
@@ -67,7 +68,20 @@ print_usage() {
   printf "Options:\n" >&2
   printf "  --project-id <ID>              STACKIT Project ID. (Required for create & destroy)\n" >&2
   printf "  --kubernetes-version <VERSION> Kubernetes version (e.g., 1.34.1). (Required for create)\n" >&2
-  printf "  --help                         Show this help message.\n" >&2
+  printf "  --help                         Show this help message.\n\n" >&2
+  printf "Environment Variables (Optional Overrides):\n" >&2
+  printf "  E2E_MACHINE_NAME:     Name for the VM, network, SA, and security group.\n" >&2
+  printf "                        (Default: \"stackit-ccm-test\")\n" >&2
+  printf "  E2E_MACHINE_TYPE:     STACKIT machine type for the VM.\n" >&2
+  printf "                        (Default: \"c2i.4\")\n" >&2
+  printf "  E2E_SSH_KEY_NAME:     Name of the SSH key pair to use (must exist at \$HOME/.ssh/<name>).\n" >&2
+  printf "                        (Default: value of E2E_MACHINE_NAME)\n" >&2
+  printf "  E2E_NETWORK_NAME:     Name of the STACKIT network to create or use.\n" >&2
+  printf "                        (Default: value of E2E_MACHINE_NAME)\n" >&2
+  printf "  E2E_DEPLOY_BRANCH:    Specify a git branch for the CCM/CSI manifests.\n" >&2
+  printf "                        (Default: auto-detects 'release-vX.Y' or 'main')\n" >&2
+  printf "  E2E_DEPLOY_CCM_IMAGE: Specify a full container image ref to override the CCM deployment.\n" >&2
+  printf "                        (Default: uses the image from the kustomize base)\n" >&2
 }
 
 check_auth() {
@@ -88,15 +102,22 @@ check_deps() {
   command -v stackit >/dev/null 2>&1 || log_error "STACKIT CLI ('stackit') not found. Please install it."
   command -v jq >/dev/null 2>&1 || log_error "jq not found. Please install it."
   
-  # Validate VM_NAME format (used for inventory file path)
-  if ! [[ "$VM_NAME" =~ ^[a-zA-Z-]+$ ]]; then
-    log_error "Invalid VM name format: '$VM_NAME'. Must only contain letters and hyphens (e.g., 'my-vm-name')"
+  # Validate MACHINE_NAME format (used for inventory file path)
+  if ! [[ "$MACHINE_NAME" =~ ^[a-zA-Z-]+$ ]]; then
+    log_error "Invalid machine name format: '$MACHINE_NAME'. Must only contain letters and hyphens (e.g., 'my-vm-name')"
   fi
 
   if [[ "$action" == "create" ]]; then
     # These are only needed for 'create'
     command -v ssh >/dev/null 2>&1 || log_error "ssh not found. Please install it."
     command -v base64 >/dev/null 2>&1 || log_error "base64 not found. Please install it."
+
+    if [[ -n "$DEPLOY_CCM_IMAGE" ]]; then
+      # Regex: Must not start with : or @, must contain : or @, must have chars after it.
+      if ! [[ "$DEPLOY_CCM_IMAGE" =~ ^[^:@].*[:@].+ ]]; then
+        log_error "Invalid ccm image format: '$DEPLOY_CCM_IMAGE'. Must be a full image reference (e.g., 'my-image:latest' or 'repo/image@digest')"
+      fi
+    fi
 
     # Validate SSH key pair
     local ssh_pub_key_path="$HOME/.ssh/$SSH_KEY_NAME.pub"
@@ -210,19 +231,19 @@ ensure_network() {
 # Finds the latest Ubuntu image
 # Globals:
 #   PROJECT_ID
-#   IMAGE_NAME_FILTER
+#   IMAGE_NAME
 # Arguments:
 #   None
 # Outputs:
 #   STDOUT: The image ID
 find_image_id() {
-  log "Finding latest '$IMAGE_NAME_FILTER' image..."
+  log "Finding latest '$IMAGE_NAME' image..."
   local image_id
   image_id=$(stackit image list --project-id "$PROJECT_ID" --output-format json | \
-    jq -r --arg f "$IMAGE_NAME_FILTER" \
+    jq -r --arg f "$IMAGE_NAME" \
     '[.[] | select(.name | test("^" + $f + "$"; "i"))] | sort_by(.version) | .[-1].id')
 
-  [[ -n "$image_id" && "$image_id" != "null" ]] || log_error "No image found matching '$IMAGE_NAME_FILTER'."
+  [[ -n "$image_id" && "$image_id" != "null" ]] || log_error "No image found matching '$IMAGE_NAME'."
   log_success "Found image ID: $image_id"
   echo "$image_id"
 }
@@ -230,7 +251,7 @@ find_image_id() {
 # Finds or creates a Service Account and Key
 # Globals:
 #   PROJECT_ID
-#   VM_NAME
+#   MACHINE_NAME
 #   SA_KEY_PATH
 #   WAIT_INTERVAL
 # Arguments:
@@ -239,7 +260,7 @@ find_image_id() {
 #   STDOUT: The Base64-encoded SA key
 ensure_service_account() {
   log "Setting up Service Account..."
-  local sa_name=$VM_NAME
+  local sa_name=$MACHINE_NAME
   local sa_json
   sa_json=$(stackit service-account list --project-id "$PROJECT_ID" --output-format json)
   
@@ -300,7 +321,7 @@ ensure_service_account() {
 # Finds or creates a Security Group and rules
 # Globals:
 #   PROJECT_ID
-#   VM_NAME
+#   MACHINE_NAME
 # Arguments:
 #   None
 # Outputs:
@@ -308,7 +329,7 @@ ensure_service_account() {
 ensure_security_group() {
   log "Setting up security group for SSH and K8s API..."
   local security_group_id
-  local security_group_name=$VM_NAME
+  local security_group_name=$MACHINE_NAME
 
   # Check if security group already exists
   security_group_id=$(stackit security-group list --project-id "$PROJECT_ID" --output-format json | \
@@ -369,7 +390,7 @@ ensure_security_group() {
 # Finds or creates a Server instance
 # Globals:
 #   PROJECT_ID
-#   VM_NAME
+#   MACHINE_NAME
 #   MACHINE_TYPE
 #   SSH_KEY_NAME
 # Arguments:
@@ -383,18 +404,18 @@ ensure_server_instance() {
   local security_group_id="$2"
   local image_id="$3"
   
-  log "Checking if server '$VM_NAME' already exists..."
+  log "Checking if server '$MACHINE_NAME' already exists..."
   local server_id=""
   server_id=$(stackit server list --project-id "$PROJECT_ID" --output-format json | \
-    jq -r --arg name "$VM_NAME" '.[] | select(.name == $name) | .id')
+    jq -r --arg name "$MACHINE_NAME" '.[] | select(.name == $name) | .id')
 
   if [[ -n "$server_id" && "$server_id" != "null" ]]; then
-    log_success "Server '$VM_NAME' already exists with ID: $server_id. Using existing server."
+    log_success "Server '$MACHINE_NAME' already exists with ID: $server_id. Using existing server."
   else
     # Server does not exist, create it
-    log "Server '$VM_NAME' not found. Creating server..."
+    log "Server '$MACHINE_NAME' not found. Creating server..."
     local creation_output_json
-    creation_output_json=$(stackit server create -y --name "$VM_NAME" \
+    creation_output_json=$(stackit server create -y --name "$MACHINE_NAME" \
       --project-id "$PROJECT_ID" \
       --machine-type "$MACHINE_TYPE" \
       --network-id "$network_id" \
@@ -408,15 +429,15 @@ ensure_server_instance() {
 
     local create_exit_code=$?
     if [[ $create_exit_code -ne 0 ]]; then
-        log_error "Failed to execute 'stackit server create' for '$VM_NAME'. Exit code: $create_exit_code. Output: $creation_output_json"
+        log_error "Failed to execute 'stackit server create' for '$MACHINE_NAME'. Exit code: $create_exit_code. Output: $creation_output_json"
     fi
 
     server_id=$(echo "$creation_output_json" | jq -r '.id')
     if [[ -z "$server_id" || "$server_id" == "null" ]]; then
       log_error "Failed to extract server ID from creation output: $creation_output_json"
     fi
-    log_success "Create command accepted. VM '$VM_NAME' is provisioning with ID: $server_id."
-    update_inventory "server" "$server_id" "$VM_NAME"
+    log_success "Create command accepted. VM '$MACHINE_NAME' is provisioning with ID: $server_id."
+    update_inventory "server" "$server_id" "$MACHINE_NAME"
   fi
   
   echo "$server_id"
@@ -425,7 +446,7 @@ ensure_server_instance() {
 # Finds or creates a Public IP and attaches it
 # Globals:
 #   PROJECT_ID
-#   VM_NAME
+#   MACHINE_NAME
 # Arguments:
 #   $1: server_id
 # Outputs:
@@ -433,7 +454,7 @@ ensure_server_instance() {
 ensure_public_ip() {
   local server_id="$1"
   
-  log "Setting up Public IP for server '$VM_NAME' (ID: $server_id)..."
+  log "Setting up Public IP for server '$MACHINE_NAME' (ID: $server_id)..."
   local current_server_details
   current_server_details=$(stackit server describe "$server_id" --project-id "$PROJECT_ID" --output-format json)
   
@@ -483,7 +504,7 @@ ensure_public_ip() {
 # Waits for the VM to be ACTIVE and the IP to be attached
 # Globals:
 #   PROJECT_ID
-#   VM_NAME
+#   MACHINE_NAME
 #   WAIT_INTERVAL
 #   MAX_WAIT_TIME
 # Arguments:
@@ -495,7 +516,7 @@ wait_for_vm_ready() {
   local server_id="$1"
   local public_ip="$2"
   
-  log "Waiting for VM '$VM_NAME' (ID: $server_id) to become 'ACTIVE' and IP $public_ip to appear..."
+  log "Waiting for VM '$MACHINE_NAME' (ID: $server_id) to become 'ACTIVE' and IP $public_ip to appear..."
   local vm_status=""
   local ip_attached=""
 
@@ -519,7 +540,7 @@ wait_for_vm_ready() {
 
     # Add a check for failure states
     if [[ "$vm_status" == "ERROR" || "$vm_status" == "FAILED" ]]; then
-        log_error "VM '$VM_NAME' entered status '$vm_status'. Aborting."
+        log_error "VM '$MACHINE_NAME' entered status '$vm_status'. Aborting."
     fi
   done
   echo >&2 # Newline after progress dots
@@ -573,6 +594,7 @@ wait_for_ssh_ready() {
 #   $5: project_id
 #   $6: deploy_branch
 #   $7: deploy_repo_url
+#   $8: deploy_ccm_image
 get_kubeadm_script() {
   local public_ip="$1"
   local network_id="$2"
@@ -581,6 +603,7 @@ get_kubeadm_script() {
   local project_id="$5"
   local deploy_branch="$6"
   local deploy_repo_url="$7"
+  local deploy_ccm_image="$8"
   
   # This check runs locally, ensuring arguments are set before generating the script
   [[ -n "$public_ip" ]] || log_error "Internal script error: public_ip is not set."
@@ -589,6 +612,7 @@ get_kubeadm_script() {
   [[ -n "$k8s_version" ]] || log_error "Internal script error: k8s_version is not set."
   [[ -n "$project_id" ]] || log_error "Internal script error: project_id is not set."
   [[ -n "$deploy_repo_url" ]] || log_error "Internal script error: deploy_repo_url is not set."
+  # deploy_ccm_image can be empty, so no check for it
   # deploy_branch can be empty, so no check for it
 
 cat << EOF
@@ -599,6 +623,9 @@ log() {
   # Use \$* (escaped) to print all remote arguments as a single string
   printf "[KUBE] --- %s\n" "\$*"
 }
+
+KUSTOMIZE_DIR=\$(mktemp -d -t stackit-ccm-overlay.XXXXXX)
+trap 'log "Cleaning up temp dir \${KUSTOMIZE_DIR}"; rm -rf "\${KUSTOMIZE_DIR}"' EXIT
 
 log "Starting Kubernetes single-node setup..."
 # Use the k8s_version passed as an argument
@@ -783,19 +810,61 @@ else
   fi
 fi
 
-log "Applying kustomization from branch: \${TARGET_BRANCH}"
-kubectl apply -k "${deploy_repo_url}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
-# Patch the deployment to use Recreate strategy and set replicas to 1
-kubectl patch deployment stackit-cloud-controller-manager -n kube-system --type='json' -p='[
-  {"op": "replace", "path": "/spec/strategy/type", "value": "Recreate"},
-  {"op": "remove", "path": "/spec/strategy/rollingUpdate"},
-  {"op": "replace", "path": "/spec/replicas", "value": 1}
-]'
+# --- Create a local Kustomize overlay to apply all patches in one step ---
+log "Creating local kustomize overlay in \${KUSTOMIZE_DIR}"
+
+# 1. Create the base kustomization.yaml
+cat << EOT_KUSTOMIZE | tee "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- "${deploy_repo_url}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
+patches:
+- path: patch.yaml
+EOT_KUSTOMIZE
+
+# 2. Create the main patch.yaml (replicas and strategy)
+cat << EOT_PATCH | tee "\${KUSTOMIZE_DIR}/patch.yaml" > /dev/null
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stackit-cloud-controller-manager
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+EOT_PATCH
+
+# 3. Conditionally add the image override patch
+if [ -n "${deploy_ccm_image}" ]; then
+  log "Using override image from DEPLOY_CCM_IMAGE: ${deploy_ccm_image}"
+  
+  # Create a separate patch file for the image
+  cat << EOT_IMAGE_PATCH | tee "\${KUSTOMIZE_DIR}/image-patch.yaml" > /dev/null
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stackit-cloud-controller-manager
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: stackit-cloud-controller-manager
+        image: ${deploy_ccm_image}
+EOT_IMAGE_PATCH
+
+  echo "- path: image-patch.yaml" | tee -a "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
+fi
+
+# 4. Apply the *single* overlay
+kubectl apply -k "\${KUSTOMIZE_DIR}"
+# --- End Kustomize overlay logic ---
 
 log "Waiting for cloud-controller-manager to be ready..."
 kubectl wait deployment/stackit-cloud-controller-manager -n kube-system --for=condition=available --timeout=300s
-
-kubectl apply -k "${deploy_repo_url}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 
 kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/client/config/crd
 log "Waiting for snapshot CRDs to be established..."
@@ -807,6 +876,7 @@ kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/deploy/k
 log "Waiting for snapshot controller to be ready..."
 kubectl wait deployment/snapshot-controller -n kube-system --for=condition=available --timeout=300s
 
+kubectl apply -k "${deploy_repo_url}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 kubectl apply -k "${deploy_repo_url}/test/e2e/csi-plugin/manifests?ref=\${TARGET_BRANCH}"
 
 log "Kustomization applied successfully."
@@ -824,6 +894,7 @@ EOF
 #   PROJECT_ID
 #   DEPLOY_BRANCH
 #   DEPLOY_REPO_URL
+#   DEPLOY_CCM_IMAGE
 # Arguments:
 #   $1: public_ip
 #   $2: network_id
@@ -845,7 +916,8 @@ configure_kubeadm_node() {
     "$K8S_VERSION" \
     "$PROJECT_ID" \
     "$DEPLOY_BRANCH" \
-    "$DEPLOY_REPO_URL")
+    "$DEPLOY_REPO_URL" \
+    "$DEPLOY_CCM_IMAGE") 
 
   # Pass the script content as a command to SSH
   ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
@@ -879,7 +951,7 @@ print_access_instructions() {
 
 create_resources() {
   log "Starting STACKIT VM & Kubeadm setup..."
-  log "Project: $PROJECT_ID, VM: $VM_NAME, K8s: $K8S_VERSION"
+  log "Project: $PROJECT_ID, VM: $MACHINE_NAME, K8s: $K8S_VERSION"
 
   # 1. Prepare prerequisites in STACKIT
   log "Setting up prerequisites in STACKIT..."
@@ -1111,9 +1183,9 @@ main() {
 
   # --- Set Dynamic Paths ---
   # Now that PROJECT_ID is validated, set the global paths
-  INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$VM_NAME.json"
-  SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$VM_NAME.json"
-  KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$VM_NAME.yaml"
+  INVENTORY_FILE="test/e2e/inventory-$PROJECT_ID-$MACHINE_NAME.json"
+  SA_KEY_PATH="test/e2e/sa-key-$PROJECT_ID-$MACHINE_NAME.json"
+  KUBECONFIG_PATH="test/e2e/kubeconfig-$PROJECT_ID-$MACHINE_NAME.yaml"
 
   # --- Execute Action ---
   case "$ACTION" in
