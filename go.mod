@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
-	github.com/stackitcloud/stackit-sdk-go/core v0.17.3
+	github.com/stackitcloud/stackit-sdk-go/core v0.18.0
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v1.1.0
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.6.0
 	go.uber.org/mock v0.6.0
