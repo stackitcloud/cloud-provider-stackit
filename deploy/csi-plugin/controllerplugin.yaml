@@ -1,0 +1,144 @@
+# This YAML file contains CSI Controller Plugin Sidecars
+# external-attacher, external-provisioner, external-snapshotter
+# external-resize, liveness-probe
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-stackit-controllerplugin
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: csi-stackit-controllerplugin
+  template:
+    metadata:
+      labels:
+        app: csi-stackit-controllerplugin
+    spec:
+      serviceAccount: csi-stackit-controller-sa
+      containers:
+      - name: csi-attacher
+        image: registry.k8s.io/sig-storage/csi-attacher:v4.10.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--timeout=3m"
+        - "--leader-election=true"
+        - "--default-fstype=ext4"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        imagePullPolicy: "IfNotPresent"
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: csi-provisioner
+        image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--timeout=3m"
+        - "--default-fstype=ext4"
+        - "--feature-gates=Topology=true"
+        - "--extra-create-metadata"
+        - "--leader-election=true"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        imagePullPolicy: "IfNotPresent"
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: csi-snapshotter
+        image: registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--timeout=3m"
+        - "--extra-create-metadata"
+        - "--leader-election=true"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+      - name: csi-resizer
+        image: registry.k8s.io/sig-storage/csi-resizer:v1.14.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        - "--timeout=3m"
+        - "--handle-volume-inuse-error=false"
+        - "--leader-election=true"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        imagePullPolicy: "IfNotPresent"
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: liveness-probe
+        image: registry.k8s.io/sig-storage/livenessprobe:v2.17.0
+        args:
+        - "--csi-address=$(ADDRESS)"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        volumeMounts:
+        - mountPath: /var/lib/csi/sockets/pluginproxy/
+          name: socket-dir
+      - name: stackit-csi-plugin
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:release-v1.33
+        args:
+        - /bin/stackit-csi-plugin
+        - "--endpoint=$(CSI_ENDPOINT)"
+        - "--cloud-config=$(CLOUD_CONFIG)"
+        - "--cluster=$(CLUSTER_NAME)"
+        - "--provide-node-service=false"
+        - "--v=1"
+        env:
+        - name: CSI_ENDPOINT
+          value: unix://csi/csi.sock
+        - name: CLOUD_CONFIG
+          value: /etc/config/cloud.conf
+        - name: CLUSTER_NAME
+          value: kubernetes
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
+        - name: STACKIT_REGION
+          value: eu01
+        imagePullPolicy: "IfNotPresent"
+        ports:
+        - containerPort: 9808
+          name: healthz
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 60
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /csi
+        - name: cloud-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: cloud-secret
+          mountPath: /etc/serviceaccount
+      volumes:
+      - name: socket-dir
+        emptyDir: {}
+      - name: cloud-config
+        configMap:
+          name: stackit-cloud-config
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret

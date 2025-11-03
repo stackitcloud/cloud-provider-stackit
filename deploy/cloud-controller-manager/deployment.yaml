@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: stackit-cloud-controller-manager
+  labels:
+    app: stackit-cloud-controller-manager
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: stackit-cloud-controller-manager
+  template:
+    metadata:
+      labels:
+        app: stackit-cloud-controller-manager
+    spec:
+      serviceAccountName: stackit-cloud-controller-manager
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: stackit-cloud-controller-manager
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controller-manager:release-v1.33
+        args:
+        - "--cloud-provider=stackit"
+        - "--webhook-secure-port=0"
+        - "--concurrent-service-syncs=3"
+        - "--controllers=service-lb-controller"
+        - "--authorization-always-allow-paths=/metrics"
+        - "--leader-elect=true"
+        - "--leader-elect-resource-name=stackit-cloud-controller-manager"
+        - "--cloud-config=/etc/config/cloud.yaml"
+        - "--cluster-name=$(CLUSTER_NAME)"
+        env:
+        - name: CLUSTER_NAME
+          value: kubernetes
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
+        ports:
+        - containerPort: 10258
+          hostPort: 10258
+          name: https
+          protocol: TCP
+        - containerPort: 9090
+          hostPort: 9090
+          name: metrics
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 500Mi
+          requests:
+            cpu: "0.1"
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /etc/config
+          name: cloud-config
+        - mountPath: /etc/serviceaccount
+          name: cloud-secret
+      volumes:
+      - name: cloud-config
+        configMap:
+          name: stackit-cloud-config
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret
