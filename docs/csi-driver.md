@@ -33,11 +33,10 @@ The CSI driver enables dynamic provisioning and management of persistent volumes
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: stackit-block-storage
+  name: premium-perf4-stackit
 provisioner: block-storage.csi.stackit.cloud
 parameters:
-  type: "standard"  # or "premium" for higher performance
-  availability: "zone1"  # specify your availability zone
+  type: "storage_premium_perf4"
 ```
 
 ### Create a PersistentVolumeClaim
@@ -114,9 +113,44 @@ metadata:
   name: encrypted-storage
 provisioner: block-storage.csi.stackit.cloud
 parameters:
+  type: "storage_premium_perf4"
   encrypted: "true"
   kmsKeyID: "your-kms-key-id"
   kmsKeyringID: "your-keyring-id"
   kmsKeyVersion: "1"
   kmsServiceAccount: "your-service-account"
 ```
+
+### Volume Snapshots
+
+This feature enables creating volume snapshots and restoring volumes from snapshots. The corresponding CSI feature (VolumeSnapshotDataSource) has been generally available since Kubernetes v1.20.
+
+To use this feature, deploy the snapshot-controller and CRDs as part of your Kubernetes cluster management process (independent of any CSI Driver). For more information, refer to the [Snapshot Controller](https://kubernetes-csi.github.io/docs/snapshot-controller.html) documentation.
+
+It is also required to create a `SnapshotClass` for example:
+
+```Yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: stackit
+driver: block-storage.csi.stackit.cloud
+deletionPolicy: Delete
+parameters:
+  type: "snapshot"
+```
+
+### Parameters
+
+- `type`: (Optional) Defines the Cinder backend operation to perform. If not specified, it defaults to `"snapshot"`.
+
+  - `type: "snapshot"` (Default)
+    This is a fast, point-in-time copy stored on the **same storage backend** as the original volume.
+
+    - **Best for:** Cloning volumes or fast, short-term rollbacks.
+    - **Warning:** This is **not** a true backup. Failure of the storage backend will result in the loss of both the volume and its snapshots.
+
+  - `type: "backup"`
+    This creates a full, independent copy of the volume's data in a **separate repository**.
+    - **Best for:** True disaster recovery and long-term data protection.
+    - **Note:** This operation is slower as it copies all data to a different location.
