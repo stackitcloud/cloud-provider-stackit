@@ -129,8 +129,9 @@ MOCK_SERVICES := iaas loadbalancer
 .PHONY: mocks
 mocks: $(MOCKGEN)
 	# clean mocks
-	@rm **/*/*_mock.go || true
+	@find . -name '*_mock.go' -delete || true
 	# generate mocks
+	@go mod download
 	@for service in $(MOCK_SERVICES); do \
 		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | paste -sd,`,DefaultApi; \
 		$(MOCKGEN) -destination ./pkg/mock/$$service/$$service.go -package $$service github.com/stackitcloud/stackit-sdk-go/services/$$service $$INTERFACES; \
