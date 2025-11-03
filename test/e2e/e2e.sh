@@ -32,15 +32,16 @@ SA_KEY_PATH=""
 KUBECONFIG_PATH=""
 
 # --- Constants ---
-MAX_WAIT_TIME=300  # 5 minutes for operations
-WAIT_INTERVAL=10   # seconds between checks
-SSH_TIMEOUT=300    # 5 minutes for SSH readiness
+MAX_WAIT_TIME=300     # 5 minutes for operations
+WAIT_INTERVAL=10      # seconds between checks
+SSH_TIMEOUT=300       # 5 minutes for SSH readiness
 SSH_CHECK_INTERVAL=10 # seconds between SSH checks
 
 DEPLOY_REPO_URL=https://github.com/stackitcloud/cloud-provider-stackit
 # Can be overridden by environment variable to force a specific branch
 DEPLOY_BRANCH="${E2E_DEPLOY_BRANCH:-}"
 DEPLOY_CCM_IMAGE="${E2E_DEPLOY_CCM_IMAGE:-}"
+DEPLOY_CSI_IMAGE="${E2E_DEPLOY_CSI_IMAGE:-}"
 
 # --- Helper Functions ---
 log() {
@@ -82,6 +83,8 @@ print_usage() {
   printf "                        (Default: auto-detects 'release-vX.Y' or 'main')\n" >&2
   printf "  E2E_DEPLOY_CCM_IMAGE: Specify a full container image ref to override the CCM deployment.\n" >&2
   printf "                        (Default: uses the image from the kustomize base)\n" >&2
+  printf "  E2E_DEPLOY_CSI_IMAGE: Specify a full container image ref to override the CSI plugin.\n" >&2
+  printf "                        (Default: uses the image from the kustomize base)\n" >&2
 }
 
 check_auth() {
@@ -116,6 +119,13 @@ check_deps() {
       # Regex: Must not start with : or @, must contain : or @, must have chars after it.
       if ! [[ "$DEPLOY_CCM_IMAGE" =~ ^[^:@].*[:@].+ ]]; then
         log_error "Invalid ccm image format: '$DEPLOY_CCM_IMAGE'. Must be a full image reference (e.g., 'my-image:latest' or 'repo/image@digest')"
+      fi
+    fi
+
+    if [[ -n "$DEPLOY_CSI_IMAGE" ]]; then
+      # Regex: Must not start with : or @, must contain : or @, must have chars after it.
+      if ! [[ "$DEPLOY_CSI_IMAGE" =~ ^[^:@].*[:@].+ ]]; then
+        log_error "Invalid csi image format: '$DEPLOY_CSI_IMAGE'. Must be a full image reference (e.g., 'my-image:latest' or 'repo/image@digest')"
       fi
     fi
 
@@ -595,6 +605,7 @@ wait_for_ssh_ready() {
 #   $6: deploy_branch
 #   $7: deploy_repo_url
 #   $8: deploy_ccm_image
+#   $9: deploy_csi_image
 get_kubeadm_script() {
   local public_ip="$1"
   local network_id="$2"
@@ -604,6 +615,7 @@ get_kubeadm_script() {
   local deploy_branch="$6"
   local deploy_repo_url="$7"
   local deploy_ccm_image="$8"
+  local deploy_csi_image="$9"
   
   # This check runs locally, ensuring arguments are set before generating the script
   [[ -n "$public_ip" ]] || log_error "Internal script error: public_ip is not set."
@@ -613,6 +625,7 @@ get_kubeadm_script() {
   [[ -n "$project_id" ]] || log_error "Internal script error: project_id is not set."
   [[ -n "$deploy_repo_url" ]] || log_error "Internal script error: deploy_repo_url is not set."
   # deploy_ccm_image can be empty, so no check for it
+  # deploy_csi_image can be empty, so no check for it
   # deploy_branch can be empty, so no check for it
 
 cat << EOF
@@ -729,7 +742,7 @@ if ! kubectl get deployment -n tigera-operator tigera-operator &>/dev/null; then
     xargs kubectl wait --for=condition=established --timeout=300s
 
   log "Waiting for Tigera Operator deployment to be ready..."
-  kubectl wait deployment/tigera-operator -n tigera-operator --for=condition=available --timeout=300s
+  kubectl rollout status deployment/tigera-operator -n tigera-operator --timeout=300s
 
   log "Installing Calico CNI (Custom Resources) from \${CALICO_RESOURCES_URL}..."
   kubectl create -f "\${CALICO_RESOURCES_URL}"
@@ -819,12 +832,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - "${deploy_repo_url}/deploy/cloud-controller-manager?ref=\${TARGET_BRANCH}"
+- "${deploy_repo_url}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 patches:
-- path: patch.yaml
+- path: ccm-patch.yaml
 EOT_KUSTOMIZE
 
-# 2. Create the main patch.yaml (replicas and strategy)
-cat << EOT_PATCH | tee "\${KUSTOMIZE_DIR}/patch.yaml" > /dev/null
+# 2. Create the main CCM patch
+cat << EOT_PATCH | tee "\${KUSTOMIZE_DIR}/ccm-patch.yaml" > /dev/null
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -837,12 +851,10 @@ spec:
     rollingUpdate: null
 EOT_PATCH
 
-# 3. Conditionally add the image override patch
+# 3. Conditionally add the CCM image override patch
 if [ -n "${deploy_ccm_image}" ]; then
   log "Using override image from DEPLOY_CCM_IMAGE: ${deploy_ccm_image}"
-  
-  # Create a separate patch file for the image
-  cat << EOT_IMAGE_PATCH | tee "\${KUSTOMIZE_DIR}/image-patch.yaml" > /dev/null
+  cat << EOT_IMAGE_PATCH | tee "\${KUSTOMIZE_DIR}/ccm-image-patch.yaml" > /dev/null
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -856,15 +868,58 @@ spec:
         image: ${deploy_ccm_image}
 EOT_IMAGE_PATCH
 
-  echo "- path: image-patch.yaml" | tee -a "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
+  echo "- path: ccm-image-patch.yaml" | tee -a "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
 fi
 
-# 4. Apply the *single* overlay
+# 4. Conditionally add the CSI image override patch
+if [ -n "${deploy_csi_image}" ]; then
+  log "Using override image from DEPLOY_CSI_IMAGE: ${deploy_csi_image}"
+  
+  cat << EOT_CSI_DS_PATCH | tee "\${KUSTOMIZE_DIR}/csi-nodeplugin-image-patch.yaml" > /dev/null
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-stackit-nodeplugin
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: stackit-csi-plugin
+        image: ${deploy_csi_image}
+EOT_CSI_DS_PATCH
+
+  cat << EOT_CSI_SS_PATCH | tee "\${KUSTOMIZE_DIR}/csi-controllerplugin-image-patch.yaml" > /dev/null
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-stackit-controllerplugin
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: stackit-csi-plugin
+        image: ${deploy_csi_image}
+EOT_CSI_SS_PATCH
+
+  # Append both patch paths to the kustomization.yaml
+  echo "- path: csi-nodeplugin-image-patch.yaml" | tee -a "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
+  echo "- path: csi-controllerplugin-image-patch.yaml" | tee -a "\${KUSTOMIZE_DIR}/kustomization.yaml" > /dev/null
+fi
+
+# 5. Apply the *single* overlay
 kubectl apply -k "\${KUSTOMIZE_DIR}"
 # --- End Kustomize overlay logic ---
 
-log "Waiting for cloud-controller-manager to be ready..."
-kubectl wait deployment/stackit-cloud-controller-manager -n kube-system --for=condition=available --timeout=300s
+log "Waiting for cloud-controller-manager rollout to complete..."
+kubectl rollout status deployment/stackit-cloud-controller-manager -n kube-system --timeout=300s
+
+log "Waiting for csi-stackit-controllerplugin rollout to complete..."
+kubectl rollout status deployment/csi-stackit-controllerplugin -n kube-system --timeout=300s
+
+log "Waiting for csi-stackit-nodeplugin rollout to complete..."
+kubectl rollout status daemonset/csi-stackit-nodeplugin -n kube-system --timeout=300s
 
 kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/client/config/crd
 log "Waiting for snapshot CRDs to be established..."
@@ -874,9 +929,8 @@ kubectl wait crd/volumesnapshotcontents.snapshot.storage.k8s.io --for=condition=
 
 kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/deploy/kubernetes/snapshot-controller
 log "Waiting for snapshot controller to be ready..."
-kubectl wait deployment/snapshot-controller -n kube-system --for=condition=available --timeout=300s
+kubectl rollout status deployment/snapshot-controller -n kube-system --timeout=300s
 
-kubectl apply -k "${deploy_repo_url}/deploy/csi-plugin?ref=\${TARGET_BRANCH}"
 kubectl apply -k "${deploy_repo_url}/test/e2e/csi-plugin/manifests?ref=\${TARGET_BRANCH}"
 
 log "Kustomization applied successfully."
@@ -895,6 +949,7 @@ EOF
 #   DEPLOY_BRANCH
 #   DEPLOY_REPO_URL
 #   DEPLOY_CCM_IMAGE
+#   DEPLOY_CSI_IMAGE
 # Arguments:
 #   $1: public_ip
 #   $2: network_id
@@ -917,7 +972,8 @@ configure_kubeadm_node() {
     "$PROJECT_ID" \
     "$DEPLOY_BRANCH" \
     "$DEPLOY_REPO_URL" \
-    "$DEPLOY_CCM_IMAGE") 
+    "$DEPLOY_CCM_IMAGE" \
+    "$DEPLOY_CSI_IMAGE")
 
   # Pass the script content as a command to SSH
   ssh -o "StrictHostKeyChecking=no" -o "IdentitiesOnly=yes" -i "$HOME/.ssh/$SSH_KEY_NAME" "$SSH_USER@$public_ip" "$setup_script"
