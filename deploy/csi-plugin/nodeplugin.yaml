@@ -53,7 +53,7 @@ spec:
           capabilities:
             add: ["SYS_ADMIN"]
           allowPrivilegeEscalation: true
-        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:release-v1.33
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:release-v1.32
         args:
         - /bin/stackit-csi-plugin
         - "--endpoint=$(CSI_ENDPOINT)"

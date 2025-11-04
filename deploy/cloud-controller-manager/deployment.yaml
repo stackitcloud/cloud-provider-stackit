@@ -21,7 +21,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: stackit-cloud-controller-manager
-        image: ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controller-manager:release-v1.33
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controller-manager:release-v1.32
         args:
         - "--cloud-provider=stackit"
         - "--webhook-secure-port=0"
