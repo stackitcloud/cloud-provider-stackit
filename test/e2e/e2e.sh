@@ -999,7 +999,7 @@ print_access_instructions() {
   echo >&2
   echo "To get the kubeconfig for local use:" >&2
   echo "  ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i $HOME/.ssh/$SSH_KEY_NAME $SSH_USER@$public_ip 'cat .kube/config' > $KUBECONFIG_PATH" >&2
-  echo "  KUBECONFIG=$KUBECONFIG_PATH kubectl get nodes" >&2
+  echo "  KUBECONFIG=$PWD/$KUBECONFIG_PATH kubectl get nodes" >&2
 }
 
 
