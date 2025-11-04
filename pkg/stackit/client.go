@@ -26,6 +26,7 @@ import (
 
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
+	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"gopkg.in/gcfg.v1"
@@ -36,6 +37,9 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
+	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
+
+	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
@@ -213,4 +217,27 @@ func isOpenAPINotFound(err error) bool {
 
 func IsNotFound(err error) bool {
 	return errors.Is(err, ErrorNotFound)
+}
+
+func request(ctx context.Context, reqFunc func(ctx context.Context) error) error {
+	_, err := request2(ctx, func(ctx context.Context) (any, error) {
+		err := reqFunc(ctx)
+		return nil, err
+	})
+	return err
+}
+
+func request2[T any](ctx context.Context, req2Func func(ctx context.Context) (T, error)) (T, error) {
+	var httpResp *http.Response
+	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	resp, err := req2Func(ctxWithHTTPResp)
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return resp, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+		return resp, err
+	}
+	return resp, nil
 }
