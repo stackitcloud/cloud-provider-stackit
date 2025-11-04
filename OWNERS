@@ -1,6 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- ske-ci-infra-reviewers
+- cloud-provider-stackit-reviewers
 approvers:
-- ske-ci-infra-approvers
+- cloud-provider-stackit-approvers
