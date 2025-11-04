@@ -2,18 +2,18 @@
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Deployment Components](#deployment-components)
-3. [Deployment Configuration](#deployment-configuration)
-   - [Cloud Controller Manager Flags](#cloud-controller-manager-flags)
-   - [CSI Driver Flags](#csi-driver-flags)
-4. [Deployment Steps](#deployment-steps)
-5. [Example Deployment](#example-deployment)
-6. [Configuration Options](#configuration-options)
-   - [Cloud Configuration](#cloud-configuration)
-7. [Monitoring and Logging](#monitoring-and-logging)
-   - [Metrics](#metrics)
-   - [Logs](#logs)
+- [Overview](#overview)
+- [Deployment Components](#deployment-components)
+- [Deployment Configuration](#deployment-configuration)
+  - [Cloud Controller Manager Flags](#cloud-controller-manager-flags)
+  - [CSI Driver Flags](#csi-driver-flags)
+- [Deployment Steps](#deployment-steps)
+- [Example Deployment](#example-deployment)
+- [Configuration Options](#configuration-options)
+  - [Cloud Configuration](#cloud-configuration)
+- [Monitoring and Logging](#monitoring-and-logging)
+  - [Metrics](#metrics)
+  - [Logs](#logs)
 
 ## Overview
 
