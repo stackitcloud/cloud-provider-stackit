@@ -2,14 +2,14 @@
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Limitations](#limitations)
-3. [Service Enablement](#service-enablement)
-4. [Configuration](#configuration)
-   - [STACKIT Annotations](#stackit-annotations)
-   - [Supported yawol Annotations](#supported-yawol-annotations)
-   - [Unsupported yawol Annotations](#unsupported-yawol-annotations)
-5. [Node Labels](#node-labels)
+- [Overview](#overview)
+- [Limitations](#limitations)
+- [Service Enablement](#service-enablement)
+- [Configuration](#configuration)
+  - [STACKIT Annotations](#stackit-annotations)
+  - [Supported yawol Annotations](#supported-yawol-annotations)
+  - [Unsupported yawol Annotations](#unsupported-yawol-annotations)
+- [Node Labels](#node-labels)
 
 ## Overview
 
