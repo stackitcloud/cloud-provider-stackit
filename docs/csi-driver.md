@@ -2,15 +2,15 @@
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Key Features](#key-features)
-3. [Basic Usage](#basic-usage)
-   - [Create a StorageClass](#create-a-storageclass)
-   - [Create a PersistentVolumeClaim](#create-a-persistentvolumeclaim)
-   - [Use the PVC in a Pod](#use-the-pvc-in-a-pod)
-4. [Configuration](#configuration)
-   - [Topology Support](#topology-support)
-   - [Volume Encryption](#volume-encryption)
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Basic Usage](#basic-usage)
+  - [Create a StorageClass](#create-a-storageclass)
+  - [Create a PersistentVolumeClaim](#create-a-persistentvolumeclaim)
+  - [Use the PVC in a Pod](#use-the-pvc-in-a-pod)
+- [Configuration](#configuration)
+  - [Topology Support](#topology-support)
+  - [Volume Encryption](#volume-encryption)
 
 ## Overview
 
