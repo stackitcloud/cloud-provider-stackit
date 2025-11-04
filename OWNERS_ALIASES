@@ -1,7 +1,6 @@
 aliases:
-  ske-ci-infra-reviewers:
+  cloud-provider-stackit-reviewers:
   - dergeberl
-  - einfachnuralex
   - JuliusSte
   - Kumm-Kai
   - maboehm
@@ -13,9 +12,12 @@ aliases:
   - hown3d
   - xoxys
   - ftl
-  ske-ci-infra-approvers:
+  - hasit97
+  - mstueer
+  - OlegVanHorst
+  - jamand
+  cloud-provider-stackit-approvers:
   - dergeberl
-  - einfachnuralex
   - JuliusSte
   - Kumm-Kai
   - maboehm
@@ -26,3 +28,7 @@ aliases:
   - hown3d
   - xoxys
   - ftl
+  - hasit97
+  - mstueer
+  - OlegVanHorst
+  - jamand
