@@ -55,6 +55,18 @@ var _ = Describe("Node Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	DescribeTable("instanceIDFromProviderID",
+		func(providerID string, expectedInstanceID string, expectedRegion string) {
+			instance, region, err := instanceIDFromProviderID(providerID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(instance).To(Equal(expectedInstanceID))
+			Expect(region).To(Equal(expectedRegion))
+		},
+		Entry("new providerID", "stackit://hello-server", "hello-server", ""),
+		Entry("old providerID", "openstack:///hello-server", "hello-server", ""),
+		Entry("old regional providerID", "openstack://eu01/hello-server", "hello-server", "eu01"),
+	)
+
 	Describe("InstanceExists", func() {
 		It("does not error if instance not found", func() {
 			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{}, nil)
