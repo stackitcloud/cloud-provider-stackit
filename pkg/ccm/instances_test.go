@@ -92,7 +92,41 @@ var _ = Describe("Node Controller", func() {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: corev1.NodeSpec{
-					ProviderID: fmt.Sprintf("stackit:///%s", serverID),
+					ProviderID: fmt.Sprintf("stackit://%s", serverID),
+				},
+			}
+
+			exist, err := instance.InstanceExists(context.Background(), node)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exist).To(BeTrue())
+		})
+
+		It("successfully get the instance when old provider ID is there", func() {
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
+				Name: ptr.To("foo"),
+			}, nil)
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: corev1.NodeSpec{
+					ProviderID: fmt.Sprintf("openstack:///%s", serverID),
+				},
+			}
+
+			exist, err := instance.InstanceExists(context.Background(), node)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exist).To(BeTrue())
+		})
+
+		It("successfully get the instance when old regional provider ID is there", func() {
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
+				Name: ptr.To("foo"),
+			}, nil)
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: corev1.NodeSpec{
+					ProviderID: fmt.Sprintf("openstack://%s/%s", region, serverID),
 				},
 			}
 
@@ -118,7 +152,7 @@ var _ = Describe("Node Controller", func() {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: corev1.NodeSpec{
-					ProviderID: fmt.Sprintf("stackit:///%s", serverID),
+					ProviderID: fmt.Sprintf("stackit://%s", serverID),
 				},
 			}
 
@@ -155,7 +189,7 @@ var _ = Describe("Node Controller", func() {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: corev1.NodeSpec{
-					ProviderID: fmt.Sprintf("stackit:///%s", serverID),
+					ProviderID: fmt.Sprintf("stackit://%s", serverID),
 				},
 			}
 
@@ -210,7 +244,7 @@ var _ = Describe("Node Controller", func() {
 
 			metadata, err := instance.InstanceMetadata(context.Background(), node)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(metadata.ProviderID).To(Equal(fmt.Sprintf("stackit:///%s", serverID)))
+			Expect(metadata.ProviderID).To(Equal(fmt.Sprintf("stackit://%s", serverID)))
 			Expect(metadata.InstanceType).To(Equal("flatcar"))
 			Expect(metadata.NodeAddresses).To(Equal([]corev1.NodeAddress{
 				{
