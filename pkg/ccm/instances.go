@@ -41,7 +41,7 @@ const (
 // If makeInstanceID is changed, the regexp should be changed too.
 var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `://([^/]+)$`)
 
-// TODO: remove old provider after migration
+// TODO(migration): remove old provider support after migration
 var oldProviderIDRegexp = regexp.MustCompile(`^` + oldProviderName + `://([^/]*)/([^/]+)$`)
 
 // Instances encapsulates an implementation of Instances for OpenStack.
@@ -114,7 +114,6 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 				})
 		}
 
-		// TODO: where to find IPv6SupportDisabled
 		if ipv6, ok := nic.GetIpv6Ok(); ok {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
@@ -174,6 +173,7 @@ func addToNodeAddresses(addresses *[]corev1.NodeAddress, addAddresses ...corev1.
 // A providerID is build out of '${ProviderName}:///${instance-id}' which contains ':///'.
 // or '${ProviderName}://${region}/${instance-id}' which contains '://'.
 // See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
+// TODO(migration): rework function once openstack:/// is no longer used
 func instanceIDFromProviderID(providerID string) (instanceID, region string, err error) {
 	// https://github.com/kubernetes/kubernetes/issues/85731
 	if providerID != "" && !strings.Contains(providerID, "://") {
@@ -181,6 +181,7 @@ func instanceIDFromProviderID(providerID string) (instanceID, region string, err
 	}
 
 	switch {
+	// TODO(migration): remove old provider support after migration
 	case strings.HasPrefix(providerID, "openstack://"):
 		matches := oldProviderIDRegexp.FindStringSubmatch(providerID)
 		if len(matches) != 3 {
