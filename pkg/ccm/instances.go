@@ -38,8 +38,8 @@ const (
 	instanceStopping = "STOPPING"
 )
 
-// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
-var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `://([^/]*)/([^/]+)$`)
+// If makeInstanceID is changed, the regexp should be changed too.
+var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `://([^/]+)$`)
 
 // TODO: remove old provider after migration
 var oldProviderIDRegexp = regexp.MustCompile(`^` + oldProviderName + `://([^/]*)/([^/]+)$`)
@@ -150,7 +150,7 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 }
 
 func (i *Instances) makeInstanceID(server *iaas.Server) string {
-	return fmt.Sprintf("%s:///%s", ProviderName, server.GetId())
+	return fmt.Sprintf("%s://%s", ProviderName, server.GetId())
 }
 
 // addToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
@@ -180,14 +180,23 @@ func instanceIDFromProviderID(providerID string) (instanceID, region string, err
 		providerID = ProviderName + "://" + providerID
 	}
 
-	matches := providerIDRegexp.FindStringSubmatch(providerID)
-	if len(matches) != 3 {
-		matches = oldProviderIDRegexp.FindStringSubmatch(providerID)
+	switch {
+	case strings.HasPrefix(providerID, "openstack://"):
+		matches := oldProviderIDRegexp.FindStringSubmatch(providerID)
 		if len(matches) != 3 {
-			return "", "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"%s://region/InstanceID\"", ProviderName, providerID)
+			return "", "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"%s://region/InstanceID\"", oldProviderName, providerID)
 		}
+		return matches[2], matches[1], nil
+	case strings.HasPrefix(providerID, "stackit://"):
+		matches := providerIDRegexp.FindStringSubmatch(providerID)
+		if len(matches) != 2 {
+			return "", "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"%s://InstanceID\"", ProviderName, providerID)
+		}
+		// The new stackit:// doesn't use the old regional providerID anymore and strictly follows the spec
+		return matches[1], "", nil
+	default:
+		return "", "", fmt.Errorf("unknown ProviderName")
 	}
-	return matches[2], matches[1], nil
 }
 
 func getServerByName(ctx context.Context, client stackit.NodeClient, name, projectID, region string) (*iaas.Server, error) {
