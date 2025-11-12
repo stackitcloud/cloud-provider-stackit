@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	driverName  = "block-storage.csi.stackit.cloud"
-	topologyKey = "topology." + driverName + "/zone"
+	driverName        = "block-storage.csi.stackit.cloud"
+	legacyDriverName  = "cinder.csi.openstack.org"
+	topologyKey       = "topology." + driverName + "/zone"
+	legacyTopologyKey = "topology." + legacyDriverName + "/zone"
 
 	// ResizeRequired parameter, if set to true, will trigger a resize on mount operation
 	ResizeRequired = driverName + "/resizeRequired"
@@ -29,10 +31,11 @@ var (
 )
 
 type Driver struct {
-	name      string
-	fqVersion string // Fully qualified version in format {Version}@{CPO version}
-	endpoint  string
-	clusterID string
+	name         string
+	fqVersion    string // Fully qualified version in format {Version}@{CPO version}
+	endpoint     string
+	clusterID    string
+	legacyDriver bool
 
 	ids *identityServer
 	cs  *controllerServer
@@ -47,8 +50,9 @@ type Driver struct {
 }
 
 type DriverOpts struct {
-	ClusterID string
-	Endpoint  string
+	ClusterID        string
+	Endpoint         string
+	LegacyDriverName bool
 
 	PVCLister corev1.PersistentVolumeClaimLister
 }
@@ -60,6 +64,11 @@ func NewDriver(o *DriverOpts) *Driver {
 		endpoint:  o.Endpoint,
 		clusterID: o.ClusterID,
 		pvcLister: o.PVCLister,
+	}
+
+	if o.LegacyDriverName {
+		d.name = legacyDriverName
+		d.legacyDriver = true
 	}
 
 	klog.Info("Driver: ", d.name)
