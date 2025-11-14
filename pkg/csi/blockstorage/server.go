@@ -105,7 +105,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 		csi.RegisterNodeServer(server, ns)
 	}
 
-	klog.Infof("Listening for connections on address: %#v", listener.Addr())
+	klog.Infof("Listening for connections on address: %s", listener.Addr().String())
 
 	if err := server.Serve(listener); err != nil {
 		klog.Infof("Server stopped with: %v", err)
