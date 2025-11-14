@@ -7,7 +7,7 @@ ARCH := $(shell uname -m)
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
 GOIMPORTS_REVISER_VERSION ?= v3.10.0
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION ?= v2.6.1
+GOLANGCI_LINT_VERSION ?= v2.6.2
 # renovate: datasource=github-releases depName=uber-go/mock
 MOCKGEN_VERSION ?= v0.6.0
 # renovate: datasource=github-releases depName=chainguard-dev/apko
