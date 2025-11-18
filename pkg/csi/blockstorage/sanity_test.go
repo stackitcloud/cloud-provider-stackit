@@ -93,7 +93,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(
 				gomock.Any(), // context
 				gomock.Any(), // create options
-			).DoAndReturn(func(ctx context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
 				size := opts.Size
 				if size == nil {
 					size = ptr.To(int64(10)) // Default to 10GiB
@@ -113,7 +113,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().GetVolume(
 				gomock.Any(), // context
 				gomock.Any(), // volumeID
-			).DoAndReturn(func(ctx context.Context, volumeID string) (*iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, volumeID string) (*iaas.Volume, error) {
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
 					return nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
@@ -124,7 +124,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().GetVolumesByName(
 				gomock.Any(), // context
 				gomock.Any(), // volName (string)
-			).DoAndReturn(func(ctx context.Context, name string) ([]iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, name string) ([]iaas.Volume, error) {
 				var found []iaas.Volume
 				for _, vol := range createdVolumes {
 					if vol.Name != nil && *vol.Name == name {
@@ -140,7 +140,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			iaasClient.EXPECT().ListVolumes(
 				gomock.Any(), gomock.Any(), gomock.Eq(""),
-			).DoAndReturn(func(ctx context.Context, maxEntries int, token string) ([]iaas.Volume, string, error) {
+			).DoAndReturn(func(_ context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
 				var volList []iaas.Volume
 				for _, vol := range createdVolumes {
 					volList = append(volList, *vol) // Append the value
@@ -151,7 +151,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().DeleteVolume(
 				gomock.Any(), // context
 				gomock.Any(), // volume ID
-			).DoAndReturn(func(ctx context.Context, volID string) error {
+			).DoAndReturn(func(_ context.Context, volID string) error {
 				delete(createdVolumes, volID)
 				return nil
 			}).AnyTimes()
@@ -180,7 +180,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // name
 				gomock.Any(), // volID
 				gomock.Any(), // tags
-			).DoAndReturn(func(ctx context.Context, name string, volID string, tags map[string]string) (*iaas.Snapshot, error) {
+			).DoAndReturn(func(_ context.Context, name string, volID string, _ map[string]string) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
 					Id:        ptr.To("snap-" + randString(8)),
 					Name:      ptr.To(name),
@@ -196,7 +196,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().GetSnapshotByID(
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
-			).DoAndReturn(func(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
+			).DoAndReturn(func(_ context.Context, snapshotID string) (*iaas.Snapshot, error) {
 				snap, ok := createdSnapshots[snapshotID]
 				if !ok {
 					return nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
@@ -207,7 +207,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().ListSnapshots(
 				gomock.Any(), // context
 				gomock.Any(), // filters
-			).DoAndReturn(func(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
 				var snaplist []iaas.Snapshot
 				startingToken := filters["Marker"]
 				limitfilter := filters["Limit"]
@@ -253,7 +253,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().DeleteSnapshot(
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
-			).DoAndReturn(func(ctx context.Context, snapshotID string) error {
+			).DoAndReturn(func(_ context.Context, snapshotID string) error {
 				delete(createdSnapshots, snapshotID)
 				return nil
 			}).AnyTimes()
@@ -274,7 +274,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // volID
 				gomock.Any(), // snapshotID
 				gomock.Any(), // tags
-			).DoAndReturn(func(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+			).DoAndReturn(func(_ context.Context, name, volID, snapshotID string, _ map[string]string) (*iaas.Backup, error) {
 				newBackup := &iaas.Backup{
 					Id:         ptr.To("backup-" + randString(8)),
 					Name:       ptr.To(name),
@@ -290,7 +290,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().GetBackupByID(
 				gomock.Any(), // context
 				gomock.Any(), // backupID
-			).DoAndReturn(func(ctx context.Context, backupID string) (*iaas.Backup, error) {
+			).DoAndReturn(func(_ context.Context, backupID string) (*iaas.Backup, error) {
 				backup, ok := createdBackups[backupID]
 				if !ok {
 					return nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
@@ -301,7 +301,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().ListBackups(
 				gomock.Any(), // context
 				gomock.Any(), // filters
-			).DoAndReturn(func(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
+			).DoAndReturn(func(_ context.Context, _ map[string]string) ([]iaas.Backup, error) {
 				var backupList []iaas.Backup
 				for _, backup := range createdBackups {
 					backupList = append(backupList, *backup)
@@ -312,7 +312,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().DeleteBackup(
 				gomock.Any(), // context
 				gomock.Any(), // backupID
-			).DoAndReturn(func(ctx context.Context, backupID string) error {
+			).DoAndReturn(func(_ context.Context, backupID string) error {
 				delete(createdBackups, backupID)
 				return nil
 			}).AnyTimes()
@@ -322,7 +322,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().GetInstanceByID(
 				gomock.Any(), // context
 				gomock.Any(), // instanceID
-			).DoAndReturn(func(ctx context.Context, instanceID string) (*iaas.Server, error) {
+			).DoAndReturn(func(_ context.Context, instanceID string) (*iaas.Server, error) {
 				if _, ok := createdInstances[FakeInstanceID]; !ok {
 					createdInstances[FakeInstanceID] = &iaas.Server{}
 				}
@@ -337,7 +337,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // instanceID
 				gomock.Any(), // volumeID
-			).DoAndReturn(func(ctx context.Context, instanceID string, volumeID string) (string, error) {
+			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string) (string, error) {
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
 					return "", status.Error(codes.NotFound, "volume not found in mock")
@@ -392,7 +392,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			mountMock.EXPECT().UnmountPath(
 				gomock.Any(), // mountPath
-			).DoAndReturn(func(mountPath string) error {
+			).DoAndReturn(func(mountPath string) error { //nolint:gocritic // false positive unlambda
 				return os.RemoveAll(mountPath)
 			}).AnyTimes()
 
@@ -410,7 +410,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			mountMock.EXPECT().GetDeviceStats(
 				gomock.Any(), // path
-			).DoAndReturn(func(path string) (*mount.DeviceStats, error) {
+			).DoAndReturn(func(_ string) (*mount.DeviceStats, error) {
 				return &mount.DeviceStats{
 					Block:      true,
 					TotalBytes: 1000,
@@ -418,7 +418,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			}).AnyTimes()
 
 			mountMock.EXPECT().GetMountFs(
-				gomock.Any(), //volumePath
+				gomock.Any(), // volumePath
 			).DoAndReturn(func(volumePath string) ([]byte, error) {
 				args := []string{"-o", "source", "--first-only", "--noheadings", "--target", volumePath}
 				return safeMounter.Exec.Command("findmnt", args...).CombinedOutput()
