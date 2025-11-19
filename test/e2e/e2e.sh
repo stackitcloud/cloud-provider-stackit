@@ -226,7 +226,7 @@ ensure_network() {
     log "Network '$NETWORK_NAME' not found. Creating it..."
     network_id=$(stackit network create --name "$NETWORK_NAME" \
       --project-id "$PROJECT_ID" \
-      --output-format json -y | jq -r ".networkId")
+      --output-format json -y | jq -r ".id")
 
     [[ -n "$network_id" && "$network_id" != "null" ]] || log_error "Failed to create new network '$NETWORK_NAME'."
     log_success "Created network '$NETWORK_NAME' with ID: $network_id"
