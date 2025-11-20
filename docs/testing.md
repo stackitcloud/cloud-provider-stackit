@@ -257,7 +257,7 @@ snapshot-controller-5b7776766f-mp8dp              1/1     Running   0           
 stackit-cloud-controller-manager-9cbc5fb6-cvj5f   1/1     Running   0              21h
 
 # Run parallel test suite, ensure KUBERNETES_TEST_VERSION matches the cluster Kubernetes version
-§ KUBERNETES_TEST_VERSION=1.32.9 make verify-e2e-csi-parallel
+$ KUBERNETES_TEST_VERSION=1.32.9 make verify-e2e-csi-parallel
 
 # The test result should look like this
 [...]
