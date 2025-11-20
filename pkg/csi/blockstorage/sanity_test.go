@@ -2,7 +2,6 @@ package blockstorage
 
 import (
 	"context"
-	"math/rand"
 	"net/http"
 	"os"
 	"path"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	. "github.com/onsi/ginkgo/v2"
 	"google.golang.org/grpc/codes"
@@ -25,16 +25,6 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
 )
-
-// randString helper (from OpenStack example)
-func randString(n int) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
 
 var _ = Describe("CSI sanity test", Ordered, func() {
 	Context("Base config", func() {
@@ -54,7 +44,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 		Socket = path.Join(os.TempDir(), "csi.sock")
 		FakeEndpoint = "unix://" + Socket
 
-		BeforeEach(func() {
+		BeforeAll(func() {
 			ctrl := gomock.NewController(GinkgoT())
 
 			opts = &DriverOpts{
@@ -99,7 +89,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					size = ptr.To(int64(10)) // Default to 10GiB
 				}
 				newVol := &iaas.Volume{
-					Id:               ptr.To("vol-" + randString(8)), // Create a random ID
+					Id:               ptr.To(uuid.New().String()), // Create a random ID
 					Name:             opts.Name,
 					Size:             size,
 					Status:           ptr.To(stackit.VolumeAvailableStatus),
@@ -182,9 +172,9 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // tags
 			).DoAndReturn(func(_ context.Context, name string, volID string, _ map[string]string) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
-					Id:        ptr.To("snap-" + randString(8)),
+					Id:        ptr.To(uuid.New().String()),
 					Name:      ptr.To(name),
-					Status:    ptr.To(string(stackit.SnapshotReadyStatus)),
+					Status:    ptr.To(stackit.SnapshotReadyStatus),
 					CreatedAt: ptr.To(time.Now()),
 					Size:      ptr.To(int64(10)), // 10 GiB
 					VolumeId:  ptr.To(volID),
@@ -208,46 +198,49 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // filters
 			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
-				var snaplist []iaas.Snapshot
-				startingToken := filters["Marker"]
-				limitfilter := filters["Limit"]
-				limit, _ := strconv.Atoi(limitfilter)
-				name := filters["Name"]
-				volumeID := filters["VolumeID"]
+				var snapshots []iaas.Snapshot
+
+				markerFilter := filters["Marker"]
+				limitFilter := filters["Limit"]
+				nameFilter := filters["Name"]
+				volumeIDFilter := filters["VolumeID"]
 
 				for _, value := range createdSnapshots {
-					if volumeID != "" {
-						if value.VolumeId != nil && *value.VolumeId == volumeID {
-							snaplist = append(snaplist, *value)
+					if volumeIDFilter != "" {
+						if value.VolumeId != nil && *value.VolumeId == volumeIDFilter {
+							snapshots = append(snapshots, *value)
 							break
 						}
-					} else if name != "" {
-						if value.Name != nil && *value.Name == name {
-							snaplist = append(snaplist, *value)
+					} else if nameFilter != "" {
+						if value.Name != nil && *value.Name == nameFilter {
+							snapshots = append(snapshots, *value)
 							break
 						}
 					} else {
-						snaplist = append(snaplist, *value)
+						snapshots = append(snapshots, *value)
 					}
 				}
 
-				if startingToken != "" {
-					t, _ := strconv.Atoi(startingToken)
-					if t >= 0 && t < len(snaplist) {
-						snaplist = snaplist[t:]
-					} else if t >= len(snaplist) {
-						snaplist = []iaas.Snapshot{}
+				if markerFilter != "" {
+					marker, _ := strconv.Atoi(markerFilter)
+
+					if marker >= 0 && marker < len(snapshots) {
+						snapshots = snapshots[marker:]
+					} else if marker >= len(snapshots) {
+						snapshots = []iaas.Snapshot{}
 					}
 				}
 
 				retToken := ""
-				if limit != 0 {
-					if limit > 0 && limit <= len(snaplist) {
-						snaplist = snaplist[:limit]
+				if limitFilter != "" {
+					limit, _ := strconv.Atoi(limitFilter)
+
+					if limit > 0 && limit <= len(snapshots) {
+						snapshots = snapshots[:limit]
 					}
-					retToken = limitfilter
+					retToken = limitFilter
 				}
-				return snaplist, retToken, nil
+				return snapshots, retToken, nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().DeleteSnapshot(
@@ -276,7 +269,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // tags
 			).DoAndReturn(func(_ context.Context, name, volID, snapshotID string, _ map[string]string) (*iaas.Backup, error) {
 				newBackup := &iaas.Backup{
-					Id:         ptr.To("backup-" + randString(8)),
+					Id:         ptr.To(uuid.New().String()),
 					Name:       ptr.To(name),
 					Status:     ptr.To("available"),
 					VolumeId:   ptr.To(volID),
