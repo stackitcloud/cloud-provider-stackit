@@ -1,6 +1,6 @@
 module github.com/stackitcloud/cloud-provider-stackit
 
-go 1.24.0
+go 1.24.6
 
 toolchain go1.25.4
 
@@ -8,7 +8,7 @@ require (
 	github.com/container-storage-interface/spec v1.12.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/uuid v1.6.0
-	github.com/kubernetes-csi/csi-lib-utils v0.22.0
+	github.com/kubernetes-csi/csi-lib-utils v0.23.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/prometheus/client_golang v1.23.2
