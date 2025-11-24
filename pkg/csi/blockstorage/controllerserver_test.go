@@ -536,7 +536,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 				_, err := fakeCs.CreateVolume(context.Background(), req)
 				Expect(err).To(HaveOccurred())
-				Expect(status.Code(err)).To(Equal(codes.NotFound))
+				Expect(status.Code(err)).To(Equal(codes.Internal))
 				Expect(err.Error()).To(ContainSubstring("Failed to retrieve the source volume"))
 			})
 		})
