@@ -162,7 +162,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		snap, err := cloud.GetSnapshotByID(ctx, sourceSnapshotID)
 		if stackiterrors.IgnoreNotFound(err) != nil {
-			return nil, status.Errorf(codes.NotFound, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
+			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
 		}
 		// If the snapshot exists but is not yet available, fail.
 		if err == nil && *snap.Status != stackit.SnapshotReadyStatus {
@@ -206,7 +206,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			if stackiterrors.IsNotFound(err) {
 				return nil, status.Errorf(codes.NotFound, "Source Volume %s not found", sourceVolID)
 			}
-			return nil, status.Errorf(codes.NotFound, "Failed to retrieve the source volume %s: %v", sourceVolID, err)
+			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume %s: %v", sourceVolID, err)
 		}
 		if volAvailability != *sourceVolume.AvailabilityZone {
 			return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Volume. Got %s Required: %s", volAvailability, *sourceVolume.AvailabilityZone)
@@ -357,7 +357,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Volume %s not found", volumeID)
 		}
-		return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] get volume failed with error %v", err)
+		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] get volume failed with error %v", err)
 	}
 
 	_, err = cloud.GetInstanceByID(ctx, instanceID)
@@ -365,7 +365,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
 		}
-		return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
+		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
 	}
 
 	_, err = cloud.AttachVolume(ctx, instanceID, volumeID)
@@ -840,7 +840,7 @@ func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "ValidateVolumeCapabilities Volume %s not found", volumeID)
 		}
-		return nil, status.Errorf(codes.NotFound, "ValidateVolumeCapabilities %v", err)
+		return nil, status.Errorf(codes.Internal, "ValidateVolumeCapabilities %v", err)
 	}
 
 	for _, volCap := range reqVolCap {
