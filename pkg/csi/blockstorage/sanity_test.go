@@ -321,7 +321,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				}
 				server, ok := createdInstances[instanceID]
 				if !ok {
-					return nil, status.Error(codes.NotFound, "server not found in mock")
+					return nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
 				}
 				return server, nil
 			}).AnyTimes()
@@ -333,7 +333,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string) (string, error) {
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
-					return "", status.Error(codes.NotFound, "volume not found in mock")
+					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
 				}
 				vol.ServerId = ptr.To(instanceID)
 				vol.Status = ptr.To("attached")
