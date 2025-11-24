@@ -1,9 +1,12 @@
-# cloud-provider-stackit
+# Cloud Provider STACKIT
 
 [![GitHub License](https://img.shields.io/github/license/stackitcloud/stackit-sdk-go)](https://www.apache.org/licenses/LICENSE-2.0)
 
-This repository includes:
+This repository contains varous components for running Kubernetes on STACKIT.  
+This provider allows your Kubernetes cluster to integrate directly with STACKIT APIs.
 
+## Features
+This repository hosts the following components:
 - Cloud Controller Manager (CCM)
 - STACKIT CSI driver
 - Kubernetes Resources for the Manager
