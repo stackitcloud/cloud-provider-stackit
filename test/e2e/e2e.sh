@@ -53,7 +53,7 @@ log_success() {
 }
 
 log_warn() {
-  printf "[$(date +'%T')] ⚠️  %s\n" "$*" >&2
+  printf "[$(date +'%T')] ⚠️ %s\n" "$*" >&2
 }
 
 log_error() {
@@ -191,10 +191,10 @@ update_inventory() {
 setup_ssh_key() {
   log "Checking for SSH key '$SSH_KEY_NAME'..."
 
-  if ! stackit key-pair describe "$SSH_KEY_NAME" --project-id "$PROJECT_ID" &>/dev/null; then
+  if ! stackit key-pair describe --public-key "$SSH_KEY_NAME" --project-id "$PROJECT_ID" &>/dev/null; then
     log "No existing key found. Creating..."
     # The '@' prefix tells the CLI to read the content from the file
-    if ! stackit key-pair create --public-key "$SSH_KEY_NAME" -y \
+    if ! stackit key-pair create --name "$SSH_KEY_NAME" -y \
       --project-id "$PROJECT_ID" \
       --public-key "@$HOME/.ssh/$SSH_KEY_NAME.pub"; then
       log_error "Failed to create SSH key '$SSH_KEY_NAME' in STACKIT."
