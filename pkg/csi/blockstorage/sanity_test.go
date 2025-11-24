@@ -12,8 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	. "github.com/onsi/ginkgo/v2"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	mountutils "k8s.io/mount-utils"
 	exec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/ptr"
@@ -123,10 +121,6 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				}
 				return found, nil
 			}).AnyTimes()
-
-			iaasClient.EXPECT().ListVolumes(
-				gomock.Any(), gomock.Any(), gomock.Eq("invalid-token"),
-			).Return(nil, "", status.Error(codes.InvalidArgument, "invalid starting token")).AnyTimes()
 
 			iaasClient.EXPECT().ListVolumes(
 				gomock.Any(), gomock.Any(), gomock.Eq(""),
