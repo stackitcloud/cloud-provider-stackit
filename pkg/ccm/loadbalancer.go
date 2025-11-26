@@ -137,7 +137,11 @@ func (l *LoadBalancer) EnsureLoadBalancer(
 
 	fulfills, immutableChanged := compareLBwithSpec(lb, spec)
 	if immutableChanged != nil {
-		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %q", immutableChanged.field)
+		changeStr := fmt.Sprintf("%q", immutableChanged.field)
+		if immutableChanged.annotation != "" {
+			changeStr += fmt.Sprintf(" (%q)", immutableChanged.annotation)
+		}
+		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %s", changeStr)
 	}
 	if !fulfills {
 		credentialsRefBeforeUpdate := getMetricsRemoteWriteRef(lb)

@@ -1312,7 +1312,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When LB has no external IP but one is specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			ExternalAddress: nil,
 		},
@@ -1322,7 +1322,7 @@ var _ = DescribeTable("compareLBwithSpec",
 	}),
 	Entry("When specified and actual IP don't match", &compareLBwithSpecTest{
 		// The IP can never be changed. Not even with promotion or demotion.
-		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			ExternalAddress: utils.Ptr("123.124.88.01"),
 		},
@@ -1346,7 +1346,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When IP is to be demoted", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.ephemeralAddress"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: utils.Ptr(false),
@@ -1542,7 +1542,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When LB has no networks but one is specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: "len(.networks)"},
+		wantImmutabledChanged: &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: utils.Ptr(true),
@@ -1559,7 +1559,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When network id doesn't match", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].networkId"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].networkId", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: utils.Ptr(true),
@@ -1582,7 +1582,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When network role doesn't match", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].role"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].role", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: utils.Ptr(true),
@@ -1858,7 +1858,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When private network is disabled but specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.privateNetworkOnly"},
+		wantImmutabledChanged: &resultImmutableChanged{field: ".options.privateNetworkOnly", annotation: internalLBAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: nil,
 		},
