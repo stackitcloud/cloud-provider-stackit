@@ -10,6 +10,7 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 )
@@ -244,6 +245,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	service *corev1.Service,
 	nodes []*corev1.Node,
 	networkID string,
+	extraLabels map[string]string,
 	observability *loadbalancer.LoadbalancerOptionObservability,
 ) (*loadbalancer.CreateLoadBalancerPayload, []Event, error) {
 	lb := &loadbalancer.CreateLoadBalancerPayload{
@@ -274,6 +276,14 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			},
 		}
 	}
+
+	// Add extraLabels if set
+	if extraLabels != nil {
+		lb.Labels = ptr.To(extraLabels)
+	}
+
+	// Add metric metricsRemoteWrite settings
+	lb.Options.Observability = observability
 
 	events := make([]Event, 0)
 
@@ -341,9 +351,6 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		}
 		lb.ExternalAddress = &externalIP
 	}
-
-	// Add metric metricsRemoteWrite settings
-	lb.Options.Observability = observability
 
 	// Parse TCP idle timeout from annotations.
 	// TODO: Split into separate function.
