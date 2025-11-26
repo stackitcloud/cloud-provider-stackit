@@ -106,7 +106,7 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 // load balancer is not ready yet (e.g., it is still being provisioned) and
 // polling at a fixed rate is preferred over backing off exponentially in
 // order to minimize latency.
-func (l *LoadBalancer) EnsureLoadBalancer(
+func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really complex
 	ctx context.Context,
 	clusterName string,
 	service *corev1.Service,
