@@ -576,7 +576,8 @@ func checkUnsupportedAnnotations(service *corev1.Service) *Event {
 // resultImmutableChanged denotes that at least one property that cannot be changed did change.
 // Attempting an update will fail.
 type resultImmutableChanged struct {
-	field string
+	field      string
+	annotation string
 }
 
 // compareLBwithSpec checks whether the load balancer fulfills the specification.
@@ -587,7 +588,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	fulfills = true
 
 	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly) {
-		return false, &resultImmutableChanged{field: ".options.privateNetworkOnly"}
+		return false, &resultImmutableChanged{field: ".options.privateNetworkOnly", annotation: internalLBAnnotation}
 	}
 
 	if !cmp.PtrValEqualFn(
@@ -620,7 +621,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		// lb.ExternalAddress is set to the ephemeral IP if the load balancer is ephemeral, while spec will never contain an ephemeral IP.
 		// So we only compare them if the spec has a static IP.
 		if !cmp.PtrValEqual(lb.ExternalAddress, spec.ExternalAddress) {
-			return false, &resultImmutableChanged{field: ".externalAddress"}
+			return false, &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation}
 		}
 		if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
 			// Promote an ephemeral IP to a static IP.
@@ -629,7 +630,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	} else if !cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) &&
 		!cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
 		// Demotion is not allowed by the load balancer API.
-		return false, &resultImmutableChanged{field: ".options.ephemeralAddress"}
+		return false, &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation}
 	}
 
 	if cmp.LenSlicePtr(lb.Listeners) != cmp.LenSlicePtr(spec.Listeners) {
@@ -664,16 +665,16 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	}
 
 	if cmp.LenSlicePtr(lb.Networks) != cmp.LenSlicePtr(spec.Networks) {
-		return false, &resultImmutableChanged{field: "len(.networks)"}
+		return false, &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation}
 	}
 	if cmp.LenSlicePtr(lb.Networks) > 0 {
 		for i, x := range *lb.Networks {
 			y := (*spec.Networks)[i]
 			if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
-				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i)}
+				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i), annotation: listenerNetworkAnnotation}
 			}
 			if !cmp.PtrValEqual(x.Role, y.Role) {
-				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i)}
+				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i), annotation: listenerNetworkAnnotation}
 			}
 		}
 	}
