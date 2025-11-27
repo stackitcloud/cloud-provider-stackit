@@ -141,7 +141,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		if immutableChanged.annotation != "" {
 			changeStr += fmt.Sprintf(" (%q)", immutableChanged.annotation)
 		}
-		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %s", changeStr)
+		return nil, fmt.Errorf("update to load balancer cannot be fulfilled: API doesn't support changing %s", changeStr)
 	}
 	if !fulfills {
 		credentialsRefBeforeUpdate := getMetricsRemoteWriteRef(lb)
