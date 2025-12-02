@@ -2,7 +2,7 @@ module github.com/stackitcloud/cloud-provider-stackit
 
 go 1.24.6
 
-toolchain go1.25.4
+toolchain go1.25.5
 
 require (
 	github.com/container-storage-interface/spec v1.12.0
