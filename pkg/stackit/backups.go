@@ -12,7 +12,7 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
 	"k8s.io/utils/ptr"
 
-	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
 
 const (

@@ -37,7 +37,7 @@ import (
 
 	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
 
 type controllerServer struct {
