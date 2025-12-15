@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"

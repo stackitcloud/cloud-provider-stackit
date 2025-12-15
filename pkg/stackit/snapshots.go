@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
-
-	stackiterrors "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/errors"
 )
 
 const (
