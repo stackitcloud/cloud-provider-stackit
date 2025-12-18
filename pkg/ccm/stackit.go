@@ -41,20 +41,9 @@ type CloudControllerManager struct {
 	instances    *Instances
 }
 
-// Config is used to read and store information from the cloud configuration file
-type Config struct {
-	ProjectID       string            `yaml:"projectId"`
-	NetworkID       string            `yaml:"networkId"`
-	ExtraLabels     map[string]string `yaml:"extraLabels"`
-	Region          string            `yaml:"region"`
-	LoadBalancerAPI struct {
-		URL string `yaml:"url"`
-	} `yaml:"loadBalancerApi"`
-}
-
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := ReadConfig(config)
+		cfg, err := stackit.GetConfig(config)
 		if err != nil {
 			klog.Warningf("failed to read config: %v", err)
 			return nil, err
@@ -72,31 +61,31 @@ func init() {
 	})
 }
 
-func ReadConfig(configReader io.Reader) (Config, error) {
+func ReadConfig(configReader io.Reader) (stackit.Config, error) {
 	if configReader == nil {
-		return Config{}, errors.New("cloud config is missing")
+		return stackit.Config{}, errors.New("cloud config is missing")
 	}
 	configBytes, err := io.ReadAll(configReader)
 	if err != nil {
-		return Config{}, err
+		return stackit.Config{}, err
 	}
-	config := Config{}
+	config := stackit.Config{}
 	err = yaml.Unmarshal(configBytes, &config)
 	if err != nil {
-		return Config{}, err
+		return stackit.Config{}, err
 	}
-	if config.ProjectID == "" {
-		return Config{}, errors.New("projectId must be set")
+	if config.Global.ProjectID == "" {
+		return stackit.Config{}, errors.New("projectId must be set")
 	}
-	if config.NetworkID == "" {
-		return Config{}, errors.New("networkId must be set")
+	if config.Global.NetworkID == "" {
+		return stackit.Config{}, errors.New("networkId must be set")
 	}
-	if config.Region == "" {
-		return Config{}, errors.New("region must be set")
+	if config.Global.Region == "" {
+		return stackit.Config{}, errors.New("region must be set")
 	}
 
-	if config.LoadBalancerAPI.URL == "" {
-		config.LoadBalancerAPI.URL = "https://load-balancer.api.eu01.stackit.cloud"
+	if config.LoadBalancer.API == "" {
+		config.LoadBalancer.API = "https://load-balancer.api.eu01.stackit.cloud"
 	}
 
 	return config, nil
@@ -130,9 +119,9 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 }
 
 // NewCloudControllerManager creates a new instance of the stackit struct from a config struct
-func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+func NewCloudControllerManager(cfg *stackit.Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
+		sdkconfig.WithEndpoint(cfg.LoadBalancer.API),
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
 
@@ -140,7 +129,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	// In those cases, the [cfg.LoadBalancerAPI.URL] will also be different (direct API URL instead of the API Gateway)
 	lbEmergencyAPIToken := os.Getenv(stackitLoadBalancerEmergencyAPIToken)
 	if lbEmergencyAPIToken != "" {
-		klog.Warningf("using emergency token for loadbalancer api on host: %s", cfg.LoadBalancerAPI.URL)
+		klog.Warningf("using emergency token for loadbalancer api on host: %s", cfg.LoadBalancer.API)
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
@@ -148,7 +137,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	if err != nil {
 		return nil, err
 	}
-	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Region)
+	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -161,12 +150,12 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Node client: %v", err)
 	}
-	instances, err := NewInstance(nodeClient, cfg.ProjectID, cfg.Region)
+	instances, err := NewInstance(nodeClient, cfg.Global.ProjectID, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.ExtraLabels, obs)
+	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.Global.NetworkID, cfg.Global.ExtraLabels, obs)
 	if err != nil {
 		return nil, err
 	}
