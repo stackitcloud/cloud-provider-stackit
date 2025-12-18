@@ -105,7 +105,7 @@ spec:
         - name: CSI_ENDPOINT
           value: unix://csi/csi.sock
         - name: CLOUD_CONFIG
-          value: /etc/config/cloud.conf
+          value: /etc/config/cloud.yaml
         - name: CLUSTER_NAME
           value: kubernetes
         - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
