@@ -19,6 +19,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 const (
@@ -41,65 +42,61 @@ type CloudControllerManager struct {
 	instances    *Instances
 }
 
-// Config is used to read and store information from the cloud configuration file
 type Config struct {
-	ProjectID       string            `yaml:"projectId"`
-	NetworkID       string            `yaml:"networkId"`
-	ExtraLabels     map[string]string `yaml:"extraLabels"`
-	Region          string            `yaml:"region"`
-	LoadBalancerAPI struct {
-		URL string `yaml:"url"`
-	} `yaml:"loadBalancerApi"`
+	Global       stackit.GlobalOpts `yaml:"global"`
+	Metadata     metadata.Opts      `yaml:"metadata"`
+	LoadBalancer LoadBalancerOpts   `yaml:"loadBalancer"`
 }
 
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := ReadConfig(config)
+		cfg, err := GetConfig(config)
 		if err != nil {
-			klog.Warningf("failed to read config: %v", err)
 			return nil, err
 		}
+
+		if cfg.Global.ProjectID == "" {
+			return nil, errors.New("projectId must be set")
+		}
+		if cfg.Global.Region == "" {
+			return nil, errors.New("region must be set")
+		}
+
+		if cfg.LoadBalancer.API == "" {
+			cfg.LoadBalancer.API = "https://load-balancer.api.eu01.stackit.cloud"
+		}
+		if cfg.LoadBalancer.NetworkID == "" {
+			return nil, errors.New("networkId must be set")
+		}
+
 		obs, err := BuildObservability()
 		if err != nil {
-			klog.Warningf("failed to build metricsRemoteWrite: %v", err)
 			return nil, err
 		}
 		cloud, err := NewCloudControllerManager(&cfg, obs)
 		if err != nil {
-			klog.Warningf("failed to create STACKIT cloud provider: %v", err)
+			klog.Warningf("Failed to create STACKIT cloud provider: %v", err)
 		}
 		return cloud, err
 	})
 }
 
-func ReadConfig(configReader io.Reader) (Config, error) {
-	if configReader == nil {
-		return Config{}, errors.New("cloud config is missing")
-	}
-	configBytes, err := io.ReadAll(configReader)
+func GetConfig(reader io.Reader) (Config, error) {
+	var cfg Config
+
+	content, err := io.ReadAll(reader)
 	if err != nil {
-		return Config{}, err
-	}
-	config := Config{}
-	err = yaml.Unmarshal(configBytes, &config)
-	if err != nil {
-		return Config{}, err
-	}
-	if config.ProjectID == "" {
-		return Config{}, errors.New("projectId must be set")
-	}
-	if config.NetworkID == "" {
-		return Config{}, errors.New("networkId must be set")
-	}
-	if config.Region == "" {
-		return Config{}, errors.New("region must be set")
+		klog.ErrorS(err, "Failed to read config content")
+		return cfg, err
 	}
 
-	if config.LoadBalancerAPI.URL == "" {
-		config.LoadBalancerAPI.URL = "https://load-balancer.api.eu01.stackit.cloud"
+	err = yaml.Unmarshal(content, &cfg)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse config as YAML")
+		return cfg, err
 	}
 
-	return config, nil
+	return cfg, nil
 }
 
 func BuildObservability() (*MetricsRemoteWrite, error) {
@@ -132,7 +129,7 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 // NewCloudControllerManager creates a new instance of the stackit struct from a config struct
 func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithEndpoint(cfg.LoadBalancerAPI.URL),
+		sdkconfig.WithEndpoint(cfg.LoadBalancer.API),
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
 
@@ -140,7 +137,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	// In those cases, the [cfg.LoadBalancerAPI.URL] will also be different (direct API URL instead of the API Gateway)
 	lbEmergencyAPIToken := os.Getenv(stackitLoadBalancerEmergencyAPIToken)
 	if lbEmergencyAPIToken != "" {
-		klog.Warningf("using emergency token for loadbalancer api on host: %s", cfg.LoadBalancerAPI.URL)
+		klog.Warningf("Using emergency token for loadbalancer api on host: %s", cfg.LoadBalancer.API)
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
@@ -148,7 +145,7 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	if err != nil {
 		return nil, err
 	}
-	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Region)
+	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -161,12 +158,12 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Node client: %v", err)
 	}
-	instances, err := NewInstance(nodeClient, cfg.ProjectID, cfg.Region)
+	instances, err := NewInstance(nodeClient, cfg.Global.ProjectID, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.ProjectID, cfg.NetworkID, cfg.ExtraLabels, obs)
+	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
 	if err != nil {
 		return nil, err
 	}

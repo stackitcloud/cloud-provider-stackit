@@ -39,25 +39,29 @@ type MetricsRemoteWrite struct {
 
 // LoadBalancer is used for creating and maintaining load balancers.
 type LoadBalancer struct {
-	client      stackit.LoadbalancerClient
-	recorder    record.EventRecorder // set in CloudControllerManager.Initialize
-	projectID   string
-	networkID   string
-	extraLabels map[string]string
+	client    stackit.LoadbalancerClient
+	recorder  record.EventRecorder // set in CloudControllerManager.Initialize
+	projectID string
+	opts      LoadBalancerOpts
 	// metricsRemoteWrite setting this enables remote writing of metrics and nil means it is disabled
 	metricsRemoteWrite *MetricsRemoteWrite
 }
 
+type LoadBalancerOpts struct {
+	API         string            `yaml:"api"`
+	NetworkID   string            `yaml:"networkId"`
+	ExtraLabels map[string]string `yaml:"extraLabels"`
+}
+
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client stackit.LoadbalancerClient, projectID, networkID string, extraLabels map[string]string, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
+func NewLoadBalancer(client stackit.LoadbalancerClient, projectID string, opts LoadBalancerOpts, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
 	// LoadBalancer.recorder is set in CloudControllerManager.Initialize
 	return &LoadBalancer{
 		client:             client,
 		projectID:          projectID,
-		networkID:          networkID,
+		opts:               opts,
 		metricsRemoteWrite: metricsRemoteWrite,
-		extraLabels:        extraLabels,
 	}, nil
 }
 
@@ -126,7 +130,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, observabilityOptions)
+	spec, events, err := lbSpecFromService(service, nodes, l.opts, observabilityOptions)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
@@ -206,12 +210,12 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, metricsRemoteWrite)
+	spec, events, err := lbSpecFromService(service, nodes, l.opts, metricsRemoteWrite)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
-	if l.extraLabels != nil {
-		spec.Labels = ptr.To(l.extraLabels)
+	if l.opts.ExtraLabels != nil {
+		spec.Labels = ptr.To(l.opts.ExtraLabels)
 	}
 	for _, event := range events {
 		l.recorder.Event(service, event.Type, event.Reason, event.Message)
@@ -238,7 +242,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 // It is not called on controller start-up. EnsureLoadBalancer must also ensure to update targets.
 func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) error {
 	// only TargetPools are used from spec
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, nil)
+	spec, events, err := lbSpecFromService(service, nodes, l.opts, nil)
 	if err != nil {
 		return fmt.Errorf("invalid service: %w", err)
 	}

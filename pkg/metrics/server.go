@@ -16,7 +16,7 @@ func Run(ctx context.Context, metricsAddr string) error {
 		return errors.New("metrics address is empty")
 	}
 
-	klog.Infof("starting prometheus listener on address %s", metricsAddr)
+	klog.Infof("Starting prometheus listener on address %s", metricsAddr)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -39,7 +39,7 @@ func Run(ctx context.Context, metricsAddr string) error {
 
 	g.Go(func() error {
 		<-gCtx.Done()
-		klog.Info("shutdown prometheus listener")
+		klog.Info("Shutdown prometheus listener")
 		return serv.Shutdown(gCtx)
 	})
 

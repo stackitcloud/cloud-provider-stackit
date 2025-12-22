@@ -779,12 +779,9 @@ data:
     projectId: $project_id
     networkId: $network_id
     region: eu01
-  cloud.conf: |-
-    [Global]
-    project-id = $project_id
-    [BlockStorage]
-    node-volume-attach-limit = 20
-    rescan-on-resize = true
+    blockStorage:
+      nodeVolumeAttachLimit: 20
+      rescanOnResize: true
 EOT_CM
 log "ConfigMap stackit-cloud-controller-manager created in kube-system."
 

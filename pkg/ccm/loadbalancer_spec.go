@@ -244,8 +244,7 @@ func getPlanID(service *corev1.Service) (planID *string, msgs []string, err erro
 func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	service *corev1.Service,
 	nodes []*corev1.Node,
-	networkID string,
-	extraLabels map[string]string,
+	opts LoadBalancerOpts,
 	observability *loadbalancer.LoadbalancerOptionObservability,
 ) (*loadbalancer.CreateLoadBalancerPayload, []Event, error) {
 	lb := &loadbalancer.CreateLoadBalancerPayload{
@@ -253,7 +252,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		Networks: &[]loadbalancer.Network{
 			{
 				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
-				NetworkId: &networkID,
+				NetworkId: &opts.NetworkID,
 			},
 		},
 	}
@@ -262,7 +261,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		lb.Networks = &[]loadbalancer.Network{
 			{
 				Role:      utils.Ptr(loadbalancer.NETWORKROLE_TARGETS),
-				NetworkId: &networkID,
+				NetworkId: &opts.NetworkID,
 			}, {
 				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS),
 				NetworkId: &listenerNetwork,
@@ -272,14 +271,14 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		lb.Networks = &[]loadbalancer.Network{
 			{
 				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
-				NetworkId: &networkID,
+				NetworkId: &opts.NetworkID,
 			},
 		}
 	}
 
 	// Add extraLabels if set
-	if extraLabels != nil {
-		lb.Labels = ptr.To(extraLabels)
+	if opts.ExtraLabels != nil {
+		lb.Labels = ptr.To(opts.ExtraLabels)
 	}
 
 	// Add metric metricsRemoteWrite settings

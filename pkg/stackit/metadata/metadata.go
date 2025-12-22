@@ -69,8 +69,8 @@ var metadataCache *Metadata
 // revive:enable:exported
 // Opts is used for configuring how to talk to metadata service or config drive
 type Opts struct {
-	SearchOrder    string   `gcfg:"search-order"`
-	RequestTimeout Duration `gcfg:"request-timeout"`
+	SearchOrder    string   `yaml:"searchOrder"`
+	RequestTimeout Duration `yaml:"requestTimeout"`
 }
 
 // Duration is the encoding.TextUnmarshaler interface for time.Duration
@@ -366,12 +366,12 @@ func (m *metadataService) GetFlavor(ctx context.Context) (string, error) {
 
 func CheckMetadataSearchOrder(order string) error {
 	if order == "" {
-		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
+		return errors.New("invalid value in metadata.searchOrder. Value cannot be empty")
 	}
 
 	elements := strings.Split(order, ",")
 	if len(elements) > 2 {
-		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
+		return errors.New("invalid value in metadata.searchOrder. Value cannot contain more than 2 elements")
 	}
 
 	for _, id := range elements {
@@ -380,7 +380,7 @@ func CheckMetadataSearchOrder(order string) error {
 		case ConfigDriveID:
 		case MetadataID:
 		default:
-			return fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+			return fmt.Errorf("invalid element %q found in metadata.searchOrder."+
 				"Supported elements include %q and %q", id, ConfigDriveID, MetadataID)
 		}
 	}
