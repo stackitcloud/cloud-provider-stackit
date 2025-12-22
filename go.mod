@@ -32,7 +32,7 @@ require (
 	k8s.io/component-base v0.33.7
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.33.7
-	k8s.io/utils v0.0.0-20251222190033-383b50a9004e
+	k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2
 )
 
 replace k8s.io/cloud-provider => github.com/stackitcloud/cloud-provider v0.33.2-ske-1
