@@ -124,27 +124,20 @@ func (os *iaasClient) GetBlockStorageOpts() BlockStorageOpts {
 	return os.bsOpts
 }
 
-type LoadBalancerOpts struct {
-	API string `yaml:"api"`
-}
-
 type BlockStorageOpts struct {
 	RescanOnResize bool `yaml:"rescanOnResize"`
 }
 
 type GlobalOpts struct {
-	ProjectID   string            `yaml:"projectId"`
-	IaasAPI     string            `yaml:"iaasApi"`
-	NetworkID   string            `yaml:"networkId"`
-	ExtraLabels map[string]string `yaml:"extraLabels"`
-	Region      string            `yaml:"region"`
+	ProjectID string `yaml:"projectId"`
+	IaasAPI   string `yaml:"iaasApi"`
+	Region    string `yaml:"region"`
 }
 
 type Config struct {
 	Global       GlobalOpts       `yaml:"global"`
 	Metadata     metadata.Opts    `yaml:"metadata"`
 	BlockStorage BlockStorageOpts `yaml:"blockStorage"`
-	LoadBalancer LoadBalancerOpts `yaml:"loadBalancer"`
 }
 
 func GetConfig(reader io.Reader) (Config, error) {

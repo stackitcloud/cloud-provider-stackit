@@ -19,6 +19,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 const (
@@ -41,9 +42,15 @@ type CloudControllerManager struct {
 	instances    *Instances
 }
 
+type Config struct {
+	Global       stackit.GlobalOpts `yaml:"global"`
+	Metadata     metadata.Opts      `yaml:"metadata"`
+	LoadBalancer LoadBalancerOpts   `yaml:"loadBalancer"`
+}
+
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := stackit.GetConfig(config)
+		cfg, err := ReadConfig(config)
 		if err != nil {
 			klog.Warningf("failed to read config: %v", err)
 			return nil, err
@@ -61,31 +68,31 @@ func init() {
 	})
 }
 
-func ReadConfig(configReader io.Reader) (stackit.Config, error) {
+func ReadConfig(configReader io.Reader) (Config, error) {
 	if configReader == nil {
-		return stackit.Config{}, errors.New("cloud config is missing")
+		return Config{}, errors.New("cloud config is missing")
 	}
 	configBytes, err := io.ReadAll(configReader)
 	if err != nil {
-		return stackit.Config{}, err
+		return Config{}, err
 	}
-	config := stackit.Config{}
+	config := Config{}
 	err = yaml.Unmarshal(configBytes, &config)
 	if err != nil {
-		return stackit.Config{}, err
+		return Config{}, err
 	}
 	if config.Global.ProjectID == "" {
-		return stackit.Config{}, errors.New("projectId must be set")
-	}
-	if config.Global.NetworkID == "" {
-		return stackit.Config{}, errors.New("networkId must be set")
+		return Config{}, errors.New("projectId must be set")
 	}
 	if config.Global.Region == "" {
-		return stackit.Config{}, errors.New("region must be set")
+		return Config{}, errors.New("region must be set")
 	}
 
 	if config.LoadBalancer.API == "" {
 		config.LoadBalancer.API = "https://load-balancer.api.eu01.stackit.cloud"
+	}
+	if config.LoadBalancer.NetworkID == "" {
+		return Config{}, errors.New("networkId must be set")
 	}
 
 	return config, nil
@@ -119,7 +126,7 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 }
 
 // NewCloudControllerManager creates a new instance of the stackit struct from a config struct
-func NewCloudControllerManager(cfg *stackit.Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithEndpoint(cfg.LoadBalancer.API),
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
@@ -155,7 +162,7 @@ func NewCloudControllerManager(cfg *stackit.Config, obs *MetricsRemoteWrite) (*C
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.Global.NetworkID, cfg.Global.ExtraLabels, obs)
+	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
 	if err != nil {
 		return nil, err
 	}
