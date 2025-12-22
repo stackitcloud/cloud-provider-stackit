@@ -27,9 +27,6 @@ var _ = Describe("Client", func() {
 				Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 				Expect(cfg.Global.Region).To(Equal("eu01"))
 				Expect(cfg.Global.IaasAPI).To(Equal("https://api.example.com"))
-				Expect(cfg.Global.NetworkID).To(Equal("test-network"))
-				Expect(cfg.Global.ExtraLabels).To(Equal(map[string]string{"env": "test"}))
-				Expect(cfg.LoadBalancer.API).To(Equal("https://lb-api.example.com"))
 			})
 
 			It("should handle missing optional fields", func() {
@@ -39,8 +36,6 @@ var _ = Describe("Client", func() {
 				Expect(cfg.Global.Region).To(Equal("eu01"))
 				// Optional fields should be empty/zero values
 				Expect(cfg.Global.IaasAPI).To(BeEmpty())
-				Expect(cfg.Global.NetworkID).To(BeEmpty())
-				Expect(cfg.Global.ExtraLabels).To(BeEmpty())
 			})
 
 			It("should return error for invalid yaml", func() {
@@ -152,17 +147,12 @@ const validYamlConf = `
 global:
   projectId: "test-project"
   iaasApi: "https://api.example.com"
-  networkId: "test-network"
-  extraLabels:
-    env: "test"
   region: "eu01"
 metadata:
   searchOrder: "configDrive,metadataService"
   requestTimeout: "5s"
 blockStorage:
-  rescanOnResize: true
-loadBalancer:
-  api: "https://lb-api.example.com"`
+  rescanOnResize: true`
 
 const minimalYamlConf = `
 global:
