@@ -112,7 +112,11 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		accessibleTopologyReq := req.GetAccessibilityRequirements()
 		// Check from topology
 		if accessibleTopologyReq != nil {
-			volAvailability = sharedcsi.GetAZFromTopology(topologyKey, accessibleTopologyReq)
+			if cs.Driver.legacyDriver {
+				volAvailability = sharedcsi.GetAZFromTopology(legacyTopologyKey, accessibleTopologyReq)
+			} else {
+				volAvailability = sharedcsi.GetAZFromTopology(topologyKey, accessibleTopologyReq)
+			}
 		}
 	}
 
@@ -131,7 +135,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, *vols[0].AvailabilityZone, *vols[0].Size)
-		return getCreateVolumeResponse(&vols[0]), nil
+		return cs.getCreateVolumeResponse(&vols[0]), nil
 	} else if len(vols) > 1 {
 		klog.V(3).Infof("found multiple existing volumes with selected name (%s) during create", volName)
 		return nil, status.Error(codes.Internal, "Multiple volumes reported by Cinder with same name")
@@ -274,7 +278,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, *vol.AvailabilityZone, *vol.Size)
 
-	return getCreateVolumeResponse(vol), nil
+	return cs.getCreateVolumeResponse(vol), nil
 }
 
 func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *stackitParameterConfig) error {
@@ -961,7 +965,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	}, nil
 }
 
-func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
+func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	var volsrc *csi.VolumeContentSource
 	var volumeSourceType stackit.VolumeSourceTypes
 	volCnx := map[string]string{}
@@ -1002,9 +1006,14 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 		}
 	}
 
+	topoKey := topologyKey
+	if cs.Driver.legacyDriver {
+		topoKey = legacyTopologyKey
+	}
+
 	accessibleTopology := []*csi.Topology{
 		{
-			Segments: map[string]string{topologyKey: ptr.Deref(vol.AvailabilityZone, "")},
+			Segments: map[string]string{topoKey: ptr.Deref(vol.AvailabilityZone, "")},
 		},
 	}
 
