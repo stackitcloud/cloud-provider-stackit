@@ -32,7 +32,7 @@ require (
 	k8s.io/component-base v0.31.14
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.31.14
-	k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2
+	k8s.io/utils v0.0.0-20260106112306-0fe9cd71b2f8
 )
 
 require (
