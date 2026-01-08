@@ -65,7 +65,7 @@ func NewInstance(client stackit.NodeClient, projectID, region string) (*Instance
 func (i *Instances) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
 	_, err := i.getInstance(ctx, node)
 	if errors.Is(err, cloudprovider.InstanceNotFound) {
-		klog.V(6).Infof("instance not found for node: %s", node.Name)
+		klog.V(6).Infof("Instance not found for node: %s", node.Name)
 		return false, nil
 	}
 	if err != nil {
@@ -94,7 +94,7 @@ func (i *Instances) InstanceShutdown(ctx context.Context, node *corev1.Node) (bo
 func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
 	server, err := i.getInstance(ctx, node)
 	if errors.Is(err, cloudprovider.InstanceNotFound) {
-		klog.V(6).Infof("instance not found for node: %s", node.Name)
+		klog.V(6).Infof("Instance not found for node: %s", node.Name)
 		return nil, nil
 	}
 	if err != nil {
