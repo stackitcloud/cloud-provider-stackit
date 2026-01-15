@@ -32,24 +32,24 @@ var _ = Describe("LoadBalancer", func() {
 		loadBalancer         *LoadBalancer
 		clusterName          string
 		projectID            string
-		networkID            string
+		lbOpts               LoadBalancerOpts
 	)
 
 	BeforeEach(func() {
 		clusterName = "my-cluster"
 		projectID = "my-project"
-		networkID = "my-network"
+		lbOpts = LoadBalancerOpts{NetworkID: "my-network"}
 
 		ctrl := gomock.NewController(GinkgoT())
 		mockClient = stackit.NewMockLoadbalancerClient(ctrl)
 		var err error
-		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, networkID, nil, &MetricsRemoteWrite{
+		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, lbOpts, &MetricsRemoteWrite{
 			endpoint: "test-endpoint",
 			username: "test-username",
 			password: "test-password",
 		})
 		Expect(err).NotTo(HaveOccurred())
-		loadBalancer, err = NewLoadBalancer(mockClient, projectID, networkID, nil, nil)
+		loadBalancer, err = NewLoadBalancer(mockClient, projectID, lbOpts, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -126,7 +126,7 @@ var _ = Describe("LoadBalancer", func() {
 		DescribeTable("should report status for external LB",
 			func(hasExternalAddress bool) {
 				svc := minimalLoadBalancerService()
-				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil, nil)
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 				Expect(err).NotTo(HaveOccurred())
 				myLb := convertToLB(spec)
 				if !hasExternalAddress {
@@ -163,7 +163,7 @@ var _ = Describe("LoadBalancer", func() {
 						Type: corev1.ServiceTypeLoadBalancer,
 					},
 				}
-				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil, nil)
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 				Expect(err).NotTo(HaveOccurred())
 				myLb := convertToLB(spec)
 				Expect(myLb.ExternalAddress).To(BeNil())
@@ -224,7 +224,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should update observability credential if credentials are specified in load balancer", func() {
 			svc := minimalLoadBalancerService()
-			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil, &loadbalancer.LoadbalancerOptionObservability{
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 					CredentialsRef: utils.Ptr(sampleCredentialsRef),
 					PushUrl:        &lbInModeIgnoreAndObs.metricsRemoteWrite.endpoint,
@@ -255,7 +255,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should update the load balancer if the service changed", func() {
 			svc := minimalLoadBalancerService()
-			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil, nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -313,7 +313,7 @@ var _ = Describe("LoadBalancer", func() {
 				Port:     80,
 				NodePort: 1234,
 			})
-			spec, _, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, networkID, nil, nil)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
 				Errors:          &[]loadbalancer.LoadBalancerError{},
@@ -344,7 +344,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should delete observability credentials and delete reference from load balancer if controller is not configured (monitoring extension disabled)", func() {
 			svc := minimalLoadBalancerService()
-			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, networkID, nil, &loadbalancer.LoadbalancerOptionObservability{
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 					CredentialsRef: ptr.To(sampleCredentialsRef),
 					PushUrl:        ptr.To("test-endpoint"),
