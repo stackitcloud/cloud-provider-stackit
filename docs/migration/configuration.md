@@ -74,8 +74,7 @@ metadata:
   searchOrder: "configDrive,metadataService"
   requestTimeout: "5s"
 loadBalancer:
-  api:
-    url: https://loadbalancer.example.com
+  api: https://loadbalancer.example.com
   networkId: my-stackit-network-id
   extraLabels:
     key1: value1
