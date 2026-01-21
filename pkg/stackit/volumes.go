@@ -170,7 +170,7 @@ func (os *iaasClient) DetachVolume(ctx context.Context, instanceID, volumeID str
 		return err
 	}
 	if *volume.Status == VolumeAvailableStatus {
-		klog.V(2).Infof("volume: %s has been detached from compute: %s ", *volume.Id, instanceID)
+		klog.V(2).Infof("Volume: %s has been detached from compute: %s ", *volume.Id, instanceID)
 		return nil
 	}
 
