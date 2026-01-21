@@ -29,7 +29,7 @@ import (
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
-	"go.yaml.in/yaml/v2"
+	"go.yaml.in/yaml/v3"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
