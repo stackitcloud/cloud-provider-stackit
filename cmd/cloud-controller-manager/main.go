@@ -36,7 +36,7 @@ var (
 func main() {
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
+		klog.Fatalf("Unable to initialize command options: %v", err)
 	}
 
 	fmt.Println("starting Controller")
@@ -91,7 +91,7 @@ func cloudInitializer(ctx context.Context) func(config *cloudcontrollerconfig.Co
 
 		if !cloud.HasClusterID() {
 			if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-				klog.Warning("detected a cluster without a ClusterID. A ClusterID will be required in the future. Please tag your cluster to avoid any future issues")
+				klog.Warning("Detected a cluster without a ClusterID. A ClusterID will be required in the future. Please tag your cluster to avoid any future issues")
 			} else {
 				klog.Fatalf(
 					"no ClusterID found. A ClusterID is required for the cloud provider to function properly. " +
