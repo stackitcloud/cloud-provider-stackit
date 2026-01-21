@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -28,7 +29,7 @@ import (
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
-	"gopkg.in/gcfg.v1"
+	"go.yaml.in/yaml/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
@@ -124,18 +125,37 @@ func (os *iaasClient) GetBlockStorageOpts() BlockStorageOpts {
 }
 
 type BlockStorageOpts struct {
-	RescanOnResize bool `gcfg:"rescan-on-resize"`
+	RescanOnResize bool `yaml:"rescanOnResize"`
 }
 
 type GlobalOpts struct {
-	ProjectID  string `gcfg:"project-id"`
-	IaasAPIURL string `gcfg:"iaas-api-url"`
+	ProjectID string `yaml:"projectId"`
+	IaasAPI   string `yaml:"iaasApi"`
+	Region    string `yaml:"region"`
 }
 
 type Config struct {
-	Global       GlobalOpts
-	Metadata     metadata.Opts
-	BlockStorage BlockStorageOpts
+	Global       GlobalOpts       `yaml:"global"`
+	Metadata     metadata.Opts    `yaml:"metadata"`
+	BlockStorage BlockStorageOpts `yaml:"blockStorage"`
+}
+
+func GetConfig(reader io.Reader) (Config, error) {
+	var cfg Config
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		klog.ErrorS(err, "Failed to read config content")
+		return cfg, err
+	}
+
+	err = yaml.Unmarshal(content, &cfg)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse config as YAML")
+		return cfg, err
+	}
+
+	return cfg, nil
 }
 
 func GetConfigFromFile(path string) (Config, error) {
@@ -148,12 +168,7 @@ func GetConfigFromFile(path string) (Config, error) {
 	}
 	defer config.Close()
 
-	err = gcfg.FatalOnly(gcfg.ReadInto(&cfg, config))
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse config file", "path", path)
-		return cfg, err
-	}
-	return cfg, nil
+	return GetConfig(config)
 }
 
 // CreateSTACKITProvider creates STACKIT Instance
@@ -183,8 +198,8 @@ func CreateIaaSClient(cfg *Config) (iaas.DefaultApi, error) {
 	}
 	klog.V(4).Infof("Using user-agent: %s", userAgent)
 
-	if cfg.Global.IaasAPIURL != "" {
-		opts = append(opts, sdkconfig.WithEndpoint(cfg.Global.IaasAPIURL))
+	if cfg.Global.IaasAPI != "" {
+		opts = append(opts, sdkconfig.WithEndpoint(cfg.Global.IaasAPI))
 	}
 
 	opts = append(opts, sdkconfig.WithUserAgent(strings.Join(userAgent, " ")))
