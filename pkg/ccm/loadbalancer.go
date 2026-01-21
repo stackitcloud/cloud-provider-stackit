@@ -106,7 +106,7 @@ func (l *LoadBalancer) GetLoadBalancerName(_ context.Context, _ string, service 
 // load balancer is not ready yet (e.g., it is still being provisioned) and
 // polling at a fixed rate is preferred over backing off exponentially in
 // order to minimize latency.
-func (l *LoadBalancer) EnsureLoadBalancer(
+func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really complex
 	ctx context.Context,
 	clusterName string,
 	service *corev1.Service,
@@ -126,7 +126,7 @@ func (l *LoadBalancer) EnsureLoadBalancer(
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, observabilityOptions)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, observabilityOptions)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
@@ -137,7 +137,11 @@ func (l *LoadBalancer) EnsureLoadBalancer(
 
 	fulfills, immutableChanged := compareLBwithSpec(lb, spec)
 	if immutableChanged != nil {
-		return nil, fmt.Errorf("updated to load balancer cannot be fulfilled. Load balancer API doesn't support changing %q", immutableChanged.field)
+		changeStr := fmt.Sprintf("%q", immutableChanged.field)
+		if immutableChanged.annotation != "" {
+			changeStr += fmt.Sprintf(" (%q)", immutableChanged.annotation)
+		}
+		return nil, fmt.Errorf("update to load balancer cannot be fulfilled: API doesn't support changing %s", changeStr)
 	}
 	if !fulfills {
 		credentialsRefBeforeUpdate := getMetricsRemoteWriteRef(lb)
@@ -202,7 +206,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("reconcile metricsRemoteWrite: %w", err)
 	}
 
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, metricsRemoteWrite)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, metricsRemoteWrite)
 	if err != nil {
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
@@ -234,7 +238,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 // It is not called on controller start-up. EnsureLoadBalancer must also ensure to update targets.
 func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service, nodes []*corev1.Node) error {
 	// only TargetPools are used from spec
-	spec, events, err := lbSpecFromService(service, nodes, l.networkID, nil)
+	spec, events, err := lbSpecFromService(service, nodes, l.networkID, l.extraLabels, nil)
 	if err != nil {
 		return fmt.Errorf("invalid service: %w", err)
 	}
