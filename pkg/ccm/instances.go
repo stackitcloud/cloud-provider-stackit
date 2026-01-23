@@ -52,6 +52,10 @@ type Instances struct {
 	region           string
 }
 
+type InstancesOpts struct {
+	API string `yaml:"api"`
+}
+
 func NewInstance(client stackit.NodeClient, projectID, region string) (*Instances, error) {
 	return &Instances{
 		iaasClient:       client,
