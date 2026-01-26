@@ -63,9 +63,6 @@ func init() {
 			return nil, errors.New("region must be set")
 		}
 
-		if cfg.LoadBalancer.API == "" {
-			cfg.LoadBalancer.API = "https://load-balancer.api.eu01.stackit.cloud"
-		}
 		if cfg.LoadBalancer.NetworkID == "" {
 			return nil, errors.New("networkId must be set")
 		}
@@ -130,8 +127,11 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 // NewCloudControllerManager creates a new instance of the stackit struct from a config struct
 func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithEndpoint(cfg.LoadBalancer.API),
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
+	}
+
+	if cfg.LoadBalancer.API != "" {
+		lbOpts = append(lbOpts, sdkconfig.WithEndpoint(cfg.LoadBalancer.API))
 	}
 
 	// The token is only provided by the 'gardener-extension-provider-stackit' in case of emergency access.
