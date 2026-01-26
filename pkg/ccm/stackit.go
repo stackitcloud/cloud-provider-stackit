@@ -46,6 +46,7 @@ type Config struct {
 	Global       stackit.GlobalOpts `yaml:"global"`
 	Metadata     metadata.Opts      `yaml:"metadata"`
 	LoadBalancer LoadBalancerOpts   `yaml:"loadBalancer"`
+	Instances    InstancesOpts      `yaml:"instances"`
 }
 
 func init() {
@@ -150,7 +151,15 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		return nil, err
 	}
 
-	iaasInnerClient, err := iaas.NewAPIClient()
+	iaasOpts := []sdkconfig.ConfigurationOption{
+		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
+	}
+
+	if cfg.Instances.API != "" {
+		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Instances.API))
+	}
+
+	iaasInnerClient, err := iaas.NewAPIClient(iaasOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
