@@ -4,20 +4,21 @@ contents:
   repositories:
   - https://packages.wolfi.dev/os
   packages:
-  - ca-certificates
-  - blkid
-  - blockdev
-  - e2fsprogs
-  - e2fsprogs-extra
-  - lsblk
-  - mount
-  - umount
-  - btrfs-progs
-  - udev
-  - util-linux-misc # contains fsck
-  - xfsprogs 
-  - xfsprogs-extra # contains xfs_io
-  - findmnt
+  - busybox
+  - ca-certificates=~20250911
+  - blkid=~2.41.2
+  - blockdev=~2.41.2
+  - e2fsprogs=~1.47.3
+  - e2fsprogs-extra=~1.47.3
+  - lsblk=~2.41.2
+  - mount=~2.41.2
+  - umount=~2.41.2
+  - btrfs-progs=~6.17
+  - udev=~258.1
+  - util-linux-misc=~2.41.2 # contains fsck
+  - xfsprogs=~6.17.0
+  - xfsprogs-extra=~6.17.0 # contains xfs_io
+  - findmnt=~2.41.2
 
 accounts:
   run-as: root
