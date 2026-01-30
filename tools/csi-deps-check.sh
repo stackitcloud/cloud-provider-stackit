@@ -30,6 +30,7 @@ set -o errexit
 /sbin/mke2fs -V
 /sbin/mkfs.ext4 -V
 /sbin/mkfs.xfs -V
+/usr/bin/fsck.xfs
 /usr/sbin/xfs_io -V # not used by mount-utils though
 /sbin/xfs_repair -V
 /usr/sbin/xfs_growfs -V
