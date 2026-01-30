@@ -10,7 +10,7 @@ contents:
   - blockdev=~2.41.2
   - e2fsprogs=~1.47.3
   - e2fsprogs-extra=~1.47.3
-  - lsblk=~2.41.2
+  - lsblk=~2.41.3
   - mount=~2.41.2
   - umount=~2.41.2
   - btrfs-progs=~6.17
