@@ -15,7 +15,7 @@ contents:
   - umount=~2.41.2
   - btrfs-progs=~6.17
   - udev=~258.1
-  - util-linux-misc=~2.41.2 # contains fsck
+  - util-linux-misc=~2.41.3 # contains fsck
   - xfsprogs=~6.17.0
   - xfsprogs-core=~6.17.0
   - xfsprogs-extra=~6.17.0 # contains xfs_io
