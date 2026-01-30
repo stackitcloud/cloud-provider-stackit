@@ -121,7 +121,7 @@ verify-image-stackit-csi-plugin: LOCAL = true
 verify-image-stackit-csi-plugin: APKO_EXTRA_PACKAGES = busybox
 verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 	@echo "verifying binaries in image"
-	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/stackit-csi-plugin:$(VERSION) 
+	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/$(REPO)/stackit-csi-plugin-dev:$(VERSION)
 
 # generate mock types for the following services (space-separated list)
 MOCK_SERVICES := iaas loadbalancer
