@@ -17,7 +17,7 @@ contents:
   - udev=~258.1
   - util-linux-misc=~2.41.2 # contains fsck
   - xfsprogs=~6.17.0
-  - xfsprogs-core=~6.17.0
+  - xfsprogs-core=~6.18.0
   - xfsprogs-extra=~6.17.0 # contains xfs_io
   - findmnt=~2.41.2
 
