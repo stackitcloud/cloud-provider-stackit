@@ -4,7 +4,7 @@ contents:
   repositories:
   - https://packages.wolfi.dev/os
   packages:
-  - busybox
+  - busybox # required by fsck.xfs as it is a sh script
   - ca-certificates=~20250911
   - blkid=~2.41.2
   - blockdev=~2.41.2
