@@ -27,6 +27,7 @@ $(BUILD_IMAGES): $(SOURCES)
 		cmd/$@/main.go
 
 .PHONY: images
+images: verify-image-stackit-csi-plugin
 images: $(foreach image,$(BUILD_IMAGES),image-$(image))
 
 # lazy reference, evaluated when called
