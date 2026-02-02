@@ -128,7 +128,7 @@
       matchManagers: [
         'custom.regex',
       ],
-      managerFilePatterns: [
+      matchFileNames: [
         'images/*/apko.yaml',
         '**/apko-base-image.yaml',
       ],
