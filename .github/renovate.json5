@@ -5,15 +5,13 @@
     'github>stackitcloud/ske-ci-infra//config/renovate/ske.json5',
   ],
   additionalReviewers: [
-    'hown3d',
-    'nschad',
+    'team:ske-infrastructure',
   ],
   baseBranchPatterns: [
     'main',
     'release-v1.34',
     'release-v1.33',
     'release-v1.32',
-    'release-v1.31',
   ],
   customManagers: [
     {
@@ -107,16 +105,6 @@
       automerge: false,
     },
     {
-      matchPackageNames: [
-        '/^k8s.io/',
-      ],
-      matchBaseBranches: [
-        'release-v1.31',
-      ],
-      allowedVersions: '<0.32.0',
-      automerge: false,
-    },
-    {
       groupName: 'devTools non-major',
       matchManagers: [
         'custom.regex',
@@ -133,6 +121,16 @@
       automerge: true,
       addLabels: [
         'skip-review',
+      ],
+    },
+    {
+      groupName: 'apko packages',
+      matchManagers: [
+        'custom.regex',
+      ],
+      matchFileNames: [
+        'images/*/apko.yaml',
+        '**/apko-base-image.yaml',
       ],
     },
   ],
