@@ -140,9 +140,15 @@ Example cloud configuration:
 
 ```yaml
 # cloud.yaml
-projectId: your-project-id
-networkId: your-network-id
-region: eu01
+global:
+  projectId: your-project-id
+  region: eu01
+loadBalancer:
+  networkId: your-network-id
+```
+
+```bash
+kubectl create configmap -n kube-system stackit-cloud-secret --from-files=cloud.yaml
 ```
 
 ### Parameters
