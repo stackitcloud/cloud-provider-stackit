@@ -117,6 +117,9 @@ linters:
           - revive
         text: 'var-naming: avoid meaningless package names'
         path: 'pkg/csi/util/*'
+      - linters:
+          - revive
+        text: 'var-naming: avoid package names that conflict with Go standard library package names'
     paths:
       - third_party$
       - builtin$
