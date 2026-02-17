@@ -16,6 +16,7 @@ aliases:
   - mstueer
   - OlegVanHorst
   - jamand
+  - breuerfelix
   cloud-provider-stackit-approvers:
   - dergeberl
   - JuliusSte
@@ -32,3 +33,4 @@ aliases:
   - mstueer
   - OlegVanHorst
   - jamand
+  - breuerfelix
