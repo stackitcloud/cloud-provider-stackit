@@ -13,7 +13,6 @@ For major changes, API changes or features please open a [Discussion](https://gi
 >
 > Use **Issues** if you have a clear plan how to implement to propose how you would do the change.
 
-
 To contribute any code to this repository, just do the following:
 
 1. Make sure you have Go's latest version installed
@@ -21,7 +20,7 @@ To contribute any code to this repository, just do the following:
 3. Make your changes
    > Please follow the [seven rules of great Git commit messages](https://chris.beams.io/posts/git-commit/#seven-rules)
    > and make sure to keep your commits clean and atomic.
-   > Your PR won't be squashed before merging so the commits should tell a story.
+   > Your PR will be squashed before merging so the commits can and should tell a story.
    >
    > Add documentation and tests for your addition if needed.
 4. Run `make verify` to ensure your code is ready to be merged
