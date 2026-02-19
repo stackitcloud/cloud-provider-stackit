@@ -1,9 +1,6 @@
 ---
 name: Feature request
 about: Suggest an idea for the cloud-provider-stackit
-title: ""
-labels: enhancement
-assignees: ""
 ---
 
 ## Problem description
@@ -21,3 +18,5 @@ _A clear and concise description of any alternative solutions or features you've
 ## Additional information
 
 _Feel free to add any additional information here._
+
+/kind enhancement
