@@ -9,6 +9,7 @@
   ],
   baseBranchPatterns: [
     'main',
+    'release-v1.35',
     'release-v1.34',
     'release-v1.33',
     'release-v1.32',
@@ -74,7 +75,17 @@
       ],
       automerge: false,
     },
-     {
+    {
+      matchPackageNames: [
+        '/^k8s.io/',
+      ],
+      matchBaseBranches: [
+        'release-v1.35',
+      ],
+      allowedVersions: '<0.36.0',
+      automerge: false,
+    },
+    {
       matchPackageNames: [
         '/^k8s.io/',
       ],
