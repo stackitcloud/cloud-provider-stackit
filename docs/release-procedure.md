@@ -43,3 +43,14 @@ If the `release-tool` or its associated Prow job fails, use the GitHub web UI to
 5. Click **Publish release** to create the release.
 
 Publishing a new release triggers the same Prow release job that builds and publishes the final container images.
+
+## Releasing a New Kubernetes Version
+
+1. Create a new version of the [`cloud-provider`](https://github.com/stackitcloud/cloud-provider) fork.
+  1. Create a new release branch `ske-v0.xx` from the latest patch version tag of the desired Kubernetes version.
+  2. Cherry-pick our changes into the release branch. Example: https://github.com/stackitcloud/cloud-provider/commits/ske-v0.35/
+  3. Tag the release branch with `v0.xx.x-ske-x`.
+2. Bump the Kubernetes packages, including an overwrite of the `cloud-provider` fork, in the `main` branch.
+3. Create a new release branch `release-v1.XX` from `main`.
+4. Update the Renovate configuration via a PR against `main`: add the new release branch to `baseBranchPatterns` and add a new rule in `packageRules` for `/^k8s.io/`. Cherry-pick this PR to all maintained release branches. Example PR: https://github.com/stackitcloud/cloud-provider-stackit/pull/756
+5. Create a manual release for the new branch (note: the release tool will only work if there is already a tag on the branch). Do not generate release notes as they will contain many unrelated changes. Just add `Initial release of v1.xx.0` as release notes.
