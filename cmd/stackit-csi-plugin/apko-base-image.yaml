@@ -6,20 +6,20 @@ contents:
   packages:
   - busybox # required by fsck.xfs as it is a sh script
   - ca-certificates
-  - blkid=~2.41.2
-  - blockdev=~2.41.2
+  - blkid=~2.41.3
+  - blockdev=~2.41.3
   - e2fsprogs=~1.47.3
   - e2fsprogs-extra=~1.47.3
-  - lsblk=~2.41.2
-  - mount=~2.41.2
-  - umount=~2.41.2
-  - btrfs-progs=~6.17
-  - udev=~258.1
-  - util-linux-misc=~2.41.2 # contains fsck
-  - xfsprogs=~6.17.0
-  - xfsprogs-core=~6.17.0
-  - xfsprogs-extra=~6.17.0 # contains xfs_io
-  - findmnt=~2.41.2
+  - lsblk=~2.41.3
+  - mount=~2.41.3
+  - umount=~2.41.3
+  - btrfs-progs=~6.19
+  - udev=~258.3
+  - util-linux-misc=~2.41.3 # contains fsck
+  - xfsprogs=~6.18.0
+  - xfsprogs-core=~6.18.0
+  - xfsprogs-extra=~6.18.0 # contains xfs_io
+  - findmnt=~2.41.3
 
 accounts:
   run-as: root
