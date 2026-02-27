@@ -27,10 +27,10 @@ require (
 	k8s.io/api v0.34.5
 	k8s.io/apimachinery v0.34.5
 	k8s.io/client-go v0.34.5
-	k8s.io/cloud-provider v0.34.4
+	k8s.io/cloud-provider v0.34.5
 	k8s.io/component-base v0.34.5
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/mount-utils v0.34.4
+	k8s.io/mount-utils v0.34.5
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 )
 
