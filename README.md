@@ -26,6 +26,6 @@ Does not include:
   - [CSI Driver](docs/csi-driver.md)
 - Administration
   - [Deployment](docs/deployment.md)
-- Development
+- [Development](docs/development.md)
   - [Testing](docs/testing.md)
   - [Release Procedure](docs/release-procedure.md)
