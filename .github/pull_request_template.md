@@ -10,6 +10,9 @@ Tide will not merge your PR, if it is missing a `kind/*` label.
 
 **What this PR does / why we need it**:
 
+**Which issue(s) this PR fixes**:
+Fixes #
+
 **Special notes for your reviewer**:
 
 **Breaking changes**:
