@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -79,11 +79,11 @@ func fixtureIngressWithParams(name, namespace string, annotations map[string]str
 	}
 }
 
-func fixtureServiceWithParams(port, nodePort int32) *v1.Service {
-	return &v1.Service{
+func fixtureServiceWithParams(port, nodePort int32) *corev1.Service { //nolint:unparam // We might need it later.
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: testServiceName},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
 				{
 					Port:     port,
 					NodePort: nodePort,
@@ -93,11 +93,11 @@ func fixtureServiceWithParams(port, nodePort int32) *v1.Service {
 	}
 }
 
-func fixtureNode(mods ...func(*v1.Node)) *v1.Node {
-	node := &v1.Node{
+func fixtureNode(mods ...func(*corev1.Node)) *corev1.Node {
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testNodeName},
-		Status: v1.NodeStatus{
-			Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: testNodeIP}},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: testNodeIP}},
 		},
 	}
 	for _, mod := range mods {
@@ -187,15 +187,16 @@ func fixtureAlbPayload(mods ...func(*albsdk.CreateLoadBalancerPayload)) *albsdk.
 	return payload
 }
 
+//nolint:funlen // Just many test cases.
 func Test_albSpecFromIngress(t *testing.T) {
 	r := &IngressClassReconciler{}
-	nodes := []v1.Node{*fixtureNode()}
+	nodes := []corev1.Node{*fixtureNode()}
 
 	tests := []struct {
 		name         string
 		ingresses    []*networkingv1.Ingress
 		ingressClass *networkingv1.IngressClass
-		services     map[string]v1.Service
+		services     map[string]corev1.Service
 		want         *albsdk.CreateLoadBalancerPayload
 		wantErr      bool
 	}{
@@ -203,7 +204,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 			name:         "valid ingress with HTTP listener",
 			ingresses:    []*networkingv1.Ingress{fixtureIngress()},
 			ingressClass: fixtureIngressClass(),
-			services:     map[string]v1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
+			services:     map[string]corev1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
 			want:         fixtureAlbPayload(),
 		},
 		{
@@ -214,7 +215,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ing.Annotations = map[string]string{externalIPAnnotation: "2.2.2.2"}
 				},
 			),
-			services: map[string]v1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
+			services: map[string]corev1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
 			want: fixtureAlbPayload(func(payload *albsdk.CreateLoadBalancerPayload) {
 				payload.ExternalAddress = ptr.To("2.2.2.2")
 				payload.Options = &albsdk.LoadBalancerOptions{EphemeralAddress: nil}
@@ -228,7 +229,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ing.Annotations = map[string]string{internalIPAnnotation: "true"}
 				},
 			),
-			services: map[string]v1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
+			services: map[string]corev1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
 			want: fixtureAlbPayload(func(payload *albsdk.CreateLoadBalancerPayload) {
 				payload.Options = &albsdk.LoadBalancerOptions{PrivateNetworkOnly: ptr.To(true)}
 			}),
@@ -242,7 +243,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ingressRule("a-host.com", ingressPrefixPath("/a", "svc2")),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc1": *fixtureServiceWithParams(testServicePort, 30001),
 				"svc2": *fixtureServiceWithParams(testServicePort, 30002),
 			},
@@ -278,7 +279,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ingressRule("host.com", ingressPrefixPath("/x", "svc2")),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc1": *fixtureServiceWithParams(testServicePort, 30003),
 				"svc2": *fixtureServiceWithParams(testServicePort, 30004),
 			},
@@ -305,7 +306,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc1": *fixtureServiceWithParams(testServicePort, 30005),
 				"svc2": *fixtureServiceWithParams(testServicePort, 30006),
 			},
@@ -332,7 +333,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc-exact":  *fixtureServiceWithParams(testServicePort, 30100),
 				"svc-prefix": *fixtureServiceWithParams(testServicePort, 30101),
 			},
@@ -359,7 +360,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ingressRule("host.com", ingressPrefixPath("/x", "svc2")),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc1": *fixtureServiceWithParams(testServicePort, 30007),
 				"svc2": *fixtureServiceWithParams(testServicePort, 30008),
 			},
@@ -386,7 +387,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 					ingressRule("host.com", ingressPrefixPath("/x", "svc2")),
 				),
 			},
-			services: map[string]v1.Service{
+			services: map[string]corev1.Service{
 				"svc1": *fixtureServiceWithParams(testServicePort, 30009),
 				"svc2": *fixtureServiceWithParams(testServicePort, 30010),
 			},

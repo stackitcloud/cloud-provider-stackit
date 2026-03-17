@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
@@ -135,7 +135,7 @@ var _ = Describe("IngressClassReconciler", func() {
 		AfterEach(func() {
 			var ic networkingv1.IngressClass
 			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ingressClass), &ic)
-			if k8serrors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				// nothing to clean up, it’s already deleted
 				return
 			}
@@ -148,12 +148,12 @@ var _ = Describe("IngressClassReconciler", func() {
 
 			// delete the patched object (ic), not the old ingressClass pointer
 			err = k8sClient.Delete(ctx, &ic)
-			if err != nil && !k8serrors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
 			Eventually(func() bool {
-				return k8serrors.IsNotFound(
+				return apierrors.IsNotFound(
 					k8sClient.Get(ctx, client.ObjectKeyFromObject(ingressClass), &networkingv1.IngressClass{}),
 				)
 			}).Should(BeTrue(), "IngressClass should be fully deleted")
@@ -183,7 +183,7 @@ var _ = Describe("IngressClassReconciler", func() {
 					Eventually(func(g Gomega) {
 						var ic networkingv1.IngressClass
 						err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ingressClass), &ic)
-						if k8serrors.IsNotFound(err) {
+						if apierrors.IsNotFound(err) {
 							// IngressClass is gone — controller must have removed the finalizer
 							return
 						}
