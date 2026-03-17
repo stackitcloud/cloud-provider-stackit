@@ -250,7 +250,7 @@ func main() {
 	}
 	// Create an ALB client
 	fmt.Printf("Create ALB client\n")
-	albClient, err := albclient.NewClient(sdkClient)
+	albClient, err := albclient.NewApplicationLoadBalancerClient(sdkClient)
 	if err != nil {
 		setupLog.Error(err, "unable to create ALB client", "controller", "IngressClass")
 		os.Exit(1)
