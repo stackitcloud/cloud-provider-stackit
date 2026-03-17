@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -64,13 +64,13 @@ type ruleMetadata struct {
 // It merges and sorts all routing rules across the ingresses based on host, priority, path specificity, path type, and ingress origin.
 // The resulting ALB payload includes targets derived from cluster nodes, target pools per backend service, HTTP(S) listeners,
 // and optional TLS certificate bindings. This spec is later used to create or update the actual ALB instance.
-func (r *IngressClassReconciler) albSpecFromIngress(
+func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // We go through a lot of fields. Not much complexity.
 	ctx context.Context,
 	ingresses []*networkingv1.Ingress,
 	ingressClass *networkingv1.IngressClass,
 	networkID *string,
-	nodes []v1.Node,
-	services map[string]v1.Service,
+	nodes []corev1.Node,
+	services map[string]corev1.Service,
 ) (*albsdk.CreateLoadBalancerPayload, error) {
 	targetPools := []albsdk.TargetPool{}
 	targetPoolSeen := map[string]bool{}
@@ -89,10 +89,11 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 
 	// Create targets for each node in the cluster
 	targets := []albsdk.Target{}
-	for _, node := range nodes {
+	for i := range nodes {
+		node := nodes[i]
 		for j := range node.Status.Addresses {
 			address := node.Status.Addresses[j]
-			if address.Type == v1.NodeInternalIP {
+			if address.Type == corev1.NodeInternalIP {
 				targets = append(targets, albsdk.Target{
 					DisplayName: &node.Name,
 					Ip:          &address.Address,
@@ -142,6 +143,7 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 		certificateIDs, err := r.loadCerts(ctx, ingressClass, ingress)
 		if err != nil {
 			log.Printf("failed to load tls certificates: %v", err)
+			//nolint:gocritic // TODO: Rework error handling.
 			// return nil, fmt.Errorf("failed to load tls certificates: %w", err)
 		}
 		allCertificateIDs = append(allCertificateIDs, certificateIDs...)
@@ -241,7 +243,7 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 	}
 
 	// Set the IP address of the ALB
-	err := setIpAddresses(ingressClass, alb)
+	err := setIPAddresses(ingressClass, alb)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set IP address: %w", err)
 	}
@@ -262,11 +264,11 @@ func (r *IngressClassReconciler) loadCerts(
 	certificateIDs := []string{}
 
 	for _, tls := range ingress.Spec.TLS {
-		if len(tls.SecretName) == 0 {
+		if tls.SecretName != "" {
 			continue
 		}
 
-		secret := &v1.Secret{}
+		secret := &corev1.Secret{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, secret); err != nil {
 			return nil, fmt.Errorf("failed to get TLS secret: %w", err)
 		}
@@ -274,7 +276,7 @@ func (r *IngressClassReconciler) loadCerts(
 		// The tls.crt should contain both the leaf certificate and the intermediate CA certificates.
 		// If it contains only the leaf certificate, the ACME challenge likely hasn't finished.
 		// Therefore the incomplete certificate shouldn't be loaded as the updates upon them are impossible.
-		complete, err := isCertValid(*secret)
+		complete, err := isCertValid(secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate certificate: %w", err)
 		}
@@ -306,17 +308,18 @@ func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass 
 	usedSecrets := map[string]bool{}
 	for _, ingress := range ingresses {
 		for _, tls := range ingress.Spec.TLS {
-			if tls.SecretName != "" {
-				// Retrieve the TLS Secret
-				tlsSecret := &v1.Secret{}
-				err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, tlsSecret)
-				if err != nil {
-					log.Printf("failed to get TLS secret %s: %v", tls.SecretName, err)
-					continue
-				}
-				certName := getCertName(ingressClass, ingress, tlsSecret)
-				usedSecrets[certName] = true
+			if tls.SecretName == "" {
+				continue
 			}
+			// Retrieve the TLS Secret
+			tlsSecret := &corev1.Secret{}
+			err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, tlsSecret)
+			if err != nil {
+				log.Printf("failed to get TLS secret %s: %v", tls.SecretName, err)
+				continue
+			}
+			certName := getCertName(ingressClass, ingress, tlsSecret)
+			usedSecrets[certName] = true
 		}
 	}
 
@@ -350,7 +353,7 @@ func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass 
 
 // isCertValid checks if the certificate chain is complete. It is used for checking if
 // the cert-manager's ACME challenge is completed, or if it's sill ongoing.
-func isCertValid(secret v1.Secret) (bool, error) {
+func isCertValid(secret *corev1.Secret) (bool, error) {
 	tlsCert := secret.Data["tls.crt"]
 	if tlsCert == nil {
 		return false, fmt.Errorf("tls.crt not found in secret")
@@ -406,13 +409,13 @@ func addTargetPool(
 	}
 	*targetPools = append(*targetPools, albsdk.TargetPool{
 		Name:       ptr.To(targetPoolName),
-		TargetPort: ptr.To(int32(nodePort)),
+		TargetPort: ptr.To(nodePort),
 		TlsConfig:  tlsConfig,
 		Targets:    targets,
 	})
 }
 
-func setIpAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateLoadBalancerPayload) error {
+func setIPAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateLoadBalancerPayload) error {
 	isInternalIP, found := ingressClass.Annotations[internalIPAnnotation]
 	if found && isInternalIP == "true" {
 		alb.Options = &albsdk.LoadBalancerOptions{
@@ -447,7 +450,7 @@ func validateIPAddress(ipAddr string) error {
 }
 
 // getNodePort gets the NodePort of the Service
-func getNodePort(services map[string]v1.Service, path networkingv1.HTTPIngressPath) (int32, error) {
+func getNodePort(services map[string]corev1.Service, path networkingv1.HTTPIngressPath) (int32, error) {
 	service, found := services[path.Backend.Service.Name]
 	if !found {
 		return 0, fmt.Errorf("service not found: %s", path.Backend.Service.Name)
