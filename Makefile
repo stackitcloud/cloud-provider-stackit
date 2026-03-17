@@ -141,6 +141,9 @@ mocks: $(MOCKGEN)
 	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
 	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
 	@$(MOCKGEN) -destination ./pkg/csi/util/mount/mount_mock.go -package mount ./pkg/csi/util/mount IMount
+	@$(MOCKGEN) -destination ./pkg/stackit/applicationloadbalancercertificates_mock.go -package stackit ./pkg/stackit CertificatesClient
+	@$(MOCKGEN) -destination ./pkg/stackit/applicationloadbalancer_mock.go -package stackit ./pkg/stackit ApplicationLoadBalancerClient
+
 
 .PHONY: generate
 generate: mocks
