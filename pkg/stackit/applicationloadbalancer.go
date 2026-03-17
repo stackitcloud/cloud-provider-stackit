@@ -21,7 +21,7 @@ const (
 	ProjectStatusDisabled ProjectStatus = "STATUS_DISABLED"
 )
 
-type Client interface {
+type ApplicationLoadBalancerClient interface {
 	GetLoadBalancer(ctx context.Context, projectID, region, name string) (*albsdk.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, projectID, region, name string) error
 	CreateLoadBalancer(ctx context.Context, projectID, region string, albsdk *albsdk.CreateLoadBalancerPayload) (*albsdk.LoadBalancer, error)
@@ -34,17 +34,17 @@ type Client interface {
 	DeleteCredentials(ctx context.Context, projectID, region, credentialRef string) error
 }
 
-type client struct {
+type applicationLoadBalancerClient struct {
 	client *albsdk.APIClient
 }
 
-var _ Client = (*client)(nil)
+var _ ApplicationLoadBalancerClient = (*applicationLoadBalancerClient)(nil)
 
-func NewClient(cl *albsdk.APIClient) (Client, error) {
-	return &client{client: cl}, nil
+func NewApplicationLoadBalancerClient(cl *albsdk.APIClient) (ApplicationLoadBalancerClient, error) {
+	return &applicationLoadBalancerClient{client: cl}, nil
 }
 
-func (cl client) GetLoadBalancer(ctx context.Context, projectID, region, name string) (*albsdk.LoadBalancer, error) {
+func (cl applicationLoadBalancerClient) GetLoadBalancer(ctx context.Context, projectID, region, name string) (*albsdk.LoadBalancer, error) {
 	lb, err := cl.client.DefaultAPI.GetLoadBalancer(ctx, projectID, region, name).Execute()
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
@@ -53,13 +53,13 @@ func (cl client) GetLoadBalancer(ctx context.Context, projectID, region, name st
 }
 
 // DeleteLoadBalancer returns no error if the load balancer doesn't exist.
-func (cl client) DeleteLoadBalancer(ctx context.Context, projectID, region, name string) error {
+func (cl applicationLoadBalancerClient) DeleteLoadBalancer(ctx context.Context, projectID, region, name string) error {
 	_, err := cl.client.DefaultAPI.DeleteLoadBalancer(ctx, projectID, region, name).Execute()
 	return err
 }
 
 // CreateLoadBalancer returns ErrorNotFound if the project is not enabled.
-func (cl client) CreateLoadBalancer(ctx context.Context, projectID, region string, create *albsdk.CreateLoadBalancerPayload) (*albsdk.LoadBalancer, error) {
+func (cl applicationLoadBalancerClient) CreateLoadBalancer(ctx context.Context, projectID, region string, create *albsdk.CreateLoadBalancerPayload) (*albsdk.LoadBalancer, error) {
 	lb, err := cl.client.DefaultAPI.CreateLoadBalancer(ctx, projectID, region).CreateLoadBalancerPayload(*create).XRequestID(uuid.NewString()).Execute()
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
@@ -67,18 +67,18 @@ func (cl client) CreateLoadBalancer(ctx context.Context, projectID, region strin
 	return lb, err
 }
 
-func (cl client) UpdateLoadBalancer(ctx context.Context, projectID, region, name string, update *albsdk.UpdateLoadBalancerPayload) (
+func (cl applicationLoadBalancerClient) UpdateLoadBalancer(ctx context.Context, projectID, region, name string, update *albsdk.UpdateLoadBalancerPayload) (
 	*albsdk.LoadBalancer, error,
 ) {
 	return cl.client.DefaultAPI.UpdateLoadBalancer(ctx, projectID, region, name).UpdateLoadBalancerPayload(*update).Execute()
 }
 
-func (cl client) UpdateTargetPool(ctx context.Context, projectID, region, name, targetPoolName string, payload albsdk.UpdateTargetPoolPayload) error {
+func (cl applicationLoadBalancerClient) UpdateTargetPool(ctx context.Context, projectID, region, name, targetPoolName string, payload albsdk.UpdateTargetPoolPayload) error {
 	_, err := cl.client.DefaultAPI.UpdateTargetPool(ctx, projectID, region, name, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
 	return err
 }
 
-func (cl client) CreateCredentials(
+func (cl applicationLoadBalancerClient) CreateCredentials(
 	ctx context.Context,
 	projectID string,
 	region string,
@@ -87,15 +87,15 @@ func (cl client) CreateCredentials(
 	return cl.client.DefaultAPI.CreateCredentials(ctx, projectID, region).CreateCredentialsPayload(payload).XRequestID(uuid.NewString()).Execute()
 }
 
-func (cl client) ListCredentials(ctx context.Context, projectID, region string) (*albsdk.ListCredentialsResponse, error) {
+func (cl applicationLoadBalancerClient) ListCredentials(ctx context.Context, projectID, region string) (*albsdk.ListCredentialsResponse, error) {
 	return cl.client.DefaultAPI.ListCredentials(ctx, projectID, region).Execute()
 }
 
-func (cl client) GetCredentials(ctx context.Context, projectID, region, credentialsRef string) (*albsdk.GetCredentialsResponse, error) {
+func (cl applicationLoadBalancerClient) GetCredentials(ctx context.Context, projectID, region, credentialsRef string) (*albsdk.GetCredentialsResponse, error) {
 	return cl.client.DefaultAPI.GetCredentials(ctx, projectID, region, credentialsRef).Execute()
 }
 
-func (cl client) UpdateCredentials(ctx context.Context, projectID, region, credentialsRef string, payload albsdk.UpdateCredentialsPayload) error {
+func (cl applicationLoadBalancerClient) UpdateCredentials(ctx context.Context, projectID, region, credentialsRef string, payload albsdk.UpdateCredentialsPayload) error {
 	_, err := cl.client.DefaultAPI.UpdateCredentials(ctx, projectID, region, credentialsRef).UpdateCredentialsPayload(payload).Execute()
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ func (cl client) UpdateCredentials(ctx context.Context, projectID, region, crede
 	return nil
 }
 
-func (cl client) DeleteCredentials(ctx context.Context, projectID, region, credentialsRef string) error {
+func (cl applicationLoadBalancerClient) DeleteCredentials(ctx context.Context, projectID, region, credentialsRef string) error {
 	_, err := cl.client.DefaultAPI.DeleteCredentials(ctx, projectID, region, credentialsRef).Execute()
 	if err != nil {
 		return err
