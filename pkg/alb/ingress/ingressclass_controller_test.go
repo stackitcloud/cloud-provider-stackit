@@ -28,6 +28,7 @@ const (
 	testPrivateIP = "10.0.0.1"
 )
 
+//nolint:funlen // Just many test cases.
 func TestIngressClassReconciler_updateStatus(t *testing.T) {
 	testIngressClass := &networkingv1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{

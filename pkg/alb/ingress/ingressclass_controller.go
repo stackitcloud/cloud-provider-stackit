@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,8 +46,8 @@ const (
 )
 
 // IngressClassReconciler reconciles a IngressClass object
-type IngressClassReconciler struct {
-	client.Client
+type IngressClassReconciler struct { //nolint:revive // Naming this ClassReconciler would be confusing.
+	Client            client.Client
 	ALBClient         stackit.ApplicationLoadBalancerClient
 	CertificateClient stackit.CertificatesClient
 	Scheme            *runtime.Scheme
@@ -70,7 +70,6 @@ type IngressClassReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.4/pkg/reconcile
 func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// _ = log.FromContext(ctx)
 	ingressClass := &networkingv1.IngressClass{}
 	err := r.Client.Get(ctx, req.NamespacedName, ingressClass)
 	if err != nil {
@@ -125,7 +124,7 @@ func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&networkingv1.IngressClass{}).
-		Watches(&v1.Node{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []ctrl.Request {
+		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []ctrl.Request {
 			// TODO: Add predicates - watch only for specific changes on nodes
 			ingressClassList := &networkingv1.IngressClassList{}
 			err := r.Client.List(ctx, ingressClassList)
@@ -133,14 +132,15 @@ func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				panic(err)
 			}
 			requestList := []ctrl.Request{}
-			for _, ingressClass := range ingressClassList.Items {
+			for i := range ingressClassList.Items {
+				ingressClass := ingressClassList.Items[i]
 				requestList = append(requestList, ctrl.Request{
 					NamespacedName: client.ObjectKeyFromObject(&ingressClass),
 				})
 			}
 			return requestList
 		})).
-		Watches(&networkingv1.Ingress{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []ctrl.Request {
+		Watches(&networkingv1.Ingress{}, handler.EnqueueRequestsFromMapFunc(func(_ context.Context, o client.Object) []ctrl.Request {
 			ingress, ok := o.(*networkingv1.Ingress)
 			if !ok || ingress.Spec.IngressClassName == nil {
 				return nil
@@ -167,18 +167,19 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 	ingressClass *networkingv1.IngressClass,
 ) (ctrl.Result, error) {
 	// Get all nodes and services
-	nodes := &v1.NodeList{}
+	nodes := &corev1.NodeList{}
 	err := r.Client.List(ctx, nodes)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get nodes: %w", err)
 	}
-	serviceList := &v1.ServiceList{}
+	serviceList := &corev1.ServiceList{}
 	err = r.Client.List(ctx, serviceList)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get services: %w", err)
 	}
-	services := map[string]v1.Service{}
-	for _, service := range serviceList.Items {
+	services := map[string]corev1.Service{}
+	for i := range serviceList.Items {
+		service := serviceList.Items[i]
 		services[service.Name] = service
 	}
 
@@ -323,7 +324,7 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 }
 
 // detectChange checks if there is any difference between the current and desired ALB configuration.
-func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool {
+func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool { //nolint:gocyclo // We check a lot of fields. Not much complexity.
 	if len(alb.Listeners) != len(albPayload.Listeners) {
 		return true
 	}
@@ -436,7 +437,8 @@ func (r *IngressClassReconciler) getAlbIngressList(
 	}
 
 	ingresses := []*networkingv1.Ingress{}
-	for _, ingress := range ingressList.Items {
+	for i := range ingressList.Items {
+		ingress := ingressList.Items[i]
 		if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName == ingressClass.Name {
 			ingresses = append(ingresses, &ingress)
 		}
@@ -452,7 +454,7 @@ func getAlbName(ingressClass *networkingv1.IngressClass) string {
 
 // getCertName generates a unique name for the Certificate using the IngressClass UID, Ingress UID,
 // and TLS Secret UID, ensuring it fits within the Kubernetes 63-character limit.
-func getCertName(ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, tlsSecret *v1.Secret) string {
+func getCertName(ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, tlsSecret *corev1.Secret) string {
 	ingressClassShortUID := generateShortUID(ingressClass.UID)
 	ingressShortUID := generateShortUID(ingress.UID)
 	tlsSecretShortUID := generateShortUID(tlsSecret.UID)
