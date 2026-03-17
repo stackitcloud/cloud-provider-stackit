@@ -2,10 +2,7 @@ package stackit
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
-	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 )
 
@@ -22,12 +19,12 @@ type certClient struct {
 
 var _ CertificatesClient = (*certClient)(nil)
 
-func NewCertClient(cl *certsdk.APIClient) (Client, error) {
+func NewCertClient(cl *certsdk.APIClient) (CertificatesClient, error) {
 	return &certClient{client: cl}, nil
 }
 
 func (cl certClient) GetCertificate(ctx context.Context, projectID, region, name string) (*certsdk.GetCertificateResponse, error) {
-	cert, err := cl.client.GetCertificateExecute(ctx, projectID, region, name)
+	cert, err := cl.client.DefaultAPI.GetCertificate(ctx, projectID, region, name).Execute()
 	if isOpenAPINotFound(err) {
 		return cert, ErrorNotFound
 	}
@@ -35,12 +32,12 @@ func (cl certClient) GetCertificate(ctx context.Context, projectID, region, name
 }
 
 func (cl certClient) DeleteCertificate(ctx context.Context, projectID, region, name string) error {
-	_, err := cl.client.DeleteCertificateExecute(ctx, projectID, region, name)
+	_, err := cl.client.DefaultAPI.DeleteCertificate(ctx, projectID, region, name).Execute()
 	return err
 }
 
 func (cl certClient) CreateCertificate(ctx context.Context, projectID, region string, certificate *certsdk.CreateCertificatePayload) (*certsdk.GetCertificateResponse, error) {
-	cert, err := cl.client.CreateCertificate(ctx, projectID, region).CreateCertificatePayload(*certificate).Execute()
+	cert, err := cl.client.DefaultAPI.CreateCertificate(ctx, projectID, region).CreateCertificatePayload(*certificate).Execute()
 	if isOpenAPINotFound(err) {
 		return cert, ErrorNotFound
 	}
@@ -48,18 +45,6 @@ func (cl certClient) CreateCertificate(ctx context.Context, projectID, region st
 }
 
 func (cl certClient) ListCertificate(ctx context.Context, projectID, region string) (*certsdk.ListCertificatesResponse, error) {
-	certs, err := cl.client.ListCertificates(ctx, projectID, region).Execute()
+	certs, err := cl.client.DefaultAPI.ListCertificates(ctx, projectID, region).Execute()
 	return certs, err
-}
-
-func isOpenAPINotFound(err error) bool {
-	apiErr := &oapiError.GenericOpenAPIError{}
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	return apiErr.StatusCode == http.StatusNotFound
-}
-
-func IsNotFound(err error) bool {
-	return errors.Is(err, ErrorNotFound)
 }
