@@ -79,10 +79,10 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 
 	alb := &albsdk.CreateLoadBalancerPayload{
 		Options: &albsdk.LoadBalancerOptions{},
-		Networks: &[]albsdk.Network{
+		Networks: []albsdk.Network{
 			{
 				NetworkId: networkID,
-				Role:      albsdk.NETWORKROLE_LISTENERS_AND_TARGETS.Ptr(),
+				Role:      ptr.To("ROLE_LISTENERS_AND_TARGETS"),
 			},
 		},
 	}
@@ -207,7 +207,7 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 		rulesCopy := hostToRules[host]
 		httpHosts = append(httpHosts, albsdk.HostConfig{
 			Host:  ptr.To(host),
-			Rules: &rulesCopy,
+			Rules: rulesCopy,
 		})
 	}
 
@@ -217,24 +217,24 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 	listeners := []albsdk.Listener{
 		{
 			Name:     ptr.To("http"),
-			Port:     ptr.To(int64(80)),
-			Protocol: albsdk.LISTENERPROTOCOL_HTTP.Ptr(),
+			Port:     ptr.To(int32(80)),
+			Protocol: ptr.To("PROTOCOL_HTTP"),
 			Http: &albsdk.ProtocolOptionsHTTP{
-				Hosts: &httpHosts,
+				Hosts: httpHosts,
 			},
 		},
 	}
 	if len(allCertificateIDs) > 0 {
 		listeners = append(listeners, albsdk.Listener{
 			Name:     ptr.To("https"),
-			Port:     ptr.To(int64(443)),
-			Protocol: albsdk.LISTENERPROTOCOL_HTTPS.Ptr(),
+			Port:     ptr.To(int32(443)),
+			Protocol: ptr.To("PROTOCOL_HTTPS"),
 			Http: &albsdk.ProtocolOptionsHTTP{
-				Hosts: &httpHosts,
+				Hosts: httpHosts,
 			},
 			Https: &albsdk.ProtocolOptionsHTTPS{
 				CertificateConfig: &albsdk.CertificateConfig{
-					CertificateIds: &allCertificateIDs,
+					CertificateIds: allCertificateIDs,
 				},
 			},
 		})
@@ -247,8 +247,8 @@ func (r *IngressClassReconciler) albSpecFromIngress(
 	}
 
 	alb.Name = ptr.To(getAlbName(ingressClass))
-	alb.Listeners = &listeners
-	alb.TargetPools = &targetPools
+	alb.Listeners = listeners
+	alb.TargetPools = targetPools
 
 	return alb, nil
 }
@@ -328,7 +328,7 @@ func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass 
 	if certificatesList == nil || certificatesList.Items == nil {
 		return nil // No certificates to clean up
 	}
-	for _, cert := range *certificatesList.Items {
+	for _, cert := range certificatesList.Items {
 		certID := *cert.Id
 		certName := *cert.Name
 
@@ -406,9 +406,9 @@ func addTargetPool(
 	}
 	*targetPools = append(*targetPools, albsdk.TargetPool{
 		Name:       ptr.To(targetPoolName),
-		TargetPort: ptr.To(int64(nodePort)),
+		TargetPort: ptr.To(int32(nodePort)),
 		TlsConfig:  tlsConfig,
-		Targets:    &targets,
+		Targets:    targets,
 	})
 }
 

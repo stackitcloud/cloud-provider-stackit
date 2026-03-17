@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 )
 
@@ -48,8 +48,8 @@ const (
 // IngressClassReconciler reconciles a IngressClass object
 type IngressClassReconciler struct {
 	client.Client
-	ALBClient         albclient.Client
-	CertificateClient certificateclient.Client
+	ALBClient         stackit.ApplicationLoadBalancerClient
+	CertificateClient stackit.CertificatesClient
 	Scheme            *runtime.Scheme
 	ProjectID         string
 	NetworkID         string
@@ -190,7 +190,7 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 
 	// Create ALB if it doesn't exist
 	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
-	if errors.Is(err, albclient.ErrorNotFound) {
+	if errors.Is(err, stackit.ErrorNotFound) {
 		_, err := r.ALBClient.CreateLoadBalancer(ctx, r.ProjectID, r.Region, albPayload)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create load balancer: %w", err)
@@ -232,7 +232,7 @@ func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*
 		return ctrl.Result{}, fmt.Errorf("failed to get load balancer: %w", err)
 	}
 
-	if *alb.Status != albclient.LBStatusReady {
+	if *alb.Status != stackit.LBStatusReady {
 		// ALB is not yet ready, requeue
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -324,13 +324,13 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 
 // detectChange checks if there is any difference between the current and desired ALB configuration.
 func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool {
-	if len(*alb.Listeners) != len(*albPayload.Listeners) {
+	if len(alb.Listeners) != len(albPayload.Listeners) {
 		return true
 	}
 
-	for i := range *alb.Listeners {
-		albListener := (*alb.Listeners)[i]
-		payloadListener := (*albPayload.Listeners)[i]
+	for i := range alb.Listeners {
+		albListener := (alb.Listeners)[i]
+		payloadListener := (albPayload.Listeners)[i]
 
 		if ptr.Deref(albListener.Protocol, "") != ptr.Deref(payloadListener.Protocol, "") ||
 			ptr.Deref(albListener.Port, 0) != ptr.Deref(payloadListener.Port, 0) {
@@ -342,25 +342,25 @@ func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 			albHosts := albListener.Http.Hosts
 			payloadHosts := payloadListener.Http.Hosts
 
-			if len(ptr.Deref(albHosts, nil)) != len(ptr.Deref(payloadHosts, nil)) {
+			if len(albHosts) != len(payloadHosts) {
 				return true
 			}
 
-			for j := range *albHosts {
-				albHost := (*albHosts)[j]
-				payloadHost := (*payloadHosts)[j]
+			for j := range albHosts {
+				albHost := albHosts[j]
+				payloadHost := payloadHosts[j]
 
 				if ptr.Deref(albHost.Host, "") != ptr.Deref(payloadHost.Host, "") {
 					return true
 				}
 
-				if len(ptr.Deref(albHost.Rules, nil)) != len(ptr.Deref(payloadHost.Rules, nil)) {
+				if len(albHost.Rules) != len(payloadHost.Rules) {
 					return true
 				}
 
-				for k := range *albHost.Rules {
-					albRule := (*albHost.Rules)[k]
-					payloadRule := (*payloadHost.Rules)[k]
+				for k := range albHost.Rules {
+					albRule := albHost.Rules[k]
+					payloadRule := payloadHost.Rules[k]
 
 					if albRule.Path != nil || payloadRule.Path != nil {
 						if albRule.Path == nil || payloadRule.Path == nil {
@@ -384,7 +384,7 @@ func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 		if albListener.Https != nil && payloadListener.Https != nil {
 			a := albListener.Https.CertificateConfig
 			b := payloadListener.Https.CertificateConfig
-			if len(ptr.Deref(a.CertificateIds, nil)) != len(ptr.Deref(b.CertificateIds, nil)) {
+			if len(a.CertificateIds) != len(b.CertificateIds) {
 				return true
 			}
 		} else if albListener.Https != nil || payloadListener.Https != nil {
@@ -394,19 +394,19 @@ func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 	}
 
 	// TargetPools comparison
-	if len(*alb.TargetPools) != len(*albPayload.TargetPools) {
+	if len(alb.TargetPools) != len(albPayload.TargetPools) {
 		return true
 	}
-	for i := range *alb.TargetPools {
-		a := (*alb.TargetPools)[i]
-		b := (*albPayload.TargetPools)[i]
+	for i := range alb.TargetPools {
+		a := alb.TargetPools[i]
+		b := albPayload.TargetPools[i]
 
 		if ptr.Deref(a.Name, "") != ptr.Deref(b.Name, "") ||
 			ptr.Deref(a.TargetPort, 0) != ptr.Deref(b.TargetPort, 0) {
 			return true
 		}
 
-		if len(ptr.Deref(a.Targets, nil)) != len(ptr.Deref(b.Targets, nil)) {
+		if len(a.Targets) != len(b.Targets) {
 			return true
 		}
 
