@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 )
 
@@ -39,7 +39,7 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 		name          string
 		ingresses     []*networkingv1.Ingress
 		mockK8sClient func(client.Client) error
-		mockALBClient func(*mock_albclient.MockClient)
+		mockALBClient func(*stackit.MockApplicationLoadBalancerClient)
 		wantResult    reconcile.Result
 		wantErr       bool
 	}{
@@ -50,11 +50,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName},
 				})
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status: albsdk.LOADBALANCERSTATUS_TERMINATING.Ptr(),
+						Status: ptr.To("STATUS_TERMINATING"),
 					}, nil)
 			},
 			wantResult: reconcile.Result{RequeueAfter: 10 * time.Second},
@@ -72,11 +72,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName},
 				})
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:          albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status:          ptr.To("STATUS_READY"),
 						ExternalAddress: ptr.To(testPublicIP),
 					}, nil)
 			},
@@ -95,11 +95,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName},
 				})
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status:         ptr.To("STATUS_READY"),
 						PrivateAddress: ptr.To(testPrivateIP),
 					}, nil)
 			},
@@ -130,11 +130,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 					},
 				})
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status:         ptr.To("STATUS_READY"),
 						PrivateAddress: ptr.To(testPublicIP),
 					}, nil)
 			},
@@ -146,8 +146,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 			ingresses: []*networkingv1.Ingress{
 				{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName}},
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
-				m.EXPECT().GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).Return(nil, albclient.ErrorNotFound)
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
+				m.EXPECT().GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).Return(nil, stackit.ErrorNotFound)
 			},
 			wantResult: reconcile.Result{},
 			wantErr:    true,
@@ -157,11 +157,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 			ingresses: []*networkingv1.Ingress{
 				{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName}},
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status:         ptr.To("STATUS_READY"),
 						PrivateAddress: ptr.To(testPublicIP),
 					}, nil)
 			},
@@ -175,11 +175,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 			ingresses: []*networkingv1.Ingress{
 				{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName}},
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status:         ptr.To("STATUS_READY"),
 						PrivateAddress: ptr.To(testPublicIP),
 					}, nil)
 			},
@@ -191,11 +191,11 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 			ingresses: []*networkingv1.Ingress{
 				{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: testIngressName}},
 			},
-			mockALBClient: func(m *mock_albclient.MockClient) {
+			mockALBClient: func(m *stackit.MockApplicationLoadBalancerClient) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status: albsdk.LOADBALANCERSTATUS_READY.Ptr(),
+						Status: ptr.To("STATUS_READY"),
 					}, nil)
 			},
 			wantResult: reconcile.Result{RequeueAfter: 10 * time.Second},
@@ -207,7 +207,7 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
-			mockAlbClient := mock_albclient.NewMockClient(ctrl)
+			mockAlbClient := stackit.NewMockApplicationLoadBalancerClient(ctrl)
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 			r := &IngressClassReconciler{
 				Client:    fakeClient,

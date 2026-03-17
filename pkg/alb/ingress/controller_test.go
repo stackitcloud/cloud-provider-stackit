@@ -18,7 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/alb/ingress"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 
 	"go.uber.org/mock/gomock"
 )
@@ -34,8 +35,8 @@ var _ = Describe("IngressClassReconciler", func() {
 		k8sClient  client.Client
 		namespace  *corev1.Namespace
 		mockCtrl   *gomock.Controller
-		albClient  *albclient.MockClient
-		certClient *certificateclient.MockClient
+		albClient  *stackit.MockApplicationLoadBalancerClient
+		certClient *stackit.MockCertificatesClient
 		ctx        context.Context
 		cancel     context.CancelFunc
 	)
@@ -45,8 +46,8 @@ var _ = Describe("IngressClassReconciler", func() {
 		DeferCleanup(cancel)
 
 		mockCtrl = gomock.NewController(GinkgoT())
-		albClient = albclient.NewMockClient(mockCtrl)
-		certClient = certificateclient.NewMockClient(mockCtrl)
+		albClient = stackit.NewMockApplicationLoadBalancerClient(mockCtrl)
+		certClient = stackit.NewMockCertificatesClient(mockCtrl)
 
 		var err error
 		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -73,7 +74,7 @@ var _ = Describe("IngressClassReconciler", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler := &controller.IngressClassReconciler{
+		reconciler := &ingress.IngressClassReconciler{
 			Client:            mgr.GetClient(),
 			Scheme:            scheme.Scheme,
 			ALBClient:         albClient,
