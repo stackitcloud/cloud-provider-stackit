@@ -2,7 +2,7 @@
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
+BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager application-load-balancer-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*' 2>/dev/null || git rev-parse --short HEAD)
 REGISTRY ?= ghcr.io
