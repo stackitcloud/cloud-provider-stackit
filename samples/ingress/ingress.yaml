@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: service-a
+  namespace: default
+spec:
+  ingressClassName: sample-alb-ingress
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /service-a
+        pathType: Prefix
+        backend:
+          service:
+            name: service-a
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: service-b
+  namespace: default
+spec:
+  ingressClassName: sample-alb-ingress
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /service-b
+        pathType: Prefix
+        backend:
+          service:
+            name: service-b
+            port:
+              number: 80
