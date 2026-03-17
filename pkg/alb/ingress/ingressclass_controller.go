@@ -338,6 +338,11 @@ func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 			return true
 		}
 
+		// WAF config check
+		if ptr.Deref(albListener.WafConfigName, "") != ptr.Deref(payloadListener.WafConfigName, "") {
+			return true
+		}
+
 		// HTTP rules comparison (via Hosts)
 		if albListener.Http != nil && payloadListener.Http != nil {
 			albHosts := albListener.Http.Hosts
@@ -368,6 +373,9 @@ func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 							return true
 						}
 						if ptr.Deref(albRule.Path.Prefix, "") != ptr.Deref(payloadRule.Path.Prefix, "") {
+							return true
+						}
+						if ptr.Deref(albRule.Path.ExactMatch, "") != ptr.Deref(payloadRule.Path.ExactMatch, "") {
 							return true
 						}
 					}
