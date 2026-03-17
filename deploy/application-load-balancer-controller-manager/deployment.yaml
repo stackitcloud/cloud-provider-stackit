@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: stackit-application-load-balancer-contoller-manager
+  labels:
+    app: stackit-application-load-balancer-contoller-manager
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: stackit-application-load-balancer-contoller-manager
+  template:
+    metadata:
+      labels:
+        app: stackit-application-load-balancer-contoller-manager
+    spec:
+      serviceAccountName: stackit-application-load-balancer-contoller-manager
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: stackit-application-load-balancer-contoller-manager
+        # TODO(jamand): Adapt image tag
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-application-load-balancer-contoller-manager:XXX
+        args:
+        - "--authorization-always-allow-paths=/metrics"
+        - "--leader-elect=true"
+        - "--leader-elect-resource-name=stackit-application-load-balancer-contoller-manager"
+        - "--enable-http2"
+        - "--metrics-bind-address=8080"
+        - "--secureMetrics=false"
+        # TODO(jamand): Check webhook cert + enableHTTP2 flag
+        env:
+        - name: STACKIT_SERVICE_ACCOUNT_KEY_PATH
+          value: /etc/serviceaccount/sa_key.json
+        ports:
+        - containerPort: 8080
+          hostPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          hostPort: 8081
+          name: probe
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: 500Mi
+          requests:
+            cpu: "0.1"
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /etc/serviceaccount
+          name: cloud-secret
+      volumes:
+      - name: cloud-secret
+        secret:
+          secretName: stackit-cloud-secret
