@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-a
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-a
+  template:
+    metadata:
+      labels:
+        app: service-a
+    spec:
+      containers:
+        - name: service-a
+          image: python:3
+          command:
+            - "sh"
+            - "-c"
+            - "mkdir -p /data/service-a && echo '<h1>This is service A!</h1>' > /data/service-a/index.html && cd /data && python -m http.server 80"
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-b
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-b
+  template:
+    metadata:
+      labels:
+        app: service-b
+    spec:
+      containers:
+        - name: service-b
+          image: python:3
+          command:
+            - "sh"
+            - "-c"
+            - "mkdir -p /data/service-b && echo '<h1>This is service B!</h1>' > /data/service-b/index.html && cd /data && python -m http.server 80"
+          ports:
+            - containerPort: 80
