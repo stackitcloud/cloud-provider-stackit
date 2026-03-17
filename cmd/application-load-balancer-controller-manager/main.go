@@ -39,9 +39,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/alb/ingress"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb"
-	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates"
+	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
+	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -263,13 +265,13 @@ func main() {
 		os.Exit(1)
 	}
 	// Create an Certificates API client
-	certificateClient, err := certificateclient.NewCertClient(certificateAPI)
+	certificateClient, err := stackit.NewCertClient(certificateAPI)
 	if err != nil {
 		setupLog.Error(err, "unable to create Certificates client", "controller", "IngressClass")
 		os.Exit(1)
 	}
 
-	if err = (&controller.IngressClassReconciler{
+	if err = (&ingress.IngressClassReconciler{
 		Client:            mgr.GetClient(),
 		ALBClient:         albClient,
 		CertificateClient: certificateClient,
