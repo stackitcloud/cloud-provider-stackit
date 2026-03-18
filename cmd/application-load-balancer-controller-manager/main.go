@@ -20,17 +20,18 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -40,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/alb/ingress"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 	// +kubebuilder:scaffold:imports
@@ -57,6 +58,49 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+type Config struct {
+	NetworkID string `yaml:"networkID"`
+	ProjectID string `yaml:"projectID"`
+	Region    string `yaml:"region"`
+}
+
+// ReadConfig reads the ALB infrastructure configuration provided via the cloud-config flag.
+func ReadConfig(cloudConfig string) Config {
+	configFile, err := os.Open(cloudConfig)
+	if err != nil {
+		setupLog.Error(err, "Failed to open the cloud config file")
+		os.Exit(1)
+	}
+	defer configFile.Close()
+
+	var config Config
+	content, err := io.ReadAll(configFile)
+	if err != nil {
+		setupLog.Error(err, "Failed to read config content")
+		os.Exit(1)
+	}
+
+	err = yaml.Unmarshal(content, &config)
+	if err != nil {
+		setupLog.Error(err, "Failed to parse config as YAML")
+		os.Exit(1)
+	}
+
+	if config.ProjectID == "" {
+		setupLog.Error(err, "projectId must be set")
+		os.Exit(1)
+	}
+	if config.Region == "" {
+		setupLog.Error(err, "region must be set")
+		os.Exit(1)
+	}
+	if config.NetworkID == "" {
+		setupLog.Error(err, "networkId must be set")
+		os.Exit(1)
+	}
+	return config
+}
+
 // nolint:gocyclo,funlen // TODO: Refactor into smaller functions.
 func main() {
 	var metricsAddr string
@@ -66,6 +110,7 @@ func main() {
 	var leaderElectionNamespace string
 	var leaderElectionID string
 	var probeAddr string
+	var cloudConfig string
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
@@ -90,6 +135,7 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&cloudConfig, "cloud-config", "cloud.yaml", "The path to the cloud config file.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -97,6 +143,8 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	config := ReadConfig(cloudConfig)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -216,24 +264,9 @@ func main() {
 
 	certURL, _ := os.LookupEnv("STACKIT_LOAD_BALANCER_API_CERT_URL")
 
-	region, set := os.LookupEnv("STACKIT_REGION")
-	if !set {
-		setupLog.Error(err, "STACKIT_REGION not set", "controller", "IngressClass")
-		os.Exit(1)
-	}
-	projectID, set := os.LookupEnv("PROJECT_ID")
-	if !set {
-		setupLog.Error(err, "PROJECT_ID not set", "controller", "IngressClass")
-		os.Exit(1)
-	}
-	networkID, set := os.LookupEnv("NETWORK_ID")
-	if !set {
-		setupLog.Error(err, "NETWORK_ID not set", "controller", "IngressClass")
-		os.Exit(1)
-	}
-
 	// Create an ALB SDK client
 	albOpts := []sdkconfig.ConfigurationOption{}
+
 	if albURL != "" {
 		albOpts = append(albOpts, sdkconfig.WithEndpoint(albURL))
 	}
@@ -251,7 +284,7 @@ func main() {
 	}
 	// Create an ALB client
 	fmt.Printf("Create ALB client\n")
-	albClient, err := stackit.NewApplicationLoadBalancerClient(sdkClient)
+	albClient, err := albclient.NewApplicationLoadBalancerClient(sdkClient)
 	if err != nil {
 		setupLog.Error(err, "unable to create ALB client", "controller", "IngressClass")
 		os.Exit(1)
@@ -264,7 +297,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Create an Certificates API client
-	certificateClient, err := stackit.NewCertClient(certificateAPI)
+	certificateClient, err := albclient.NewCertClient(certificateAPI)
 	if err != nil {
 		setupLog.Error(err, "unable to create Certificates client", "controller", "IngressClass")
 		os.Exit(1)
@@ -275,9 +308,9 @@ func main() {
 		ALBClient:         albClient,
 		CertificateClient: certificateClient,
 		Scheme:            mgr.GetScheme(),
-		ProjectID:         projectID,
-		NetworkID:         networkID,
-		Region:            region,
+		ProjectID:         config.ProjectID,
+		NetworkID:         config.NetworkID,
+		Region:            config.Region,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IngressClass")
 		os.Exit(1)
