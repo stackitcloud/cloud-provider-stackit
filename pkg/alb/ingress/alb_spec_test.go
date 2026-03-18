@@ -156,6 +156,7 @@ func fixtureAlbPayload(mods ...func(*albsdk.CreateLoadBalancerPayload)) *albsdk.
 		Name: ptr.To("k8s-ingress-" + testIngressClassName),
 		Listeners: []albsdk.Listener{
 			{
+				Name:     ptr.To("http"),
 				Port:     ptr.To(int32(80)),
 				Protocol: ptr.To("PROTOCOL_HTTP"),
 				Http: &albsdk.ProtocolOptionsHTTP{
