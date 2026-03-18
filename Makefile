@@ -79,7 +79,9 @@ check: lint test ## Check everything (lint + test).
 
 .PHONY: verify-fmt
 verify-fmt: fmt ## Verify go code is formatted.
-	exit 0
+	@if !(git diff --quiet HEAD); then \
+		echo "unformatted files detected, please run 'make fmt'"; exit 1; \
+	fi
 
 .PHONY: verify-modules
 verify-modules: modules ## Verify go module files are up to date.
@@ -131,7 +133,7 @@ mocks: $(MOCKGEN)
 	# generate mocks
 	@go mod download
 	@for service in $(MOCK_SERVICES); do \
-		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | gpaste -sd,`,DefaultApi; \
+		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | paste -sd,`,DefaultApi; \
 		$(MOCKGEN) -destination ./pkg/mock/$$service/$$service.go -package $$service github.com/stackitcloud/stackit-sdk-go/services/$$service $$INTERFACES; \
 	done
 	@$(MOCKGEN) -destination ./pkg/stackit/iaas_mock.go -package stackit ./pkg/stackit IaasClient
