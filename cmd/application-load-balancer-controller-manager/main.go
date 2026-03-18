@@ -18,6 +18,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -65,40 +66,34 @@ type Config struct {
 }
 
 // ReadConfig reads the ALB infrastructure configuration provided via the cloud-config flag.
-func ReadConfig(cloudConfig string) Config {
+func ReadConfig(cloudConfig string) (Config, error) {
 	configFile, err := os.Open(cloudConfig)
 	if err != nil {
-		setupLog.Error(err, "Failed to open the cloud config file")
-		os.Exit(1)
+		return Config{}, err
 	}
 	defer configFile.Close()
 
 	var config Config
 	content, err := io.ReadAll(configFile)
 	if err != nil {
-		setupLog.Error(err, "Failed to read config content")
-		os.Exit(1)
+		return Config{}, err
 	}
 
 	err = yaml.Unmarshal(content, &config)
 	if err != nil {
-		setupLog.Error(err, "Failed to parse config as YAML")
-		os.Exit(1)
+		return Config{}, err
 	}
 
 	if config.ProjectID == "" {
-		setupLog.Error(err, "projectId must be set")
-		os.Exit(1)
+		return Config{}, errors.New("project ID must be set")
 	}
 	if config.Region == "" {
-		setupLog.Error(err, "region must be set")
-		os.Exit(1)
+		return Config{}, errors.New("region must be set")
 	}
 	if config.NetworkID == "" {
-		setupLog.Error(err, "networkId must be set")
-		os.Exit(1)
+		return Config{}, errors.New("network ID must be set")
 	}
-	return config
+	return config, nil
 }
 
 // nolint:gocyclo,funlen // TODO: Refactor into smaller functions.
@@ -144,7 +139,11 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	config := ReadConfig(cloudConfig)
+	config, err := ReadConfig(cloudConfig)
+	if err != nil {
+		setupLog.Error(err, "Failed to read cloud config")
+		os.Exit(1)
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will

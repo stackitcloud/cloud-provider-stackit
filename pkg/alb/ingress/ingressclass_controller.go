@@ -324,7 +324,7 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 }
 
 // detectChange checks if there is any difference between the current and desired ALB configuration.
-func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool { //nolint:gocyclo // We check a lot of fields. Not much complexity.
+func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool { //nolint:gocyclo,funlen // We check a lot of fields. Not much complexity.
 	if len(alb.Listeners) != len(albPayload.Listeners) {
 		return true
 	}
