@@ -17,14 +17,14 @@
 
 ## Overview
 
-The STACKIT Cloud Provider includes both the Cloud Controller Manager (CCM) for managing cloud resources and the CSI driver for persistent storage. This deployment provides a unified solution for cloud integration and storage provisioning.
+The STACKIT Cloud Provider includes the Cloud Controller Manager (CCM) for managing cloud resources, the CSI driver for persistent storage and the Application Load Balancer Controller Manager (ALBCM) for managing STACKIT Application Load Balancer (ALB) via Ingress Resources.
 
 ## Deployment Components
 
 The deployment consists of the following components:
 
 1. **ServiceAccount**: `stackit-cloud-controller-manager` with appropriate RBAC permissions
-2. **Deployment**: Runs the cloud provider container with necessary configuration
+2. **Deployment**: Runs the cloud provider containers with necessary configuration
 3. **Service**: Exposes metrics and API endpoints
 
 ## Deployment Configuration
@@ -49,6 +49,10 @@ The deployment can be customized using the following flags:
 - `--http-endpoint`: HTTP server endpoint for metrics
 - `--provide-controller-service`: Enable controller service (default: true)
 - `--provide-node-service`: Enable node service (default: true)
+
+### Application Load Balancer Controller Manager
+
+- `--cloud-config`: Path to cloud configuration file
 
 ## Deployment Steps
 

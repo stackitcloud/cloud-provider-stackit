@@ -1,31 +1,27 @@
-### Run the ALB Ingress controller locally
-To run the controller on your local machine, ensure you have a valid kubeconfig pointing to the target Kubernetes cluster where the ALB resources should be managed.
+# Application Load Balancer Controller Manager
+
+The Application Load Balancer Controller Manager (ALBCM) manages ALBs from within a Kubernetes cluster.
+Currently, the Ingress API is supported.
+Support for Gateway API is planned.
 
 ##### Environment Variables
+
 The controller requires specific configuration and credentials to interact with the STACKIT APIs and your network infrastructure. Set the following variables:
-  - STACKIT_SERVICE_ACCOUNT_TOKEN: Your authentication token for performing CRUD operations via the ALB and Certificates SDK.
-  - STACKIT_REGION: The STACKIT region where the infrastructure resides (e.g., eu01).
-  - PROJECT_ID: The unique identifier of your STACKIT project where the ALB will be provisioned.
-  - NETWORK_ID: The ID of the STACKIT network where the ALB will be provisioned.
-```
-export STACKIT_SERVICE_ACCOUNT_TOKEN=<your-token>
-export STACKIT_REGION=<region>
-export PROJECT_ID=<project-id>
-export NETWORK_ID=<network-id>
-```
-Kubernetes Context
+
+- STACKIT_REGION: The STACKIT region where the infrastructure resides (e.g., eu01).
+- PROJECT_ID: The unique identifier of your STACKIT project where the ALB will be provisioned.
+- NETWORK_ID: The ID of the STACKIT network where the ALB will be provisioned.
+- In addition, the ALBCM supports all environment variable support by the STACKIT SDK. This includes authentication.
+
 The controller uses the default Kubernetes client. Ensure your KUBECONFIG environment variable is set or your current context is correctly configured:
 ```
 export KUBECONFIG=~/.kube/config
 ```
-#### Run
-Use the provided Makefile in the root of repository to start the controller:
-```
-make run
-```
 
 ### Create your deployment and expose it via Ingress
+
 1. Create your k8s deployment, here’s an example of a simple http web server:
+
 ```
 apiVersion: apps/v1
 kind: Deployment
@@ -50,7 +46,9 @@ spec:
         ports:
         - containerPort: 80
 ```
+
 2. Now, create a k8s service so that the traffic can be routed to the pods:
+
 ```
 apiVersion: v1
 kind: Service
@@ -69,8 +67,11 @@ spec:
     app: httpbin-deployment
   type: NodePort
 ```
->NOTE: The service has to be of type NodePort to enable access to the nodes from the outside of the cluster.
+
+> NOTE: The service has to be of type NodePort to enable access to the nodes from the outside of the cluster.
+
 3. Create an IngressClass that specifies the ALB Ingress controller:
+
 ```
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
@@ -80,7 +81,9 @@ metadata:
 spec:
   controller: stackit.cloud/alb-ingress
 ```
+
 4. Lastly, create an ingress resource that references the previously created IngressClass:
+
 ```
 apiVersion: networking.k8s.io/v1
 kind: Ingress
