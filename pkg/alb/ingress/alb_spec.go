@@ -415,6 +415,8 @@ func addTargetPool(
 	})
 }
 
+// setIPAddresses configures the Application Load Balancer IP address
+// based on IngressClass annotations: internal, ephemeral, or static public IPs.
 func setIPAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateLoadBalancerPayload) error {
 	isInternalIP, found := ingressClass.Annotations[internalIPAnnotation]
 	if found && isInternalIP == "true" {
