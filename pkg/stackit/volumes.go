@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
@@ -33,7 +34,7 @@ const (
 var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
 func (os *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
-	payload.Description = ptr.To(VolumeDescription)
+	payload.Description = new(VolumeDescription)
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 	req, err := os.iaas.CreateVolume(ctxWithHTTPResp, os.projectID, os.region).CreateVolumePayload(*payload).Execute()
@@ -82,7 +83,7 @@ func (os *iaasClient) AttachVolume(ctx context.Context, instanceID, volumeID str
 		return *volume.Id, nil
 	}
 	payload := iaas.AddVolumeToServerPayload{
-		DeleteOnTermination: ptr.To(false),
+		DeleteOnTermination: new(false),
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -104,10 +105,8 @@ func (os *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Contex
 		if err != nil {
 			return false, err
 		}
-		for _, t := range tStatus {
-			if *vol.Status == t {
-				return true, nil
-			}
+		if slices.Contains(tStatus, *vol.Status) {
+			return true, nil
 		}
 		for _, eState := range volumeErrorStates {
 			if *vol.Status == eState {
@@ -305,10 +304,8 @@ func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID strin
 		if err != nil {
 			return false, err
 		}
-		for _, t := range tStatus {
-			if *vol.Status == t {
-				return true, nil
-			}
+		if slices.Contains(tStatus, *vol.Status) {
+			return true, nil
 		}
 		for _, eState := range volumeErrorStates {
 			if *vol.Status == eState {
@@ -326,7 +323,7 @@ func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID strin
 }
 
 func (os *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, newSize int64) error {
-	extendOpts := iaas.ResizeVolumePayload{Size: ptr.To(newSize)}
+	extendOpts := iaas.ResizeVolumePayload{Size: new(newSize)}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 

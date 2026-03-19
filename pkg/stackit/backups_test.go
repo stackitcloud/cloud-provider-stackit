@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
-	"k8s.io/utils/ptr"
 
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/iaas"
 )
@@ -68,10 +67,10 @@ var _ = Describe("Backup", func() {
 				"volume-id", "",
 				nil,
 				iaas.CreateBackupPayload{
-					Name: ptr.To("expected-name"),
+					Name: new("expected-name"),
 					Source: &iaas.BackupSource{
-						Type: ptr.To("volume"),
-						Id:   ptr.To("volume-id"),
+						Type: new("volume"),
+						Id:   new("volume-id"),
 					},
 					Labels: nil,
 				},
@@ -81,12 +80,12 @@ var _ = Describe("Backup", func() {
 				"", "snapshot-id",
 				map[string]string{"tag1": "value1"},
 				iaas.CreateBackupPayload{
-					Name: ptr.To("expected-name"),
+					Name: new("expected-name"),
 					Source: &iaas.BackupSource{
-						Type: ptr.To("snapshot"),
-						Id:   ptr.To("snapshot-id"),
+						Type: new("snapshot"),
+						Id:   new("snapshot-id"),
 					},
-					Labels: ptr.To(map[string]any{
+					Labels: new(map[string]any{
 						"tag1": "value1",
 					}),
 				},
@@ -159,12 +158,12 @@ var _ = Describe("Backup", func() {
 			}
 
 			expectedPayload := iaas.CreateBackupPayload{
-				Name: ptr.To("expected-name"),
+				Name: new("expected-name"),
 				Source: &iaas.BackupSource{
-					Type: ptr.To("volume"),
-					Id:   ptr.To("volume-id"),
+					Type: new("volume"),
+					Id:   new("volume-id"),
 				},
-				Labels: ptr.To(map[string]any{
+				Labels: new(map[string]any{
 					"special": "tag with spaces and !@#$%^&*()",
 					"normal":  "value",
 				}),
@@ -195,10 +194,10 @@ var _ = Describe("Backup", func() {
 
 		It("should handle nil tags", func() {
 			expectedPayload := iaas.CreateBackupPayload{
-				Name: ptr.To("expected-name"),
+				Name: new("expected-name"),
 				Source: &iaas.BackupSource{
-					Type: ptr.To("volume"),
-					Id:   ptr.To("volume-id"),
+					Type: new("volume"),
+					Id:   new("volume-id"),
 				},
 				Labels: nil,
 			}
@@ -214,12 +213,12 @@ var _ = Describe("Backup", func() {
 
 		It("should handle empty tags map", func() {
 			expectedPayload := iaas.CreateBackupPayload{
-				Name: ptr.To("expected-name"),
+				Name: new("expected-name"),
 				Source: &iaas.BackupSource{
-					Type: ptr.To("volume"),
-					Id:   ptr.To("volume-id"),
+					Type: new("volume"),
+					Id:   new("volume-id"),
 				},
-				Labels: ptr.To(map[string]any{}),
+				Labels: new(map[string]any{}),
 			}
 
 			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
@@ -235,10 +234,10 @@ var _ = Describe("Backup", func() {
 			longName := "very-long-backup-name-" + string(make([]byte, 200))
 
 			expectedPayload := iaas.CreateBackupPayload{
-				Name: ptr.To(longName),
+				Name: new(longName),
 				Source: &iaas.BackupSource{
-					Type: ptr.To("volume"),
-					Id:   ptr.To("volume-id"),
+					Type: new("volume"),
+					Id:   new("volume-id"),
 				},
 			}
 
@@ -260,7 +259,7 @@ func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi,
 	)
 	createRequest := mock.NewMockApiCreateBackupRequest(mockCtrl)
 	createRequest.EXPECT().CreateBackupPayload(expectedPayload).Return(createRequest)
-	createRequest.EXPECT().Execute().Return(&iaas.Backup{Id: ptr.To("expected backup")}, nil)
+	createRequest.EXPECT().Execute().Return(&iaas.Backup{Id: new("expected backup")}, nil)
 
 	mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(createRequest)
 }
