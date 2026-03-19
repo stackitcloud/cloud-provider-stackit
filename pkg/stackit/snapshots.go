@@ -11,7 +11,6 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -26,11 +25,11 @@ const (
 
 func (os *iaasClient) CreateSnapshot(ctx context.Context, name, volID string, tags map[string]string) (*iaas.Snapshot, error) {
 	opts := iaas.CreateSnapshotPayload{
-		VolumeId: ptr.To(volID),
-		Name:     ptr.To(name),
+		VolumeId: new(volID),
+		Name:     new(name),
 	}
 	if tags != nil {
-		opts.Labels = ptr.To(map[string]interface{}(labelsFromTags(tags)))
+		opts.Labels = new(map[string]any(labelsFromTags(tags)))
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -115,7 +114,7 @@ func (os *iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) 
 	if snap != nil {
 		return snap.Status, err
 	}
-	return ptr.To("Failed to get snapshot status"), err
+	return new("Failed to get snapshot status"), err
 }
 
 func (os *iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (bool, error) {
