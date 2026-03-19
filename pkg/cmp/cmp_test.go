@@ -3,8 +3,6 @@ package cmp
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 )
 
 type sliceEqualUnorderedTest struct {
@@ -120,17 +118,17 @@ var _ = DescribeTable("PtrValEqual",
 	Entry("nil vs value", &ptrValEqualTest{
 		want: false,
 		a:    nil,
-		b:    utils.Ptr(""),
+		b:    new(""),
 	}),
 	Entry("equal values", &ptrValEqualTest{
 		want: true,
-		a:    utils.Ptr("c"),
-		b:    utils.Ptr("c"),
+		a:    new("c"),
+		b:    new("c"),
 	}),
 	Entry("unequal values", &ptrValEqualTest{
 		want: false,
-		a:    utils.Ptr("c"),
-		b:    utils.Ptr("d"),
+		a:    new("c"),
+		b:    new("d"),
 	}),
 )
 
@@ -153,17 +151,17 @@ var _ = DescribeTable("PtrValEqualFn",
 	Entry("nil vs value", &ptrValEqualFnTest{
 		want: false,
 		a:    nil,
-		b:    utils.Ptr(""),
+		b:    new(""),
 	}),
 	Entry("equal values", &ptrValEqualFnTest{
 		want: true,
-		a:    utils.Ptr("c"),
-		b:    utils.Ptr("c"),
+		a:    new("c"),
+		b:    new("c"),
 	}),
 	Entry("unequal values", &ptrValEqualFnTest{
 		want: false,
-		a:    utils.Ptr("c"),
-		b:    utils.Ptr("d"),
+		a:    new("c"),
+		b:    new("d"),
 	}),
 )
 
@@ -182,15 +180,15 @@ var _ = DescribeTable("LenSlicePtr",
 	}),
 	Entry("nil slice", &lenSlicePtrTest{
 		want: 0,
-		in:   utils.Ptr[[]any](nil),
+		in:   new([]any(nil)),
 	}),
 	Entry("empty slice", &lenSlicePtrTest{
 		want: 0,
-		in:   utils.Ptr[[]any]([]any{}),
+		in:   new([]any{}),
 	}),
 	Entry("length 1 slice", &lenSlicePtrTest{
 		want: 1,
-		in:   utils.Ptr[[]any]([]any{nil}),
+		in:   new([]any{nil}),
 	}),
 )
 
@@ -205,6 +203,6 @@ var _ = Describe("UnpackPtr", func() {
 	})
 
 	It("should", func() {
-		Expect(UnpackPtr(utils.Ptr("hello"))).To(Equal("hello"))
+		Expect(UnpackPtr(new("hello"))).To(Equal("hello"))
 	})
 })

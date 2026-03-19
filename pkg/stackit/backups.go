@@ -10,7 +10,6 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
-	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
@@ -46,14 +45,14 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	}
 
 	opts := iaas.CreateBackupPayload{
-		Name: ptr.To(name),
+		Name: new(name),
 		Source: &iaas.BackupSource{
-			Type: ptr.To(string(backupSource)),
-			Id:   ptr.To(backupSourceID),
+			Type: new(string(backupSource)),
+			Id:   new(backupSourceID),
 		},
 	}
 	if tags != nil {
-		opts.Labels = ptr.To(map[string]interface{}(labelsFromTags(tags)))
+		opts.Labels = new(map[string]any(labelsFromTags(tags)))
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -133,7 +132,7 @@ func (os *iaasClient) WaitBackupReady(ctx context.Context, backupID string, snap
 	if back != nil {
 		return back.Status, err
 	}
-	return ptr.To("Failed to get backup status"), err
+	return new("Failed to get backup status"), err
 }
 
 func (os *iaasClient) waitBackupReadyWithContext(backupID string, duration time.Duration) error {
