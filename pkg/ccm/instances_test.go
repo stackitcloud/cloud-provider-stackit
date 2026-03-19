@@ -29,7 +29,6 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Node Controller", func() {
@@ -83,7 +82,7 @@ var _ = Describe("Node Controller", func() {
 		It("successfully get the instance when provider ID not there", func() {
 			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
-					Name: ptr.To("foo"),
+					Name: new("foo"),
 				},
 			}, nil)
 
@@ -98,7 +97,7 @@ var _ = Describe("Node Controller", func() {
 
 		It("successfully get the instance when provider ID is there", func() {
 			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
-				Name: ptr.To("foo"),
+				Name: new("foo"),
 			}, nil)
 
 			node := &corev1.Node{
@@ -115,7 +114,7 @@ var _ = Describe("Node Controller", func() {
 
 		It("successfully get the instance when old provider ID is there", func() {
 			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
-				Name: ptr.To("foo"),
+				Name: new("foo"),
 			}, nil)
 
 			node := &corev1.Node{
@@ -132,7 +131,7 @@ var _ = Describe("Node Controller", func() {
 
 		It("successfully get the instance when old regional provider ID is there", func() {
 			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
-				Name: ptr.To("foo"),
+				Name: new("foo"),
 			}, nil)
 
 			node := &corev1.Node{
@@ -178,8 +177,8 @@ var _ = Describe("Node Controller", func() {
 		It("successfully gets the instance status with provider ID", func() {
 			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
-					Name:   ptr.To("foo"),
-					Status: ptr.To(instanceStopping),
+					Name:   new("foo"),
+					Status: new(instanceStopping),
 				},
 			}, nil)
 
@@ -194,8 +193,8 @@ var _ = Describe("Node Controller", func() {
 
 		It("successfully gets the instance status without provider ID", func() {
 			nodeMockClient.EXPECT().GetServer(gomock.Any(), projectID, region, serverID).Return(&iaas.Server{
-				Name:   ptr.To("foo"),
-				Status: ptr.To("ACTIVE"),
+				Name:   new("foo"),
+				Status: new("ACTIVE"),
 			}, nil)
 
 			node := &corev1.Node{
@@ -239,12 +238,12 @@ var _ = Describe("Node Controller", func() {
 		It("successfully get all the metadata values", func() {
 			nodeMockClient.EXPECT().ListServers(gomock.Any(), projectID, region).Return(&[]iaas.Server{
 				{
-					Name:        ptr.To("foo"),
-					Id:          ptr.To(serverID),
-					MachineType: ptr.To("flatcar"),
+					Name:        new("foo"),
+					Id:          new(serverID),
+					MachineType: new("flatcar"),
 					Nics: &[]iaas.ServerNetwork{
 						{
-							Ipv4: ptr.To("10.10.100.24"),
+							Ipv4: new("10.10.100.24"),
 						},
 					},
 				},

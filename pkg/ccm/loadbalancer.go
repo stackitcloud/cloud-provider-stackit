@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
-	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
@@ -215,7 +214,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
 	if l.opts.ExtraLabels != nil {
-		spec.Labels = ptr.To(l.opts.ExtraLabels)
+		spec.Labels = new(l.opts.ExtraLabels)
 	}
 	for _, event := range events {
 		l.recorder.Event(service, event.Type, event.Reason, event.Message)
@@ -433,7 +432,7 @@ func loadBalancerStatus(lb *loadbalancer.LoadBalancer, svc *corev1.Service) *cor
 	if ip != nil {
 		ingress := corev1.LoadBalancerIngress{IP: *ip}
 		if ipModeProxy, _ := strconv.ParseBool(svc.Annotations[ipModeProxyAnnotation]); ipModeProxy {
-			ingress.IPMode = ptr.To(corev1.LoadBalancerIPModeProxy)
+			ingress.IPMode = new(corev1.LoadBalancerIPModeProxy)
 		}
 		ingresses = []corev1.LoadBalancerIngress{ingress}
 	}

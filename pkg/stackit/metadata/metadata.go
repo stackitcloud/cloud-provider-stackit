@@ -313,8 +313,7 @@ func Get(ctx context.Context, order string) (*Metadata, error) {
 		var md *Metadata
 		var err error
 
-		elements := strings.Split(order, ",")
-		for _, id := range elements {
+		for id := range strings.SplitSeq(order, ",") {
 			id = strings.TrimSpace(id)
 			switch id {
 			case ConfigDriveID:
