@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -171,12 +172,10 @@ func (m *Mount) getDevicePathBySerialID(volumeID string) string {
 	}
 
 	for _, f := range files {
-		for _, c := range candidateDeviceNodes {
-			if c == f.Name() {
-				klog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n",
-					f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
-				return path.Join("/dev/disk/by-id/", f.Name())
-			}
+		if slices.Contains(candidateDeviceNodes, f.Name()) {
+			klog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n",
+				f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
+			return path.Join("/dev/disk/by-id/", f.Name())
 		}
 	}
 

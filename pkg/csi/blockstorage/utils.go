@@ -100,7 +100,7 @@ func DetermineMaxVolumesByFlavor(flavor string) int64 {
 	}
 }
 
-func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	callID := atomic.AddUint64(&serverGRPCEndpointCallCounter, 1)
 
 	klog.V(3).Infof("[ID:%d] GRPC call: %s", callID, info.FullMethod)

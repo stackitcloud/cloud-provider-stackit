@@ -215,12 +215,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	opts := &iaas.CreateVolumePayload{
-		Name:             ptr.To(volName),
+		Name:             new(volName),
 		PerformanceClass: volParams.PerformanceClass,
-		Size:             ptr.To(volSizeGB),
-		AvailabilityZone: ptr.To(volAvailability),
+		Size:             new(volSizeGB),
+		AvailabilityZone: new(volAvailability),
 		//TODO: IaaS API does not allow dots or slashes. Additionally we would like to actually use metadata/annotations
-		//Labels:           ptr.To(util.ConvertMapStringToInterface(properties)),
+		//Labels:           new(util.ConvertMapStringToInterface(properties)),
 	}
 
 	// Only set CreateVolumePayload.Source when actually creating volume from source/snapshot/backup
@@ -233,8 +233,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeSourceID := determineSourceIDForSourceType(volumeSourceType, sourceSnapshotID, sourceVolID)
 		klog.V(4).Infof("Creating volume from %s source", volumeSourceType)
 		opts.Source = &iaas.VolumeSource{
-			Id:   ptr.To(volumeSourceID),
-			Type: ptr.To(string(volumeSourceType)),
+			Id:   new(volumeSourceID),
+			Type: new(string(volumeSourceType)),
 		}
 	}
 
@@ -290,7 +290,7 @@ func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *st
 
 	encryptionConfig := &iaas.VolumeEncryptionParameter{
 		KekKeyId:       volParams.KMSKeyID,
-		KekKeyVersion:  ptr.To(int64(kmsKeyVersionInt)),
+		KekKeyVersion:  new(int64(kmsKeyVersionInt)),
 		KekKeyringId:   volParams.KMSKeyringID,
 		ServiceAccount: volParams.KMSServiceAccount,
 	}
