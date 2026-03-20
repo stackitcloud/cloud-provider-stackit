@@ -276,9 +276,9 @@ func (r *IngressClassReconciler) loadCerts(
 		// The tls.crt should contain both the leaf certificate and the intermediate CA certificates.
 		// If it contains only the leaf certificate, the ACME challenge likely hasn't finished.
 		// Therefore the incomplete certificate shouldn't be loaded as the updates upon them are impossible.
-		complete, err := isCertValid(secret)
+		complete, err := isCertReady(secret)
 		if err != nil {
-			return nil, fmt.Errorf("failed to validate certificate: %w", err)
+			return nil, fmt.Errorf("failed to check if certificate is ready: %w", err)
 		}
 		if !complete {
 			// TODO: Requeue, instead of returning error - the ACME challenge hasn't finished yet
@@ -351,9 +351,13 @@ func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass 
 	return nil
 }
 
-// isCertValid checks if the certificate chain is complete. It is used for checking if
-// the cert-manager's ACME challenge is completed, or if it's sill ongoing.
-func isCertValid(secret *corev1.Secret) (bool, error) {
+// isCertReady checks if the certificate chain is complete (leaf + intermediates).
+// This is required during ACME challenges (e.g., cert-manager), where a race condition 
+// can occur where the Secret may temporarily contain only the leaf certificate before the 
+// full chain is written. Because the STACKIT Application Load Balancer Certificates API
+// only validates the cryptographic key match and is immutable (no update call),
+// we must wait for the full chain to avoid locking the ALB with an incomplete certificate.
+func isCertReady(secret *corev1.Secret) (bool, error) {
 	tlsCert := secret.Data["tls.crt"]
 	if tlsCert == nil {
 		return false, fmt.Errorf("tls.crt not found in secret")
@@ -380,7 +384,8 @@ func isCertValid(secret *corev1.Secret) (bool, error) {
 		certs = append(certs, cert)
 	}
 
-	// If there are multiple certificates, it means the chain is likely complete
+    // A valid, trusted chain must contain at least 2 certificates: 
+    // the leaf (domain) and at least one intermediate CA.
 	return len(certs) > 1, nil
 }
 
