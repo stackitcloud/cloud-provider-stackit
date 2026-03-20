@@ -5,8 +5,8 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    # server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: kamil.przybyl@stackit.cloud
+    # server: https://acme-staging-v02.api.letsencrypt.org/directory # Use this for testing to avoid hitting letsencrypt rate limits.
+    email: mail@example.com
     privateKeySecretRef:
       name: letsencrypt
     solvers:
