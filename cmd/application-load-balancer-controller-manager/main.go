@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -244,12 +243,9 @@ func main() {
 	}
 
 	albURL, _ := os.LookupEnv("STACKIT_LOAD_BALANCER_API_ALB_URL")
-
 	certURL, _ := os.LookupEnv("STACKIT_LOAD_BALANCER_API_CERT_URL")
 
-	// Create an ALB SDK client
 	albOpts := []sdkconfig.ConfigurationOption{}
-
 	if albURL != "" {
 		albOpts = append(albOpts, sdkconfig.WithEndpoint(albURL))
 	}
@@ -259,27 +255,24 @@ func main() {
 		certOpts = append(certOpts, sdkconfig.WithEndpoint(certURL))
 	}
 
-	fmt.Printf("Create ALB SDK client\n")
+	// Setup ALB API client
 	sdkClient, err := albsdk.NewAPIClient(albOpts...)
 	if err != nil {
 		setupLog.Error(err, "unable to create ALB SDK client", "controller", "IngressClass")
 		os.Exit(1)
 	}
-	// Create an ALB client
-	fmt.Printf("Create ALB client\n")
 	albClient, err := albclient.NewApplicationLoadBalancerClient(sdkClient)
 	if err != nil {
 		setupLog.Error(err, "unable to create ALB client", "controller", "IngressClass")
 		os.Exit(1)
 	}
 
-	// Create an Certificates SDK client
+	// Setup Certificates API client
 	certificateAPI, err := certsdk.NewAPIClient(certOpts...)
 	if err != nil {
 		setupLog.Error(err, "unable to create certificate SDK client", "controller", "IngressClass")
 		os.Exit(1)
 	}
-	// Create an Certificates API client
 	certificateClient, err := albclient.NewCertClient(certificateAPI)
 	if err != nil {
 		setupLog.Error(err, "unable to create Certificates client", "controller", "IngressClass")
