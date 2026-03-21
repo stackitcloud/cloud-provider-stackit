@@ -184,7 +184,10 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 	}
 
 	// Create ALB payload from Ingresses
-	albPayload, err := r.albSpecFromIngress(ctx, ingresses, ingressClass, &r.NetworkID, nodes.Items, services)
+	requeueNeeded, albPayload, err := r.albSpecFromIngress(ctx, ingresses, ingressClass, &r.NetworkID, nodes.Items, services)
+	if requeueNeeded {
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create alb payload: %w", err)
 	}
