@@ -71,7 +71,7 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	networkID *string,
 	nodes []corev1.Node,
 	services map[string]corev1.Service,
-) (*albsdk.CreateLoadBalancerPayload, error) {
+) (bool, *albsdk.CreateLoadBalancerPayload, error) {
 	targetPools := []albsdk.TargetPool{}
 	targetPoolSeen := map[string]bool{}
 	allCertificateIDs := []string{}
@@ -111,7 +111,7 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 			for j, path := range rule.HTTP.Paths {
 				nodePort, err := getNodePort(services, path)
 				if err != nil {
-					return nil, err
+					return false, nil, err
 				}
 
 				targetPoolName := fmt.Sprintf("pool-%d", nodePort)
@@ -140,12 +140,13 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 		}
 
 		// Apend certificates from the current Ingress to the combined certificates
-		certificateIDs, err := r.loadCerts(ctx, ingressClass, ingress)
-		if err != nil {
-			log.Printf("failed to load tls certificates: %v", err)
-			//nolint:gocritic // TODO: Rework error handling.
-			// return nil, fmt.Errorf("failed to load tls certificates: %w", err)
-		}
+		requeueNeeded, certificateIDs, err := r.loadCerts(ctx, ingressClass, ingress)
+		if requeueNeeded {
+            return true, nil, nil
+        }
+        if err != nil {
+            return false, nil, fmt.Errorf("failed to load tls certificates: %w", err)
+        }
 		allCertificateIDs = append(allCertificateIDs, certificateIDs...)
 	}
 
@@ -245,14 +246,14 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	// Set the IP address of the ALB
 	err := setIPAddresses(ingressClass, alb)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set IP address: %w", err)
+		return false, nil, fmt.Errorf("failed to set IP address: %w", err)
 	}
 
 	alb.Name = ptr.To(getAlbName(ingressClass))
 	alb.Listeners = listeners
 	alb.TargetPools = targetPools
 
-	return alb, nil
+	return false, alb, nil
 }
 
 // laodCerts loads the tls certificates from Ingress to the Certificates API
@@ -260,30 +261,26 @@ func (r *IngressClassReconciler) loadCerts(
 	ctx context.Context,
 	ingressClass *networkingv1.IngressClass,
 	ingress *networkingv1.Ingress,
-) ([]string, error) {
+) (bool, []string, error) {
 	certificateIDs := []string{}
 
 	for _, tls := range ingress.Spec.TLS {
-		if tls.SecretName != "" {
+		if tls.SecretName == "" {
 			continue
 		}
 
 		secret := &corev1.Secret{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, secret); err != nil {
-			return nil, fmt.Errorf("failed to get TLS secret: %w", err)
+			return false, nil, fmt.Errorf("failed to get TLS secret: %w", err)
 		}
 
-		// The tls.crt should contain both the leaf certificate and the intermediate CA certificates.
-		// If it contains only the leaf certificate, the ACME challenge likely hasn't finished.
-		// Therefore the incomplete certificate shouldn't be loaded as the updates upon them are impossible.
 		complete, err := isCertReady(secret)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if certificate is ready: %w", err)
+			return false, nil, fmt.Errorf("failed to check if certificate is ready: %w", err)
 		}
 		if !complete {
-			// TODO: Requeue, instead of returning error - the ACME challenge hasn't finished yet
-			// return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-			return nil, fmt.Errorf("certificate is not complete: %w", err)
+			// Requeue: The ACME challenge is still in progress and the certificate is not yet fully issued.
+			return true, nil, fmt.Errorf("certificate is not complete: %w", err)
 		}
 
 		createCertificatePayload := &certsdk.CreateCertificatePayload{
@@ -294,12 +291,12 @@ func (r *IngressClassReconciler) loadCerts(
 		}
 		res, err := r.CertificateClient.CreateCertificate(ctx, r.ProjectID, r.Region, createCertificatePayload)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create certificate: %w", err)
+			return false, nil, fmt.Errorf("failed to create certificate: %w", err)
 		}
 
 		certificateIDs = append(certificateIDs, *res.Id)
 	}
-	return certificateIDs, nil
+	return false, certificateIDs, nil
 }
 
 // cleanupCerts deletes the certificates from the Certificates API that are no longer associated with any Ingress in the IngressClass
