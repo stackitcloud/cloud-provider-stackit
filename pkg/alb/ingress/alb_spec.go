@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	// externalIPAnnotation references an OpenStack floating IP that should be used by the application load balancer.
+	// externalIPAnnotation references a STACKIT floating IP that should be used by the application load balancer.
 	// If set it will be used instead of an ephemeral IP. The IP must be created by the customer. When the service is deleted,
 	// the floating IP will not be deleted. The IP is ignored if the alb.stackit.cloud/internal-alb is set.
 	// If the annotation is set after the creation it must match the ephemeral IP.
