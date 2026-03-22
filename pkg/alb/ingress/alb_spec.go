@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"net/netip"
 	"sort"
 	"strconv"
@@ -299,53 +298,31 @@ func (r *IngressClassReconciler) loadCerts(
 	return false, certificateIDs, nil
 }
 
-// cleanupCerts deletes the certificates from the Certificates API that are no longer associated with any Ingress in the IngressClass
-func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass *networkingv1.IngressClass, ingresses []*networkingv1.Ingress) error {
-	// Prepare a map of secret names that are currently being used by the ingresses
-	usedSecrets := map[string]bool{}
-	for _, ingress := range ingresses {
-		for _, tls := range ingress.Spec.TLS {
-			if tls.SecretName == "" {
-				continue
-			}
-			// Retrieve the TLS Secret
-			tlsSecret := &corev1.Secret{}
-			err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, tlsSecret)
-			if err != nil {
-				log.Printf("failed to get TLS secret %s: %v", tls.SecretName, err)
-				continue
-			}
-			certName := getCertName(ingressClass, ingress, tlsSecret)
-			usedSecrets[certName] = true
-		}
-	}
+// cleanupCerts deletes all certificates from the Certificates API that are associated with this IngressClass.
+func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass *networkingv1.IngressClass) error {
+    // We use the IngressClass UID to identify certificates for this specific class.
+	// A shortened version is used because that is how the names were generated on creation.
+	// Note: While a UID collision between clusters is technically possible, it is almost impossible in practice.
+    classPrefix := generateShortUID(ingressClass.UID)
 
-	certificatesList, err := r.CertificateClient.ListCertificate(ctx, r.ProjectID, r.Region)
-	if err != nil {
-		return fmt.Errorf("failed to list certificates: %w", err)
-	}
+    certificatesList, err := r.CertificateClient.ListCertificate(ctx, r.ProjectID, r.Region)
+    if err != nil {
+        return fmt.Errorf("failed to list certificates: %w", err)
+    }
 
-	if certificatesList == nil || certificatesList.Items == nil {
-		return nil // No certificates to clean up
-	}
-	for _, cert := range certificatesList.Items {
-		certID := *cert.Id
-		certName := *cert.Name
+    if certificatesList == nil || certificatesList.Items == nil {
+        return nil // No certificates to clean up
+    }
 
-		// The certificatesList contains all certificates in the project, so we need to filter them by the ALB IngressClass UID.
-		if !strings.HasPrefix(certName, generateShortUID(ingressClass.UID)) {
-			continue
-		}
-
-		// If the tls secret is no longer in referenced, delete the certificate
-		if _, inUse := usedSecrets[certName]; !inUse {
-			err := r.CertificateClient.DeleteCertificate(ctx, r.ProjectID, r.Region, certID)
-			if err != nil {
-				return fmt.Errorf("failed to delete certificate %s: %v", certName, err)
-			}
-		}
-	}
-	return nil
+    for _, cert := range certificatesList.Items {
+        if strings.HasPrefix(*cert.Name, classPrefix) {
+            err := r.CertificateClient.DeleteCertificate(ctx, r.ProjectID, r.Region, *cert.Id)
+            if err != nil {
+                return fmt.Errorf("failed to delete orphaned certificate %s: %v", *cert.Name, err)
+            }
+        }
+    }
+    return nil
 }
 
 // isCertReady checks if the certificate chain is complete (leaf + intermediates).
