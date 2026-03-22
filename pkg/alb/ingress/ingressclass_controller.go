@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	// finalizerName is the name of the finalizer that is added to the IngressClass
+	// finalizerName is the name of the finalizer that is added to Ingress and IngressClass
 	finalizerName = "stackit.cloud/alb-ingress"
 	// controllerName is the name of the ALB controller that the IngressClass should point to for reconciliation
 	controllerName = "stackit.cloud/alb-ingress"
@@ -105,7 +105,7 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if len(albIngressList) < 1 {
-		err := r.handleIngressClassWithoutIngresses(ctx, albIngressList, ingressClass)
+		err := r.handleIngressClassWithoutIngresses(ctx, ingressClass)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to reconcile %s IngressClass with no Ingresses: %w", getAlbName(ingressClass), err)
 		}
@@ -281,17 +281,18 @@ func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*
 	return ctrl.Result{}, nil
 }
 
-// handleIngressClassWithoutIngresses handles the state of the IngressClass that is not referenced by any Ingress
+// handleIngressClassWithoutIngresses handles the case where an IngressClass exists 
+// but is not referenced by any Ingresses. In this scenario, we delete the associated ALB
+// and clean up certificates to avoid billing for unused resources.
 func (r *IngressClassReconciler) handleIngressClassWithoutIngresses(
 	ctx context.Context,
-	ingresses []*networkingv1.Ingress,
 	ingressClass *networkingv1.IngressClass,
 ) error {
 	err := r.ALBClient.DeleteLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
 	if err != nil {
 		return fmt.Errorf("failed to delete load balancer: %w", err)
 	}
-	err = r.cleanupCerts(ctx, ingressClass, ingresses)
+	err = r.cleanupCerts(ctx, ingressClass)
 	if err != nil {
 		return fmt.Errorf("failed to clean up certificates: %w", err)
 	}
