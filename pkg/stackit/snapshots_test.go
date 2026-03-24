@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
-	"k8s.io/utils/ptr"
 
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/iaas"
 )
@@ -37,22 +36,22 @@ var _ = Describe("Snapshot", func() {
 		snapShotListResponse := iaas.SnapshotListResponse{
 			Items: &[]iaas.Snapshot{
 				{
-					Id:       ptr.To("fake-snapshot"),
-					Name:     ptr.To("fake-snapshot"),
-					VolumeId: ptr.To("some-special-volume"),
-					Status:   ptr.To("ERROR"),
+					Id:       new("fake-snapshot"),
+					Name:     new("fake-snapshot"),
+					VolumeId: new("some-special-volume"),
+					Status:   new("ERROR"),
 				},
 				{
-					Id:       ptr.To("fake-snapshot2"),
-					Name:     ptr.To("fake-snapshot2"),
-					VolumeId: ptr.To("some-special-volume"),
-					Status:   ptr.To("AVAILABLE"),
+					Id:       new("fake-snapshot2"),
+					Name:     new("fake-snapshot2"),
+					VolumeId: new("some-special-volume"),
+					Status:   new("AVAILABLE"),
 				},
 				{
-					Id:       ptr.To("wrong snapshot"),
-					Name:     ptr.To("wrong snapshot"),
-					VolumeId: ptr.To("another-special-volume"),
-					Status:   ptr.To("AVAILABLE"),
+					Id:       new("wrong snapshot"),
+					Name:     new("wrong snapshot"),
+					VolumeId: new("another-special-volume"),
+					Status:   new("AVAILABLE"),
 				},
 			},
 		}
@@ -81,16 +80,16 @@ var _ = Describe("Snapshot", func() {
 				map[string]string{"VolumeID": "some-special-volume"},
 				[]iaas.Snapshot{
 					{
-						Id:       ptr.To("fake-snapshot"),
-						Name:     ptr.To("fake-snapshot"),
-						VolumeId: ptr.To("some-special-volume"),
-						Status:   ptr.To("ERROR"),
+						Id:       new("fake-snapshot"),
+						Name:     new("fake-snapshot"),
+						VolumeId: new("some-special-volume"),
+						Status:   new("ERROR"),
 					},
 					{
-						Id:       ptr.To("fake-snapshot2"),
-						Name:     ptr.To("fake-snapshot2"),
-						VolumeId: ptr.To("some-special-volume"),
-						Status:   ptr.To("AVAILABLE"),
+						Id:       new("fake-snapshot2"),
+						Name:     new("fake-snapshot2"),
+						VolumeId: new("some-special-volume"),
+						Status:   new("AVAILABLE"),
 					},
 				},
 			),
@@ -98,10 +97,10 @@ var _ = Describe("Snapshot", func() {
 				map[string]string{"Name": "fake-snapshot"},
 				[]iaas.Snapshot{
 					{
-						Id:       ptr.To("fake-snapshot"),
-						Name:     ptr.To("fake-snapshot"),
-						VolumeId: ptr.To("some-special-volume"),
-						Status:   ptr.To("ERROR"),
+						Id:       new("fake-snapshot"),
+						Name:     new("fake-snapshot"),
+						VolumeId: new("some-special-volume"),
+						Status:   new("ERROR"),
 					},
 				},
 			),
@@ -109,10 +108,10 @@ var _ = Describe("Snapshot", func() {
 				map[string]string{"Name": "fake-snapshot2", "Status": "AVAILABLE"},
 				[]iaas.Snapshot{
 					{
-						Id:       ptr.To("fake-snapshot2"),
-						Name:     ptr.To("fake-snapshot2"),
-						VolumeId: ptr.To("some-special-volume"),
-						Status:   ptr.To("AVAILABLE"),
+						Id:       new("fake-snapshot2"),
+						Name:     new("fake-snapshot2"),
+						VolumeId: new("some-special-volume"),
+						Status:   new("AVAILABLE"),
 					},
 				},
 			),

@@ -14,7 +14,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	mountutils "k8s.io/mount-utils"
 	exec "k8s.io/utils/exec/testing"
-	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
@@ -84,13 +83,13 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			).DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
 				size := opts.Size
 				if size == nil {
-					size = ptr.To(int64(10)) // Default to 10GiB
+					size = new(int64(10)) // Default to 10GiB
 				}
 				newVol := &iaas.Volume{
-					Id:               ptr.To(uuid.New().String()), // Create a random ID
+					Id:               new(uuid.New().String()), // Create a random ID
 					Name:             opts.Name,
 					Size:             size,
-					Status:           ptr.To(stackit.VolumeAvailableStatus),
+					Status:           new(stackit.VolumeAvailableStatus),
 					AvailabilityZone: opts.AvailabilityZone,
 					Source:           opts.Source,
 				}
@@ -166,12 +165,12 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // tags
 			).DoAndReturn(func(_ context.Context, name string, volID string, _ map[string]string) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
-					Id:        ptr.To(uuid.New().String()),
-					Name:      ptr.To(name),
-					Status:    ptr.To(stackit.SnapshotReadyStatus),
-					CreatedAt: ptr.To(time.Now()),
-					Size:      ptr.To(int64(10)), // 10 GiB
-					VolumeId:  ptr.To(volID),
+					Id:        new(uuid.New().String()),
+					Name:      new(name),
+					Status:    new(stackit.SnapshotReadyStatus),
+					CreatedAt: new(time.Now()),
+					Size:      new(int64(10)), // 10 GiB
+					VolumeId:  new(volID),
 				}
 				createdSnapshots[*newSnap.Id] = newSnap
 				return newSnap, nil
@@ -249,7 +248,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
 			).Return(
-				ptr.To(string(stackit.SnapshotReadyStatus)),
+				new(string(stackit.SnapshotReadyStatus)),
 				nil,
 			).AnyTimes()
 
@@ -263,12 +262,12 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // tags
 			).DoAndReturn(func(_ context.Context, name, volID, snapshotID string, _ map[string]string) (*iaas.Backup, error) {
 				newBackup := &iaas.Backup{
-					Id:         ptr.To(uuid.New().String()),
-					Name:       ptr.To(name),
-					Status:     ptr.To("available"),
-					VolumeId:   ptr.To(volID),
-					SnapshotId: ptr.To(snapshotID),
-					CreatedAt:  ptr.To(time.Now()),
+					Id:         new(uuid.New().String()),
+					Name:       new(name),
+					Status:     new("available"),
+					VolumeId:   new(volID),
+					SnapshotId: new(snapshotID),
+					CreatedAt:  new(time.Now()),
 				}
 				createdBackups[*newBackup.Id] = newBackup
 				return newBackup, nil
@@ -329,8 +328,8 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				if !ok {
 					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
 				}
-				vol.ServerId = ptr.To(instanceID)
-				vol.Status = ptr.To("attached")
+				vol.ServerId = new(instanceID)
+				vol.Status = new("attached")
 				return *vol.Id, nil
 			}).AnyTimes()
 
