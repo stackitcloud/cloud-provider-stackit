@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var serverGRPCEndpointCallCounter uint64
+var serverGRPCEndpointCallCounter atomic.Uint64
 
 func NewControllerServiceCapability(rpcType csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
 	return &csi.ControllerServiceCapability{
@@ -101,7 +101,7 @@ func DetermineMaxVolumesByFlavor(flavor string) int64 {
 }
 
 func logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	callID := atomic.AddUint64(&serverGRPCEndpointCallCounter, 1)
+	callID := serverGRPCEndpointCallCounter.Add(1)
 
 	klog.V(3).Infof("[ID:%d] GRPC call: %s", callID, info.FullMethod)
 	klog.V(5).Infof("[ID:%d] GRPC request: %s", callID, protosanitizer.StripSecrets(req))
