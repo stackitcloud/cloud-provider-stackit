@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
@@ -36,8 +37,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
-
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 // userAgentData is used to add extra information to the STACKIT SDK user-agent
@@ -75,7 +74,7 @@ type IaasClient interface {
 	WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error)
 	GetInstanceByID(ctx context.Context, instanceID string) (*iaas.Server, error)
 	ExpandVolume(ctx context.Context, volumeID string, status string, size int64) error
-	GetBlockStorageOpts() BlockStorageOpts
+	GetBlockStorageOpts() config.BlockStorageOpts
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, targetStatus []string, backoff *wait.Backoff) error
 }
 
@@ -107,7 +106,7 @@ type iaasClient struct {
 	iaas      iaas.DefaultApi
 	projectID string
 	region    string
-	bsOpts    BlockStorageOpts
+	bsOpts    config.BlockStorageOpts
 }
 
 type lbClient struct {
@@ -120,33 +119,12 @@ type nodeClient struct {
 }
 
 //nolint:gocritic // The openstack package currently shadows but will be renamed anyway.
-func (os *iaasClient) GetBlockStorageOpts() BlockStorageOpts {
+func (os *iaasClient) GetBlockStorageOpts() config.BlockStorageOpts {
 	return os.bsOpts
 }
 
-type BlockStorageOpts struct {
-	RescanOnResize bool `yaml:"rescanOnResize"`
-}
-
-type GlobalOpts struct {
-	ProjectID    string       `yaml:"projectId"`
-	Region       string       `yaml:"region"`
-	APIEndpoints APIEndpoints `yaml:"apiEndpoints"`
-}
-
-type APIEndpoints struct {
-	IaasAPI         string `yaml:"iaasApi"`
-	LoadBalancerAPI string `yaml:"loadBalancerApi"`
-}
-
-type Config struct {
-	Global       GlobalOpts       `yaml:"global"`
-	Metadata     metadata.Opts    `yaml:"metadata"`
-	BlockStorage BlockStorageOpts `yaml:"blockStorage"`
-}
-
-func GetConfig(reader io.Reader) (Config, error) {
-	var cfg Config
+func GetConfig(reader io.Reader) (config.CSIConfig, error) {
+	var cfg config.CSIConfig
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -163,8 +141,8 @@ func GetConfig(reader io.Reader) (Config, error) {
 	return cfg, nil
 }
 
-func GetConfigFromFile(path string) (Config, error) {
-	var cfg Config
+func GetConfigFromFile(path string) (config.CSIConfig, error) {
+	var cfg config.CSIConfig
 
 	config, err := os.Open(path)
 	if err != nil {
@@ -177,7 +155,7 @@ func GetConfigFromFile(path string) (Config, error) {
 }
 
 // CreateSTACKITProvider creates STACKIT Instance
-func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, error) {
+func CreateSTACKITProvider(client iaas.DefaultApi, cfg *config.CSIConfig) (IaasClient, error) {
 	region := os.Getenv("STACKIT_REGION")
 	if region == "" {
 		panic("STACKIT_REGION environment variable not set")
@@ -193,7 +171,7 @@ func CreateSTACKITProvider(client iaas.DefaultApi, cfg *Config) (IaasClient, err
 	return instance, nil
 }
 
-func CreateIaaSClient(cfg *Config) (iaas.DefaultApi, error) {
+func CreateIaaSClient(cfg *config.CSIConfig) (iaas.DefaultApi, error) {
 	var userAgent []string
 	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))

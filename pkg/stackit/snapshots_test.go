@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
 
@@ -18,7 +19,7 @@ var _ = Describe("Snapshot", func() {
 		mockCtrl      *gomock.Controller
 		mockAPI       *mock.MockDefaultApi
 		stackitClient IaasClient
-		config        *Config
+		config        *stackitconfig.CSIConfig
 	)
 	const projectID = "project-id"
 	const region = "eu01"
@@ -57,8 +58,8 @@ var _ = Describe("Snapshot", func() {
 		}
 
 		BeforeEach(func() {
-			config = &Config{
-				Global: GlobalOpts{
+			config = &stackitconfig.CSIConfig{
+				Global: stackitconfig.GlobalOpts{
 					ProjectID: projectID,
 				},
 			}

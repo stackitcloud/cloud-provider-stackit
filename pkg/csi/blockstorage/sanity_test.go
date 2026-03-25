@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	. "github.com/onsi/ginkgo/v2"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	mountutils "k8s.io/mount-utils"
 	exec "k8s.io/utils/exec/testing"
 
@@ -437,7 +438,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			// --- Driver Setup & Run ---
 			driver.SetupControllerService(iaasClient)
-			driver.SetupNodeService(mountMock, metadataMock, stackit.BlockStorageOpts{})
+			driver.SetupNodeService(mountMock, metadataMock, stackitconfig.BlockStorageOpts{})
 
 			go func() {
 				defer GinkgoRecover()
