@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +25,7 @@ var _ = Describe("lbSpecFromService", func() {
 		httpAlt corev1.ServicePort
 		https   corev1.ServicePort
 		dns     corev1.ServicePort
-		lbOpts  LoadBalancerOpts
+		lbOpts  stackitconfig.LoadBalancerOpts
 	)
 	BeforeEach(func() {
 		http = corev1.ServicePort{
@@ -47,7 +48,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Port:     53,
 			Protocol: corev1.ProtocolUDP,
 		}
-		lbOpts = LoadBalancerOpts{NetworkID: "my-network"}
+		lbOpts = stackitconfig.LoadBalancerOpts{NetworkID: "my-network"}
 	})
 
 	Context("internal load balancer", func() {
