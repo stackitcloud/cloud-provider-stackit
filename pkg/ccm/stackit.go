@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
@@ -72,8 +72,8 @@ func init() {
 	})
 }
 
-func GetConfig(reader io.Reader) (config.CCMConfig, error) {
-	var cfg config.CCMConfig
+func GetConfig(reader io.Reader) (stackitconfig.CCMConfig, error) {
+	var cfg stackitconfig.CCMConfig
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -117,8 +117,8 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 	return nil, fmt.Errorf("missing from env: %q", missingKeys)
 }
 
-// NewCloudControllerManager creates a new instance of the stackit struct from a config struct
-func NewCloudControllerManager(cfg *config.CCMConfig, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+// NewCloudControllerManager creates a new instance of the stackit struct from a stackitconfig struct
+func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
