@@ -47,7 +47,6 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	API         string            `yaml:"api"`
 	NetworkID   string            `yaml:"networkId"`
 	ExtraLabels map[string]string `yaml:"extraLabels"`
 }
