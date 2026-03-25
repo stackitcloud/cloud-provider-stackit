@@ -26,7 +26,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -43,7 +43,7 @@ type nodeServer struct {
 	Driver   *Driver
 	Mount    mount.IMount
 	Metadata metadata.IMetadata
-	Opts     config.BlockStorageOpts
+	Opts     stackitconfig.BlockStorageOpts
 	csi.UnimplementedNodeServer
 }
 
