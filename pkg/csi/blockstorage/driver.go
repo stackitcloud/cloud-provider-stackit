@@ -5,7 +5,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 
@@ -139,7 +139,7 @@ func (d *Driver) SetupControllerService(instance stackit.IaasClient) {
 	d.cs = NewControllerServer(d, instance)
 }
 
-func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts config.BlockStorageOpts) {
+func (d *Driver) SetupNodeService(mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackitconfig.BlockStorageOpts) {
 	klog.Info("Providing node service")
 	d.ns = NewNodeServer(d, mountProvider, metadataProvider, opts)
 }

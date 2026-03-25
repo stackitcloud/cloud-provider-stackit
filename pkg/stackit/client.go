@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
@@ -74,7 +74,7 @@ type IaasClient interface {
 	WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error)
 	GetInstanceByID(ctx context.Context, instanceID string) (*iaas.Server, error)
 	ExpandVolume(ctx context.Context, volumeID string, status string, size int64) error
-	GetBlockStorageOpts() config.BlockStorageOpts
+	GetBlockStorageOpts() stackitconfig.BlockStorageOpts
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, targetStatus []string, backoff *wait.Backoff) error
 }
 
@@ -106,7 +106,7 @@ type iaasClient struct {
 	iaas      iaas.DefaultApi
 	projectID string
 	region    string
-	bsOpts    config.BlockStorageOpts
+	bsOpts    stackitconfig.BlockStorageOpts
 }
 
 type lbClient struct {
@@ -119,12 +119,12 @@ type nodeClient struct {
 }
 
 //nolint:gocritic // The openstack package currently shadows but will be renamed anyway.
-func (os *iaasClient) GetBlockStorageOpts() config.BlockStorageOpts {
+func (os *iaasClient) GetBlockStorageOpts() stackitconfig.BlockStorageOpts {
 	return os.bsOpts
 }
 
-func GetConfig(reader io.Reader) (config.CSIConfig, error) {
-	var cfg config.CSIConfig
+func GetConfig(reader io.Reader) (stackitconfig.CSIConfig, error) {
+	var cfg stackitconfig.CSIConfig
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -141,12 +141,12 @@ func GetConfig(reader io.Reader) (config.CSIConfig, error) {
 	return cfg, nil
 }
 
-func GetConfigFromFile(path string) (config.CSIConfig, error) {
-	var cfg config.CSIConfig
+func GetConfigFromFile(path string) (stackitconfig.CSIConfig, error) {
+	var cfg stackitconfig.CSIConfig
 
 	config, err := os.Open(path)
 	if err != nil {
-		klog.ErrorS(err, "Failed to open config file", "path", path)
+		klog.ErrorS(err, "Failed to open stackitconfig file", "path", path)
 		return cfg, err
 	}
 	defer config.Close()
@@ -155,7 +155,7 @@ func GetConfigFromFile(path string) (config.CSIConfig, error) {
 }
 
 // CreateSTACKITProvider creates STACKIT Instance
-func CreateSTACKITProvider(client iaas.DefaultApi, cfg *config.CSIConfig) (IaasClient, error) {
+func CreateSTACKITProvider(client iaas.DefaultApi, cfg *stackitconfig.CSIConfig) (IaasClient, error) {
 	region := os.Getenv("STACKIT_REGION")
 	if region == "" {
 		panic("STACKIT_REGION environment variable not set")
@@ -171,7 +171,7 @@ func CreateSTACKITProvider(client iaas.DefaultApi, cfg *config.CSIConfig) (IaasC
 	return instance, nil
 }
 
-func CreateIaaSClient(cfg *config.CSIConfig) (iaas.DefaultApi, error) {
+func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultApi, error) {
 	var userAgent []string
 	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))

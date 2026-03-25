@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -42,14 +42,14 @@ type LoadBalancer struct {
 	client    stackit.LoadbalancerClient
 	recorder  record.EventRecorder // set in CloudControllerManager.Initialize
 	projectID string
-	opts      config.LoadBalancerOpts
+	opts      stackitconfig.LoadBalancerOpts
 	// metricsRemoteWrite setting this enables remote writing of metrics and nil means it is disabled
 	metricsRemoteWrite *MetricsRemoteWrite
 }
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client stackit.LoadbalancerClient, projectID string, opts config.LoadBalancerOpts, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
+func NewLoadBalancer(client stackit.LoadbalancerClient, projectID string, opts stackitconfig.LoadBalancerOpts, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
 	// LoadBalancer.recorder is set in CloudControllerManager.Initialize
 	return &LoadBalancer{
 		client:             client,
