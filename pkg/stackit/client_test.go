@@ -8,6 +8,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
@@ -31,7 +32,7 @@ blockStorage:
 				SearchOrder:    "configDrive,metadataService",
 				RequestTimeout: metadata.Duration{Duration: 5 * time.Second},
 			}))
-			Expect(cfg.BlockStorage).To(Equal(BlockStorageOpts{
+			Expect(cfg.BlockStorage).To(Equal(config.BlockStorageOpts{
 				RescanOnResize: true,
 			}))
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
@@ -64,7 +65,7 @@ global:
 			cfg, err := GetConfig(strings.NewReader(``))
 			Expect(err).NotTo(HaveOccurred())
 			// Empty YAML should result in zero values
-			Expect(cfg).To(Equal(Config{}))
+			Expect(cfg).To(Equal(config.CSIConfig{}))
 		})
 	})
 

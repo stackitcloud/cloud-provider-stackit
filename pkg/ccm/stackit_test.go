@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 )
 
 var _ = Describe("GetConfig", func() {
@@ -83,7 +84,7 @@ global:
 
 		config, err := GetConfig(strings.NewReader(emptyYAML))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(config).To(Equal(Config{}))
+		Expect(config).To(Equal(stackitconfig.CCMConfig{}))
 	})
 
 	It("should return error for invalid YAML structure", func() {
@@ -134,6 +135,6 @@ loadBalancer:
 
 		config, err := GetConfig(emptyReader)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(config).To(Equal(Config{}))
+		Expect(config).To(Equal(stackitconfig.CCMConfig{}))
 	})
 })
