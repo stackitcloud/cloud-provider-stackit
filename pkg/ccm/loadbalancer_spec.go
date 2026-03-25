@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
 
@@ -241,7 +242,7 @@ func getPlanID(service *corev1.Service) (planID *string, msgs []string, err erro
 func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	service *corev1.Service,
 	nodes []*corev1.Node,
-	opts LoadBalancerOpts,
+	opts config.LoadBalancerOpts,
 	observability *loadbalancer.LoadbalancerOptionObservability,
 ) (*loadbalancer.CreateLoadBalancerPayload, []Event, error) {
 	lb := &loadbalancer.CreateLoadBalancerPayload{

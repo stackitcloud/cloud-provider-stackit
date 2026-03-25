@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -30,13 +31,13 @@ var _ = Describe("LoadBalancer", func() {
 		loadBalancer         *LoadBalancer
 		clusterName          string
 		projectID            string
-		lbOpts               LoadBalancerOpts
+		lbOpts               stackitconfig.LoadBalancerOpts
 	)
 
 	BeforeEach(func() {
 		clusterName = "my-cluster"
 		projectID = "my-project"
-		lbOpts = LoadBalancerOpts{NetworkID: "my-network"}
+		lbOpts = stackitconfig.LoadBalancerOpts{NetworkID: "my-network"}
 
 		ctrl := gomock.NewController(GinkgoT())
 		mockClient = stackit.NewMockLoadbalancerClient(ctrl)

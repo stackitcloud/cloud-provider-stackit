@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 const (
@@ -40,12 +40,6 @@ const (
 type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
 	instances    *Instances
-}
-
-type Config struct {
-	Global       stackit.GlobalOpts `yaml:"global"`
-	Metadata     metadata.Opts      `yaml:"metadata"`
-	LoadBalancer LoadBalancerOpts   `yaml:"loadBalancer"`
 }
 
 func init() {
@@ -78,8 +72,8 @@ func init() {
 	})
 }
 
-func GetConfig(reader io.Reader) (Config, error) {
-	var cfg Config
+func GetConfig(reader io.Reader) (config.CCMConfig, error) {
+	var cfg config.CCMConfig
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -124,7 +118,7 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 }
 
 // NewCloudControllerManager creates a new instance of the stackit struct from a config struct
-func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+func NewCloudControllerManager(cfg *config.CCMConfig, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
