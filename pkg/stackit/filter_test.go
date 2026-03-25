@@ -4,7 +4,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Filter", func() {
@@ -16,9 +15,9 @@ var _ = Describe("Filter", func() {
 
 		BeforeEach(func() {
 			backups = []iaas.Backup{
-				{Status: ptr.To("available"), VolumeId: ptr.To("vol-1"), Name: ptr.To("backup-1")},
-				{Status: ptr.To("error"), VolumeId: ptr.To("vol-2"), Name: ptr.To("backup-2")},
-				{Status: ptr.To("available"), VolumeId: ptr.To("vol-1"), Name: ptr.To("backup-3")},
+				{Status: new("available"), VolumeId: new("vol-1"), Name: new("backup-1")},
+				{Status: new("error"), VolumeId: new("vol-2"), Name: new("backup-2")},
+				{Status: new("available"), VolumeId: new("vol-1"), Name: new("backup-3")},
 			}
 			filters = make(map[string]string)
 		})
@@ -68,9 +67,9 @@ var _ = Describe("Filter", func() {
 
 		BeforeEach(func() {
 			volumes = []iaas.Volume{
-				{Name: ptr.To("volume-1")},
-				{Name: ptr.To("volume-2")},
-				{Name: ptr.To("volume-1")},
+				{Name: new("volume-1")},
+				{Name: new("volume-2")},
+				{Name: new("volume-1")},
 			}
 			filters = make(map[string]string)
 		})
@@ -97,9 +96,9 @@ var _ = Describe("Filter", func() {
 
 		BeforeEach(func() {
 			snapshots = []iaas.Snapshot{
-				{Status: ptr.To("available"), VolumeId: ptr.To("vol-1"), Name: ptr.To("snapshot-1")},
-				{Status: ptr.To("error"), VolumeId: ptr.To("vol-2"), Name: ptr.To("snapshot-2")},
-				{Status: ptr.To("available"), VolumeId: ptr.To("vol-1"), Name: ptr.To("snapshot-3")},
+				{Status: new("available"), VolumeId: new("vol-1"), Name: new("snapshot-1")},
+				{Status: new("error"), VolumeId: new("vol-2"), Name: new("snapshot-2")},
+				{Status: new("available"), VolumeId: new("vol-1"), Name: new("snapshot-3")},
 			}
 			filters = make(map[string]string)
 		})

@@ -3,14 +3,13 @@ package ccm
 import (
 	"fmt"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 )
@@ -216,10 +215,8 @@ func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPo
 func getPlanID(service *corev1.Service) (planID *string, msgs []string, err error) {
 	msgs = make([]string, 0)
 	if planID, found := service.Annotations[servicePlanAnnotation]; found {
-		for _, availablePlan := range availablePlanIDs {
-			if planID == availablePlan {
-				return &planID, nil, nil
-			}
+		if slices.Contains(availablePlanIDs, planID) {
+			return &planID, nil, nil
 		}
 		return nil, nil, fmt.Errorf("unsupported plan ID value %q, supported values are %v", planID, availablePlanIDs)
 	}
@@ -251,7 +248,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 		Options: &loadbalancer.LoadBalancerOptions{},
 		Networks: &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
+				Role:      new(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &opts.NetworkID,
 			},
 		},
@@ -260,17 +257,17 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 	if listenerNetwork := service.Annotations[listenerNetworkAnnotation]; listenerNetwork != "" {
 		lb.Networks = &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr(loadbalancer.NETWORKROLE_TARGETS),
+				Role:      new(loadbalancer.NETWORKROLE_TARGETS),
 				NetworkId: &opts.NetworkID,
 			}, {
-				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS),
+				Role:      new(loadbalancer.NETWORKROLE_LISTENERS),
 				NetworkId: &listenerNetwork,
 			},
 		}
 	} else {
 		lb.Networks = &[]loadbalancer.Network{
 			{
-				Role:      utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
+				Role:      new(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &opts.NetworkID,
 			},
 		}
@@ -278,7 +275,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 
 	// Add extraLabels if set
 	if opts.ExtraLabels != nil {
-		lb.Labels = ptr.To(opts.ExtraLabels)
+		lb.Labels = new(opts.ExtraLabels)
 	}
 
 	// Add metric metricsRemoteWrite settings
@@ -288,7 +285,7 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 
 	// Parse private network from annotations.
 	// TODO: Split into separate function.
-	lb.Options.PrivateNetworkOnly = utils.Ptr(false)
+	lb.Options.PrivateNetworkOnly = new(false)
 	var internal *bool
 	var yawolInternal *bool
 	if internalStr, found := service.Annotations[internalLBAnnotation]; found {
@@ -333,9 +330,9 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			"incompatible values for annotations %s and %s", yawolExistingFloatingIPAnnotation, externalIPAnnotation,
 		)
 	}
-	lb.Options.EphemeralAddress = utils.Ptr(false)
+	lb.Options.EphemeralAddress = new(false)
 	if !found && !yawolFound && !*lb.Options.PrivateNetworkOnly {
-		lb.Options.EphemeralAddress = utils.Ptr(true)
+		lb.Options.EphemeralAddress = new(true)
 	}
 	if !found && yawolFound {
 		externalIP = yawolExternalIP
@@ -507,12 +504,12 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 				protocol = loadbalancer.LISTENERPROTOCOL_TCP
 			}
 			tcpOptions = &loadbalancer.OptionsTCP{
-				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
+				IdleTimeout: new(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
 			}
 		case corev1.ProtocolUDP:
 			protocol = loadbalancer.LISTENERPROTOCOL_UDP
 			udpOptions = &loadbalancer.OptionsUDP{
-				IdleTimeout: utils.Ptr(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
+				IdleTimeout: new(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
 			}
 		default:
 			return nil, nil, fmt.Errorf("unsupported protocol %q for port %q", port.Protocol, port.Name)
@@ -520,19 +517,19 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 
 		listeners = append(listeners, loadbalancer.Listener{
 			DisplayName: &name,
-			Port:        utils.Ptr(int64(port.Port)),
+			Port:        new(int64(port.Port)),
 			TargetPool:  &name,
-			Protocol:    utils.Ptr(protocol),
+			Protocol:    new(protocol),
 			Tcp:         tcpOptions,
 			Udp:         udpOptions,
 		})
 
 		targetPools = append(targetPools, loadbalancer.TargetPool{
 			Name:       &name,
-			TargetPort: utils.Ptr(int64(port.NodePort)),
+			TargetPort: new(int64(port.NodePort)),
 			Targets:    &targets,
 			SessionPersistence: &loadbalancer.SessionPersistence{
-				UseSourceIpAddress: utils.Ptr(useSourceIP),
+				UseSourceIpAddress: new(useSourceIP),
 			},
 		})
 	}

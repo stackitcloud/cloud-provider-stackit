@@ -20,6 +20,7 @@ linters:
     - importas
     - ineffassign
     - misspell
+    - modernize
     - nakedret
     - noctx
     - nolintlint

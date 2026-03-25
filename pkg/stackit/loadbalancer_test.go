@@ -35,7 +35,7 @@ var _ = Describe("LBAPI Client", func() {
 	Describe("GetLoadBalancer", func() {
 		It("should return the received load balancer instance", func() {
 			expectedName := "test LB instance"
-			expectedLB := &loadbalancer.LoadBalancer{Name: ptr.To(expectedName)}
+			expectedLB := &loadbalancer.LoadBalancer{Name: new(expectedName)}
 			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any(), "projectID", gomock.Any(), expectedName).
 				Return(expectedLB, nil).Times(1)
 
