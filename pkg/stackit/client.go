@@ -129,9 +129,14 @@ type BlockStorageOpts struct {
 }
 
 type GlobalOpts struct {
-	ProjectID string `yaml:"projectId"`
-	IaasAPI   string `yaml:"iaasApi"`
-	Region    string `yaml:"region"`
+	ProjectID    string       `yaml:"projectId"`
+	Region       string       `yaml:"region"`
+	APIEndpoints APIEndpoints `yaml:"apiEndpoints"`
+}
+
+type APIEndpoints struct {
+	IaasAPI         string `yaml:"iaasApi"`
+	LoadBalancerAPI string `yaml:"loadBalancerApi"`
 }
 
 type Config struct {
@@ -198,8 +203,8 @@ func CreateIaaSClient(cfg *Config) (iaas.DefaultApi, error) {
 	}
 	klog.V(4).Infof("Using user-agent: %s", userAgent)
 
-	if cfg.Global.IaasAPI != "" {
-		opts = append(opts, sdkconfig.WithEndpoint(cfg.Global.IaasAPI))
+	if cfg.Global.APIEndpoints.IaasAPI != "" {
+		opts = append(opts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
 	opts = append(opts, sdkconfig.WithUserAgent(strings.Join(userAgent, " ")))

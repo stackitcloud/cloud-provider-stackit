@@ -19,6 +19,8 @@ global:
   projectId: "test-project"
   iaasApi: "https://api.example.com"
   region: "eu01"
+  apiEndpoints:
+    iaasApi: "https://api.example.com"
 metadata:
   searchOrder: "configDrive,metadataService"
   requestTimeout: "5s"
@@ -34,7 +36,7 @@ blockStorage:
 			}))
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 			Expect(cfg.Global.Region).To(Equal("eu01"))
-			Expect(cfg.Global.IaasAPI).To(Equal("https://api.example.com"))
+			Expect(cfg.Global.APIEndpoints.IaasAPI).To(Equal("https://api.example.com"))
 		})
 
 		It("should handle missing optional fields", func() {
@@ -46,7 +48,7 @@ global:
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 			Expect(cfg.Global.Region).To(Equal("eu01"))
 			// Optional fields should be empty/zero values
-			Expect(cfg.Global.IaasAPI).To(BeEmpty())
+			Expect(cfg.Global.APIEndpoints.IaasAPI).To(BeEmpty())
 		})
 
 		It("should return error for invalid yaml", func() {
