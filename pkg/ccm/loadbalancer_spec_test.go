@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
-	"github.com/stackitcloud/stackit-sdk-go/core/utils"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,7 +187,7 @@ var _ = Describe("lbSpecFromService", func() {
 			pushURL := "test-endpoint"
 			spec, _, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, lbOpts, &loadbalancer.LoadbalancerOptionObservability{
 				Metrics: &loadbalancer.LoadbalancerOptionMetrics{
-					CredentialsRef: ptr.To(sampleCredentialsRef),
+					CredentialsRef: new(sampleCredentialsRef),
 					PushUrl:        &pushURL,
 				},
 			})
@@ -500,8 +499,8 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec.TargetPools).To(PointTo(HaveLen(2)))
 			Expect(spec.TargetPools).To(PointTo(HaveEach(
 				haveTargets(ContainElements(loadbalancer.Target{
-					DisplayName: utils.Ptr("node-1"),
-					Ip:          utils.Ptr("10.2.3.4"),
+					DisplayName: new("node-1"),
+					Ip:          new("10.2.3.4"),
 				})))))
 		})
 
@@ -533,8 +532,8 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec.TargetPools).To(PointTo(ConsistOf(
 				haveTargets(ConsistOf( // node-2 is missing
 					loadbalancer.Target{
-						DisplayName: utils.Ptr("node-1"),
-						Ip:          utils.Ptr("10.2.3.4"),
+						DisplayName: new("node-1"),
+						Ip:          new("10.2.3.4"),
 					},
 				)),
 			)))
@@ -1232,30 +1231,30 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				Observability: &loadbalancer.LoadbalancerOptionObservability{
 					Logs: &loadbalancer.LoadbalancerOptionLogs{
-						CredentialsRef: ptr.To("credentials-12345"),
-						PushUrl:        ptr.To("https://logs.example.org"),
+						CredentialsRef: new("credentials-12345"),
+						PushUrl:        new("https://logs.example.org"),
 					},
 					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
-						CredentialsRef: ptr.To("credentials-12345"),
-						PushUrl:        ptr.To("https://metrics.example.org"),
+						CredentialsRef: new("credentials-12345"),
+						PushUrl:        new("https://metrics.example.org"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				Observability: &loadbalancer.LoadbalancerOptionObservability{
 					Logs: &loadbalancer.LoadbalancerOptionLogs{
-						CredentialsRef: ptr.To("credentials-12345"),
-						PushUrl:        ptr.To("https://logs.example.org"),
+						CredentialsRef: new("credentials-12345"),
+						PushUrl:        new("https://logs.example.org"),
 					},
 					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
-						CredentialsRef: ptr.To("credentials-12345"),
-						PushUrl:        ptr.To("https://metrics.example.org"),
+						CredentialsRef: new("credentials-12345"),
+						PushUrl:        new("https://metrics.example.org"),
 					},
 				},
 			},
@@ -1266,18 +1265,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				Observability: &loadbalancer.LoadbalancerOptionObservability{
 					Metrics: &loadbalancer.LoadbalancerOptionMetrics{
-						CredentialsRef: ptr.To("credentials-12345"),
-						PushUrl:        ptr.To("https://metrics.example.org"),
+						CredentialsRef: new("credentials-12345"),
+						PushUrl:        new("https://metrics.example.org"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 		},
 	}),
@@ -1285,15 +1284,15 @@ var _ = DescribeTable("compareLBwithSpec",
 		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			ExternalAddress: nil,
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 	}),
@@ -1301,15 +1300,15 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled:         false,
 		wantImmutabledChanged: nil,
 		lb: &loadbalancer.LoadBalancer{
-			PlanId: loadbalancer.PtrString("p10"),
+			PlanId: new("p10"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			PlanId: loadbalancer.PtrString("p250"),
+			PlanId: new("p250"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 	}),
@@ -1319,31 +1318,31 @@ var _ = DescribeTable("compareLBwithSpec",
 			ExternalAddress: nil,
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 		},
 	}),
 	Entry("When specified and actual IP don't match", &compareLBwithSpecTest{
 		// The IP can never be changed. Not even with promotion or demotion.
 		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation},
 		lb: &loadbalancer.LoadBalancer{
-			ExternalAddress: utils.Ptr("123.124.88.01"),
+			ExternalAddress: new("123.124.88.01"),
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 		},
 	}),
 	Entry("When IP is to be promoted", &compareLBwithSpecTest{
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(false),
+				EphemeralAddress: new(false),
 			},
 		},
 	}),
@@ -1351,13 +1350,13 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantImmutabledChanged: &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(false),
+				EphemeralAddress: new(false),
 			},
-			ExternalAddress: utils.Ptr("123.124.88.99"),
+			ExternalAddress: new("123.124.88.99"),
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: utils.Ptr(true),
+				EphemeralAddress: new(true),
 			},
 		},
 	}),
@@ -1365,7 +1364,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{}, {},
@@ -1373,7 +1372,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{},
@@ -1384,18 +1383,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{DisplayName: utils.Ptr("port-a")},
+				{DisplayName: new("port-a")},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{DisplayName: utils.Ptr("port-b")},
+				{DisplayName: new("port-b")},
 			},
 		},
 	}),
@@ -1403,18 +1402,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{Port: utils.Ptr[int64](80)},
+				{Port: new(int64(80))},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{Port: utils.Ptr[int64](443)},
+				{Port: new(int64(443))},
 			},
 		},
 	}),
@@ -1422,18 +1421,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP)},
+				{Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP)},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)},
+				{Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)},
 			},
 		},
 	}),
@@ -1441,26 +1440,26 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP),
 					Tcp: &loadbalancer.OptionsTCP{
-						IdleTimeout: utils.Ptr("60s"),
+						IdleTimeout: new("60s"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP),
 					Tcp: &loadbalancer.OptionsTCP{
-						IdleTimeout: utils.Ptr("120s"),
+						IdleTimeout: new("120s"),
 					},
 				},
 			},
@@ -1470,26 +1469,26 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_UDP),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_UDP),
 					Udp: &loadbalancer.OptionsUDP{
-						IdleTimeout: utils.Ptr("60s"),
+						IdleTimeout: new("60s"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_UDP),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_UDP),
 					Udp: &loadbalancer.OptionsUDP{
-						IdleTimeout: utils.Ptr("120s"),
+						IdleTimeout: new("120s"),
 					},
 				},
 			},
@@ -1499,26 +1498,26 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
 					Tcp: &loadbalancer.OptionsTCP{
-						IdleTimeout: utils.Ptr("60s"),
+						IdleTimeout: new("60s"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
 				{
-					Protocol: utils.Ptr(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
+					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
 					Tcp: &loadbalancer.OptionsTCP{
-						IdleTimeout: utils.Ptr("120s"),
+						IdleTimeout: new("120s"),
 					},
 				},
 			},
@@ -1528,18 +1527,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{TargetPool: utils.Ptr("target-pool-a")},
+				{TargetPool: new("target-pool-a")},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Listeners: &[]loadbalancer.Listener{
-				{TargetPool: utils.Ptr("target-pool-b")},
+				{TargetPool: new("target-pool-b")},
 			},
 		},
 	}),
@@ -1547,13 +1546,13 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantImmutabledChanged: &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: nil,
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: &[]loadbalancer.Network{
 				{},
@@ -1564,21 +1563,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].networkId", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: &[]loadbalancer.Network{
 				{
-					NetworkId: utils.Ptr("my-network"),
+					NetworkId: new("my-network"),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: &[]loadbalancer.Network{
 				{
-					NetworkId: utils.Ptr("other-network"),
+					NetworkId: new("other-network"),
 				},
 			},
 		},
@@ -1587,21 +1586,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].role", annotation: listenerNetworkAnnotation},
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: &[]loadbalancer.Network{
 				{
-					Role: utils.Ptr(loadbalancer.NETWORKROLE_LISTENERS),
+					Role: new(loadbalancer.NETWORKROLE_LISTENERS),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			Networks: &[]loadbalancer.Network{
 				{
-					Role: utils.Ptr(loadbalancer.NETWORKROLE_TARGETS),
+					Role: new(loadbalancer.NETWORKROLE_TARGETS),
 				},
 			},
 		},
@@ -1610,7 +1609,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{},
@@ -1618,7 +1617,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{}, {},
@@ -1629,21 +1628,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					Name: utils.Ptr("target-pool-a"),
+					Name: new("target-pool-a"),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					Name: utils.Ptr("target-pool-b"),
+					Name: new("target-pool-b"),
 				},
 			},
 		},
@@ -1652,21 +1651,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					TargetPort: utils.Ptr[int64](80),
+					TargetPort: new(int64(80)),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
-					TargetPort: utils.Ptr[int64](443),
+					TargetPort: new(int64(443)),
 				},
 			},
 		},
@@ -1675,18 +1674,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.1"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.1"),
 						},
 						{
-							DisplayName: utils.Ptr("node-b"),
-							Ip:          utils.Ptr("10.0.0.2"),
+							DisplayName: new("node-b"),
+							Ip:          new("10.0.0.2"),
 						},
 					},
 				},
@@ -1694,18 +1693,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-b"),
-							Ip:          utils.Ptr("10.0.0.2"),
+							DisplayName: new("node-b"),
+							Ip:          new("10.0.0.2"),
 						},
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.1"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.1"),
 						},
 					},
 				},
@@ -1716,14 +1715,14 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.1"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.1"),
 						},
 					},
 				},
@@ -1731,18 +1730,18 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-b"),
-							Ip:          utils.Ptr("10.0.0.2"),
+							DisplayName: new("node-b"),
+							Ip:          new("10.0.0.2"),
 						},
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.1"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.1"),
 						},
 					},
 				},
@@ -1753,14 +1752,14 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.1"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.1"),
 						},
 					},
 				},
@@ -1768,14 +1767,14 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					Targets: &[]loadbalancer.Target{
 						{
-							DisplayName: utils.Ptr("node-a"),
-							Ip:          utils.Ptr("10.0.0.2"),
+							DisplayName: new("node-a"),
+							Ip:          new("10.0.0.2"),
 						},
 					},
 				},
@@ -1786,7 +1785,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
@@ -1796,7 +1795,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
@@ -1809,24 +1808,24 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
-						Interval: utils.Ptr("2"),
+						Interval: new("2"),
 					},
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
-						Interval: utils.Ptr("3"),
+						Interval: new("3"),
 					},
 				},
 			},
@@ -1836,7 +1835,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
@@ -1848,12 +1847,12 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
-						UnhealthyThreshold: utils.Ptr[int64](3),
+						UnhealthyThreshold: new(int64(3)),
 					},
 				},
 			},
@@ -1866,21 +1865,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 		},
 	}),
 	Entry("When private IP is reported back from API", &compareLBwithSpecTest{
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
-			PrivateAddress: utils.Ptr("10.1.1.3"),
+			PrivateAddress: new("10.1.1.3"),
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 		},
 	}),
@@ -1888,15 +1887,15 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: utils.Ptr([]string{"10.0.0.0/24"}),
+					AllowedSourceRanges: new([]string{"10.0.0.0/24"}),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 		},
 	}),
@@ -1904,17 +1903,17 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: utils.Ptr([]string{"10.5.0.0/24"}),
+					AllowedSourceRanges: new([]string{"10.5.0.0/24"}),
 				},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: utils.Ptr([]string{"10.0.0.0/24"}),
+					AllowedSourceRanges: new([]string{"10.0.0.0/24"}),
 				},
 			},
 		},
@@ -1923,21 +1922,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(true),
+					UseSourceIpAddress: new(true),
 				},
 			}},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(true),
+					UseSourceIpAddress: new(true),
 				},
 			}},
 		},
@@ -1946,21 +1945,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(false),
+					UseSourceIpAddress: new(false),
 				},
 			}},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(false),
+					UseSourceIpAddress: new(false),
 				},
 			}},
 		},
@@ -1969,21 +1968,21 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(false),
+					UseSourceIpAddress: new(false),
 				},
 			}},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: utils.Ptr(true),
+				PrivateNetworkOnly: new(true),
 			},
 			TargetPools: &[]loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
-					UseSourceIpAddress: utils.Ptr(true),
+					UseSourceIpAddress: new(true),
 				},
 			}},
 		},
