@@ -14,10 +14,11 @@ var _ = Describe("GetConfig", func() {
 global:
   projectId: "test-project"
   region: "eu01"
+  apiEndpoints:
+    loadBalancerApi: "https://load-balancer.api.eu01.stackit.cloud"
 metadata:
   searchOrder: "metadataService,configDrive"
 loadBalancer:
-  api: "https://load-balancer.api.eu01.stackit.cloud"
   networkId: "test-network"
 `
 
@@ -25,8 +26,8 @@ loadBalancer:
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.Global.ProjectID).To(Equal("test-project"))
 		Expect(config.Global.Region).To(Equal("eu01"))
+		Expect(config.Global.APIEndpoints.LoadBalancerAPI).To(Equal("https://load-balancer.api.eu01.stackit.cloud"))
 		Expect(config.Metadata.SearchOrder).To(Equal("metadataService,configDrive"))
-		Expect(config.LoadBalancer.API).To(Equal("https://load-balancer.api.eu01.stackit.cloud"))
 		Expect(config.LoadBalancer.NetworkID).To(Equal("test-network"))
 	})
 
@@ -43,8 +44,8 @@ loadBalancer:
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.Global.ProjectID).To(Equal("my-project"))
 		Expect(config.Global.Region).To(Equal("eu01"))
+		Expect(config.Global.APIEndpoints.LoadBalancerAPI).To(BeEmpty())
 		Expect(config.LoadBalancer.NetworkID).To(Equal("my-network"))
-		Expect(config.LoadBalancer.API).To(BeEmpty())
 	})
 
 	It("should handle configuration with extra labels", func() {
