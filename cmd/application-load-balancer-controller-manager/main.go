@@ -2,9 +2,7 @@ package main
 
 import (
 	"crypto/tls"
-	"errors"
 	"flag"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -12,7 +10,6 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
-	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,37 +38,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
-}
-
-// ReadConfig reads the ALB infrastructure configuration provided via the cloud-config flag.
-func ReadConfig(cloudConfig string) (stackitconfig.ALBConfig, error) {
-	configFile, err := os.Open(cloudConfig)
-	if err != nil {
-		return stackitconfig.ALBConfig{}, err
-	}
-	defer configFile.Close()
-
-	var config stackitconfig.ALBConfig
-	content, err := io.ReadAll(configFile)
-	if err != nil {
-		return stackitconfig.ALBConfig{}, err
-	}
-
-	err = yaml.Unmarshal(content, &config)
-	if err != nil {
-		return stackitconfig.ALBConfig{}, err
-	}
-
-	if config.Global.ProjectID == "" {
-		return stackitconfig.ALBConfig{}, errors.New("project ID must be set")
-	}
-	if config.Global.Region == "" {
-		return stackitconfig.ALBConfig{}, errors.New("region must be set")
-	}
-	if config.ApplicationLoadBalancer.NetworkID == "" {
-		return stackitconfig.ALBConfig{}, errors.New("network ID must be set")
-	}
-	return config, nil
 }
 
 // nolint:gocyclo,funlen // TODO: Refactor into smaller functions.
@@ -117,7 +83,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	config, err := ReadConfig(cloudConfig)
+	config, err := stackitconfig.ReadALBConfigFromFile(cloudConfig)
 	if err != nil {
 		setupLog.Error(err, "Failed to read cloud config")
 		os.Exit(1)
