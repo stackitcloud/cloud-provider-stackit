@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
@@ -81,7 +80,7 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 		Networks: []albsdk.Network{
 			{
 				NetworkId: networkID,
-				Role:      ptr.To("ROLE_LISTENERS_AND_TARGETS"),
+				Role:      new("ROLE_LISTENERS_AND_TARGETS"),
 			},
 		},
 	}
@@ -183,15 +182,15 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	hostToRules := map[string][]albsdk.Rule{}
 	for _, meta := range ruleMetadataList {
 		rule := albsdk.Rule{
-			TargetPool: ptr.To(meta.targetPool),
+			TargetPool: new(meta.targetPool),
 		}
 		if meta.pathTypeVal == 0 { // Exact path
 			rule.Path = &albsdk.Path{
-				ExactMatch: ptr.To(meta.path),
+				ExactMatch: new(meta.path),
 			}
 		} else { // Prefix path
 			rule.Path = &albsdk.Path{
-				Prefix: ptr.To(meta.path),
+				Prefix: new(meta.path),
 			}
 		}
 		hostToRules[meta.host] = append(hostToRules[meta.host], rule)
@@ -208,7 +207,7 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	for _, host := range hostnames {
 		rulesCopy := hostToRules[host]
 		httpHosts = append(httpHosts, albsdk.HostConfig{
-			Host:  ptr.To(host),
+			Host:  new(host),
 			Rules: rulesCopy,
 		})
 	}
@@ -218,9 +217,9 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	// Add TLS listener if any Ingress has TLS configured
 	listeners := []albsdk.Listener{
 		{
-			Name:     ptr.To("http"),
-			Port:     ptr.To(int32(80)),
-			Protocol: ptr.To("PROTOCOL_HTTP"),
+			Name:     new("http"),
+			Port:     new(int32(80)),
+			Protocol: new("PROTOCOL_HTTP"),
 			Http: &albsdk.ProtocolOptionsHTTP{
 				Hosts: httpHosts,
 			},
@@ -228,9 +227,9 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 	}
 	if len(allCertificateIDs) > 0 {
 		listeners = append(listeners, albsdk.Listener{
-			Name:     ptr.To("https"),
-			Port:     ptr.To(int32(443)),
-			Protocol: ptr.To("PROTOCOL_HTTPS"),
+			Name:     new("https"),
+			Port:     new(int32(443)),
+			Protocol: new("PROTOCOL_HTTPS"),
 			Http: &albsdk.ProtocolOptionsHTTP{
 				Hosts: httpHosts,
 			},
@@ -248,14 +247,15 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 		return false, nil, fmt.Errorf("failed to set IP address: %w", err)
 	}
 
-	alb.Name = ptr.To(getAlbName(ingressClass))
+	alb.Name = new(getAlbName(ingressClass))
 	alb.Listeners = listeners
 	alb.TargetPools = targetPools
 
 	return false, alb, nil
 }
 
-// laodCerts loads the tls certificates from Ingress to the Certificates API
+// loadCerts loads the tls certificates from Ingress to the Certificates API
+// nolint:gocritic // no named results
 func (r *IngressClassReconciler) loadCerts(
 	ctx context.Context,
 	ingressClass *networkingv1.IngressClass,
@@ -283,10 +283,10 @@ func (r *IngressClassReconciler) loadCerts(
 		}
 
 		createCertificatePayload := &certsdk.CreateCertificatePayload{
-			Name:       ptr.To(getCertName(ingressClass, ingress, secret)),
+			Name:       new(getCertName(ingressClass, ingress, secret)),
 			ProjectId:  &r.ALBConfig.Global.ProjectID,
-			PrivateKey: ptr.To(string(secret.Data["tls.key"])),
-			PublicKey:  ptr.To(string(secret.Data["tls.crt"])),
+			PrivateKey: new(string(secret.Data["tls.key"])),
+			PublicKey:  new(string(secret.Data["tls.crt"])),
 		}
 		res, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {
@@ -373,22 +373,22 @@ func addTargetPool(
 ) {
 	tlsConfig := &albsdk.TlsConfig{}
 	if val, ok := ingress.Annotations[tlsBridgingTrustedCaAnnotation]; ok && val == "true" {
-		tlsConfig.Enabled = ptr.To(true)
+		tlsConfig.Enabled = new(true)
 	}
 	if val, ok := ingress.Annotations[tlsBridgingCustomCaAnnotation]; ok && val != "" {
-		tlsConfig.Enabled = ptr.To(true)
-		tlsConfig.CustomCa = ptr.To(val)
+		tlsConfig.Enabled = new(true)
+		tlsConfig.CustomCa = new(val)
 	}
 	if val, ok := ingress.Annotations[tlsBridgingSkipValidationAnnotation]; ok && val == "true" {
-		tlsConfig.Enabled = ptr.To(true)
-		tlsConfig.SkipCertificateValidation = ptr.To(true)
+		tlsConfig.Enabled = new(true)
+		tlsConfig.SkipCertificateValidation = new(true)
 	}
 	if tlsConfig.Enabled == nil {
 		tlsConfig = nil
 	}
 	*targetPools = append(*targetPools, albsdk.TargetPool{
-		Name:       ptr.To(targetPoolName),
-		TargetPort: ptr.To(nodePort),
+		Name:       new(targetPoolName),
+		TargetPort: new(nodePort),
 		TlsConfig:  tlsConfig,
 		Targets:    targets,
 	})
@@ -400,14 +400,14 @@ func setIPAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateL
 	isInternalIP, found := ingressClass.Annotations[internalIPAnnotation]
 	if found && isInternalIP == "true" {
 		alb.Options = &albsdk.LoadBalancerOptions{
-			PrivateNetworkOnly: ptr.To(true),
+			PrivateNetworkOnly: new(true),
 		}
 		return nil
 	}
 	externalAddress, found := ingressClass.Annotations[externalIPAnnotation]
 	if !found {
 		alb.Options = &albsdk.LoadBalancerOptions{
-			EphemeralAddress: ptr.To(true),
+			EphemeralAddress: new(true),
 		}
 		return nil
 	}
@@ -415,7 +415,7 @@ func setIPAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateL
 	if err != nil {
 		return fmt.Errorf("failed to validate external address: %w", err)
 	}
-	alb.ExternalAddress = ptr.To(externalAddress)
+	alb.ExternalAddress = new(externalAddress)
 	return nil
 }
 

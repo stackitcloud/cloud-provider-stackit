@@ -11,7 +11,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,7 +70,7 @@ var _ = Describe("IngressClassReconciler", func() {
 					namespace.Name: {},
 				},
 			},
-			Controller: config.Controller{SkipNameValidation: ptr.To(true)},
+			Controller: config.Controller{SkipNameValidation: new(true)},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -208,7 +207,7 @@ var _ = Describe("IngressClassReconciler", func() {
 							Namespace: namespace.Name,
 						},
 						Spec: networkingv1.IngressSpec{
-							IngressClassName: ptr.To("managed-ingressclass"),
+							IngressClassName: new("managed-ingressclass"),
 							Rules: []networkingv1.IngressRule{
 								{
 									Host: "example.com",
@@ -217,7 +216,7 @@ var _ = Describe("IngressClassReconciler", func() {
 											Paths: []networkingv1.HTTPIngressPath{
 												{
 													Path:     "/",
-													PathType: ptr.To(networkingv1.PathTypePrefix),
+													PathType: new(networkingv1.PathTypePrefix),
 													Backend: networkingv1.IngressBackend{
 														Service: &networkingv1.IngressServiceBackend{
 															Name: "dummy-svc",
@@ -322,7 +321,7 @@ var _ = Describe("IngressClassReconciler", func() {
 								Namespace: namespace.Name,
 							},
 							Spec: networkingv1.IngressSpec{
-								IngressClassName: ptr.To("managed-ingressclass"),
+								IngressClassName: new("managed-ingressclass"),
 								Rules: []networkingv1.IngressRule{
 									{
 										Host: "example.com",
@@ -331,7 +330,7 @@ var _ = Describe("IngressClassReconciler", func() {
 												Paths: []networkingv1.HTTPIngressPath{
 													{
 														Path:     "/",
-														PathType: ptr.To(networkingv1.PathTypePrefix),
+														PathType: new(networkingv1.PathTypePrefix),
 														Backend: networkingv1.IngressBackend{
 															Service: &networkingv1.IngressServiceBackend{
 																Name: "dummy-svc",
@@ -372,7 +371,7 @@ var _ = Describe("IngressClassReconciler", func() {
 					// 				Listeners:      &[]albsdk.Listener{},
 					// 				TargetPools:    &[]albsdk.TargetPool{},
 					// 				Status:         albsdk.LOADBALANCERSTATUS_READY.Ptr(),
-					// 				ExternalAddress: ptr.To("1.2.3.4"),
+					// 				ExternalAddress: new("1.2.3.4"),
 					// 				Version:        albsdk.PtrString("1"),
 					// 			}, nil)
 					// 	})
@@ -421,7 +420,7 @@ var _ = Describe("IngressClassReconciler", func() {
 					// 				Return(&albsdk.LoadBalancer{
 					// 					Listeners:       &[]albsdk.Listener{},
 					// 					TargetPools:     &[]albsdk.TargetPool{},
-					// 					Status:          ptr.To(albclient.LBStatusReady),
+					// 					Status:          new(albclient.LBStatusReady),
 					// 					ExternalAddress: nil,
 					// 					PrivateAddress:  nil,
 					// 					Version:         1,
@@ -446,7 +445,7 @@ var _ = Describe("IngressClassReconciler", func() {
 					// 				Return(&albsdk.LoadBalancer{
 					// 					Listeners:       &[]albsdk.Listener{},
 					// 					TargetPools:     &[]albsdk.TargetPool{},
-					// 					Status:          ptr.To("PENDING"),
+					// 					Status:          new("PENDING"),
 					// 					ExternalAddress: nil,
 					// 					PrivateAddress:  nil,
 					// 					Version:         1,
