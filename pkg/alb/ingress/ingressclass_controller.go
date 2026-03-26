@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,9 +52,7 @@ type IngressClassReconciler struct { //nolint:revive // Naming this ClassReconci
 	ALBClient         stackit.ApplicationLoadBalancerClient
 	CertificateClient stackit.CertificatesClient
 	Scheme            *runtime.Scheme
-	ProjectID         string
-	NetworkID         string
-	Region            string
+	ALBConfig         stackitconfig.ALBConfig
 }
 
 // +kubebuilder:rbac:groups=networking.k8s.io.stackit.cloud,resources=ingressclasses,verbs=get;list;watch;create;update;patch;delete
@@ -184,7 +183,7 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 	}
 
 	// Create ALB payload from Ingresses
-	requeueNeeded, albPayload, err := r.albSpecFromIngress(ctx, ingresses, ingressClass, &r.NetworkID, nodes.Items, services)
+	requeueNeeded, albPayload, err := r.albSpecFromIngress(ctx, ingresses, ingressClass, &r.ALBConfig.ApplicationLoadBalancer.NetworkID, nodes.Items, services)
 	if requeueNeeded {
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -193,9 +192,9 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 	}
 
 	// Create ALB if it doesn't exist
-	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
+	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
 	if errors.Is(err, stackit.ErrorNotFound) {
-		_, err := r.ALBClient.CreateLoadBalancer(ctx, r.ProjectID, r.Region, albPayload)
+		_, err := r.ALBClient.CreateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, albPayload)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to create load balancer: %w", err)
 		}
@@ -217,7 +216,7 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 			Version:         alb.Version,
 		}
 
-		if _, err := r.ALBClient.UpdateLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass), updatePayload); err != nil {
+		if _, err := r.ALBClient.UpdateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass), updatePayload); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update load balancer: %w", err)
 		}
 	}
@@ -231,7 +230,7 @@ func (r *IngressClassReconciler) handleIngressClassWithIngresses(
 
 // updateStatus updates the status of the Ingresses with the ALB IP address
 func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*networkingv1.Ingress, ingressClass *networkingv1.IngressClass) (ctrl.Result, error) {
-	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
+	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get load balancer: %w", err)
 	}
@@ -281,14 +280,14 @@ func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*
 	return ctrl.Result{}, nil
 }
 
-// handleIngressClassWithoutIngresses handles the case where an IngressClass exists 
+// handleIngressClassWithoutIngresses handles the case where an IngressClass exists
 // but is not referenced by any Ingresses. In this scenario, we delete the associated ALB
 // and clean up certificates to avoid billing for unused resources.
 func (r *IngressClassReconciler) handleIngressClassWithoutIngresses(
 	ctx context.Context,
 	ingressClass *networkingv1.IngressClass,
 ) error {
-	err := r.ALBClient.DeleteLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
+	err := r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
 	if err != nil {
 		return fmt.Errorf("failed to delete load balancer: %w", err)
 	}
@@ -310,7 +309,7 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 ) error {
 	// Before deleting ALB, ensure no other Ingresses with the same IngressClassName exist
 	if len(ingresses) < 1 {
-		err := r.ALBClient.DeleteLoadBalancer(ctx, r.ProjectID, r.Region, getAlbName(ingressClass))
+		err := r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
 		if err != nil {
 			return fmt.Errorf("failed to delete load balancer: %w", err)
 		}

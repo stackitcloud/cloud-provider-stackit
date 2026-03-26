@@ -141,11 +141,11 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 		// Apend certificates from the current Ingress to the combined certificates
 		requeueNeeded, certificateIDs, err := r.loadCerts(ctx, ingressClass, ingress)
 		if requeueNeeded {
-            return true, nil, nil
-        }
-        if err != nil {
-            return false, nil, fmt.Errorf("failed to load tls certificates: %w", err)
-        }
+			return true, nil, nil
+		}
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to load tls certificates: %w", err)
+		}
 		allCertificateIDs = append(allCertificateIDs, certificateIDs...)
 	}
 
@@ -284,11 +284,11 @@ func (r *IngressClassReconciler) loadCerts(
 
 		createCertificatePayload := &certsdk.CreateCertificatePayload{
 			Name:       ptr.To(getCertName(ingressClass, ingress, secret)),
-			ProjectId:  &r.ProjectID,
+			ProjectId:  &r.ALBConfig.Global.ProjectID,
 			PrivateKey: ptr.To(string(secret.Data["tls.key"])),
 			PublicKey:  ptr.To(string(secret.Data["tls.crt"])),
 		}
-		res, err := r.CertificateClient.CreateCertificate(ctx, r.ProjectID, r.Region, createCertificatePayload)
+		res, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to create certificate: %w", err)
 		}
@@ -300,34 +300,34 @@ func (r *IngressClassReconciler) loadCerts(
 
 // cleanupCerts deletes all certificates from the Certificates API that are associated with this IngressClass.
 func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass *networkingv1.IngressClass) error {
-    // We use the IngressClass UID to identify certificates for this specific class.
+	// We use the IngressClass UID to identify certificates for this specific class.
 	// A shortened version is used because that is how the names were generated on creation.
 	// Note: While a UID collision between clusters is technically possible, it is almost impossible in practice.
-    classPrefix := generateShortUID(ingressClass.UID)
+	classPrefix := generateShortUID(ingressClass.UID)
 
-    certificatesList, err := r.CertificateClient.ListCertificate(ctx, r.ProjectID, r.Region)
-    if err != nil {
-        return fmt.Errorf("failed to list certificates: %w", err)
-    }
+	certificatesList, err := r.CertificateClient.ListCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region)
+	if err != nil {
+		return fmt.Errorf("failed to list certificates: %w", err)
+	}
 
-    if certificatesList == nil || certificatesList.Items == nil {
-        return nil // No certificates to clean up
-    }
+	if certificatesList == nil || certificatesList.Items == nil {
+		return nil // No certificates to clean up
+	}
 
-    for _, cert := range certificatesList.Items {
-        if strings.HasPrefix(*cert.Name, classPrefix) {
-            err := r.CertificateClient.DeleteCertificate(ctx, r.ProjectID, r.Region, *cert.Id)
-            if err != nil {
-                return fmt.Errorf("failed to delete orphaned certificate %s: %v", *cert.Name, err)
-            }
-        }
-    }
-    return nil
+	for _, cert := range certificatesList.Items {
+		if strings.HasPrefix(*cert.Name, classPrefix) {
+			err := r.CertificateClient.DeleteCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, *cert.Id)
+			if err != nil {
+				return fmt.Errorf("failed to delete orphaned certificate %s: %v", *cert.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // isCertReady checks if the certificate chain is complete (leaf + intermediates).
-// This is required during ACME challenges (e.g., cert-manager), where a race condition 
-// can occur where the Secret may temporarily contain only the leaf certificate before the 
+// This is required during ACME challenges (e.g., cert-manager), where a race condition
+// can occur where the Secret may temporarily contain only the leaf certificate before the
 // full chain is written. Because the STACKIT Application Load Balancer Certificates API
 // only validates the cryptographic key match and is immutable (no update call),
 // we must wait for the full chain to avoid locking the ALB with an incomplete certificate.
@@ -358,8 +358,8 @@ func isCertReady(secret *corev1.Secret) (bool, error) {
 		certs = append(certs, cert)
 	}
 
-    // A valid, trusted chain must contain at least 2 certificates: 
-    // the leaf (domain) and at least one intermediate CA.
+	// A valid, trusted chain must contain at least 2 certificates:
+	// the leaf (domain) and at least one intermediate CA.
 	return len(certs) > 1, nil
 }
 

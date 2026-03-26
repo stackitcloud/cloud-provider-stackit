@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
@@ -42,39 +43,33 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-type Config struct {
-	NetworkID string `yaml:"networkID"`
-	ProjectID string `yaml:"projectID"`
-	Region    string `yaml:"region"`
-}
-
 // ReadConfig reads the ALB infrastructure configuration provided via the cloud-config flag.
-func ReadConfig(cloudConfig string) (Config, error) {
+func ReadConfig(cloudConfig string) (stackitconfig.ALBConfig, error) {
 	configFile, err := os.Open(cloudConfig)
 	if err != nil {
-		return Config{}, err
+		return stackitconfig.ALBConfig{}, err
 	}
 	defer configFile.Close()
 
-	var config Config
+	var config stackitconfig.ALBConfig
 	content, err := io.ReadAll(configFile)
 	if err != nil {
-		return Config{}, err
+		return stackitconfig.ALBConfig{}, err
 	}
 
 	err = yaml.Unmarshal(content, &config)
 	if err != nil {
-		return Config{}, err
+		return stackitconfig.ALBConfig{}, err
 	}
 
-	if config.ProjectID == "" {
-		return Config{}, errors.New("project ID must be set")
+	if config.Global.ProjectID == "" {
+		return stackitconfig.ALBConfig{}, errors.New("project ID must be set")
 	}
-	if config.Region == "" {
-		return Config{}, errors.New("region must be set")
+	if config.Global.Region == "" {
+		return stackitconfig.ALBConfig{}, errors.New("region must be set")
 	}
-	if config.NetworkID == "" {
-		return Config{}, errors.New("network ID must be set")
+	if config.ApplicationLoadBalancer.NetworkID == "" {
+		return stackitconfig.ALBConfig{}, errors.New("network ID must be set")
 	}
 	return config, nil
 }
@@ -241,18 +236,14 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	albURL, _ := os.LookupEnv("STACKIT_LOAD_BALANCER_API_ALB_URL")
-	certURL, _ := os.LookupEnv("STACKIT_LOAD_BALANCER_API_CERT_URL")
-
 	albOpts := []sdkconfig.ConfigurationOption{}
-	if albURL != "" {
-		albOpts = append(albOpts, sdkconfig.WithEndpoint(albURL))
+	if config.Global.APIEndpoints.ApplicationLoadBalancerAPI != "" {
+		albOpts = append(albOpts, sdkconfig.WithEndpoint(config.Global.APIEndpoints.ApplicationLoadBalancerAPI))
 	}
 
 	certOpts := []sdkconfig.ConfigurationOption{}
-	if certURL != "" {
-		certOpts = append(certOpts, sdkconfig.WithEndpoint(certURL))
+	if config.Global.APIEndpoints.ApplicationLoadBalancerCertificateAPI != "" {
+		certOpts = append(certOpts, sdkconfig.WithEndpoint(config.Global.APIEndpoints.ApplicationLoadBalancerCertificateAPI))
 	}
 
 	// Setup ALB API client
@@ -284,9 +275,7 @@ func main() {
 		ALBClient:         albClient,
 		CertificateClient: certificateClient,
 		Scheme:            mgr.GetScheme(),
-		ProjectID:         config.ProjectID,
-		NetworkID:         config.NetworkID,
-		Region:            config.Region,
+		ALBConfig:         config,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IngressClass")
 		os.Exit(1)
