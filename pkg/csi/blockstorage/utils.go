@@ -8,6 +8,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -56,7 +57,7 @@ func NewIdentityServer(d *Driver) *identityServer {
 	}
 }
 
-func NewNodeServer(d *Driver, mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackit.BlockStorageOpts) *nodeServer { //nolint:lll // looks weird when shortened
+func NewNodeServer(d *Driver, mountProvider mount.IMount, metadataProvider metadata.IMetadata, opts stackitconfig.BlockStorageOpts) *nodeServer { //nolint:lll // looks weird when shortened
 	return &nodeServer{
 		Driver:   d,
 		Mount:    mountProvider,

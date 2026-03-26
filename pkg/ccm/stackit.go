@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
 const (
@@ -40,13 +40,6 @@ const (
 type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
 	instances    *Instances
-}
-
-type Config struct {
-	Global       stackit.GlobalOpts `yaml:"global"`
-	Metadata     metadata.Opts      `yaml:"metadata"`
-	LoadBalancer LoadBalancerOpts   `yaml:"loadBalancer"`
-	Instances    InstancesOpts      `yaml:"instances"`
 }
 
 func init() {
@@ -79,8 +72,8 @@ func init() {
 	})
 }
 
-func GetConfig(reader io.Reader) (Config, error) {
-	var cfg Config
+func GetConfig(reader io.Reader) (stackitconfig.CCMConfig, error) {
+	var cfg stackitconfig.CCMConfig
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -124,21 +117,21 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 	return nil, fmt.Errorf("missing from env: %q", missingKeys)
 }
 
-// NewCloudControllerManager creates a new instance of the stackit struct from a config struct
-func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+// NewCloudControllerManager creates a new instance of the stackit struct from a stackitconfig struct
+func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
 	lbOpts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
 
-	if cfg.LoadBalancer.API != "" {
-		lbOpts = append(lbOpts, sdkconfig.WithEndpoint(cfg.LoadBalancer.API))
+	if cfg.Global.APIEndpoints.LoadBalancerAPI != "" {
+		lbOpts = append(lbOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.LoadBalancerAPI))
 	}
 
 	// The token is only provided by the 'gardener-extension-provider-stackit' in case of emergency access.
 	// In those cases, the [cfg.LoadBalancerAPI.URL] will also be different (direct API URL instead of the API Gateway)
 	lbEmergencyAPIToken := os.Getenv(stackitLoadBalancerEmergencyAPIToken)
 	if lbEmergencyAPIToken != "" {
-		klog.Warningf("Using emergency token for loadbalancer api on host: %s", cfg.LoadBalancer.API)
+		klog.Warningf("Using emergency token for loadbalancer api on host: %s", cfg.Global.APIEndpoints.LoadBalancerAPI)
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
@@ -155,8 +148,8 @@ func NewCloudControllerManager(cfg *Config, obs *MetricsRemoteWrite) (*CloudCont
 		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 	}
 
-	if cfg.Instances.API != "" {
-		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Instances.API))
+	if cfg.Global.APIEndpoints.IaasAPI != "" {
+		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
 	iaasInnerClient, err := iaas.NewAPIClient(iaasOpts...)

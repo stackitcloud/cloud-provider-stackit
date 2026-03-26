@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	config "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	gomock "go.uber.org/mock/gomock"
 	wait "k8s.io/apimachinery/pkg/util/wait"
@@ -188,10 +189,10 @@ func (mr *MockIaasClientMockRecorder) GetBackupByID(ctx, backupID any) *gomock.C
 }
 
 // GetBlockStorageOpts mocks base method.
-func (m *MockIaasClient) GetBlockStorageOpts() BlockStorageOpts {
+func (m *MockIaasClient) GetBlockStorageOpts() config.BlockStorageOpts {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlockStorageOpts")
-	ret0, _ := ret[0].(BlockStorageOpts)
+	ret0, _ := ret[0].(config.BlockStorageOpts)
 	return ret0
 }
 

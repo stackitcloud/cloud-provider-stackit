@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
 	"go.uber.org/mock/gomock"
 
@@ -18,7 +19,7 @@ var _ = Describe("Backup", func() {
 		mockCtrl  *gomock.Controller
 		mockAPI   *mock.MockDefaultApi
 		openStack IaasClient
-		config    *Config
+		config    *stackitconfig.CSIConfig
 	)
 
 	const projectID = "project-id"
@@ -34,8 +35,8 @@ var _ = Describe("Backup", func() {
 
 	Context("CreateBackup", func() {
 		BeforeEach(func() {
-			config = &Config{
-				Global: GlobalOpts{
+			config = &stackitconfig.CSIConfig{
+				Global: stackitconfig.GlobalOpts{
 					ProjectID: projectID,
 				},
 			}
@@ -97,8 +98,8 @@ var _ = Describe("Backup", func() {
 		const projectID = "project-id"
 
 		BeforeEach(func() {
-			config = &Config{
-				Global: GlobalOpts{
+			config = &stackitconfig.CSIConfig{
+				Global: stackitconfig.GlobalOpts{
 					ProjectID: projectID,
 				},
 			}
@@ -131,8 +132,8 @@ var _ = Describe("Backup", func() {
 		const projectID = "project-id"
 
 		BeforeEach(func() {
-			config = &Config{
-				Global: GlobalOpts{
+			config = &stackitconfig.CSIConfig{
+				Global: stackitconfig.GlobalOpts{
 					ProjectID: projectID,
 				},
 			}
@@ -183,8 +184,8 @@ var _ = Describe("Backup", func() {
 		const projectID = "project-id"
 
 		BeforeEach(func() {
-			config = &Config{
-				Global: GlobalOpts{
+			config = &stackitconfig.CSIConfig{
+				Global: stackitconfig.GlobalOpts{
 					ProjectID: projectID,
 				},
 			}

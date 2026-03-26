@@ -8,6 +8,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
@@ -19,6 +20,8 @@ global:
   projectId: "test-project"
   iaasApi: "https://api.example.com"
   region: "eu01"
+  apiEndpoints:
+    iaasApi: "https://api.example.com"
 metadata:
   searchOrder: "configDrive,metadataService"
   requestTimeout: "5s"
@@ -29,12 +32,12 @@ blockStorage:
 				SearchOrder:    "configDrive,metadataService",
 				RequestTimeout: metadata.Duration{Duration: 5 * time.Second},
 			}))
-			Expect(cfg.BlockStorage).To(Equal(BlockStorageOpts{
+			Expect(cfg.BlockStorage).To(Equal(stackitconfig.BlockStorageOpts{
 				RescanOnResize: true,
 			}))
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 			Expect(cfg.Global.Region).To(Equal("eu01"))
-			Expect(cfg.Global.IaasAPI).To(Equal("https://api.example.com"))
+			Expect(cfg.Global.APIEndpoints.IaasAPI).To(Equal("https://api.example.com"))
 		})
 
 		It("should handle missing optional fields", func() {
@@ -46,7 +49,7 @@ global:
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 			Expect(cfg.Global.Region).To(Equal("eu01"))
 			// Optional fields should be empty/zero values
-			Expect(cfg.Global.IaasAPI).To(BeEmpty())
+			Expect(cfg.Global.APIEndpoints.IaasAPI).To(BeEmpty())
 		})
 
 		It("should return error for invalid yaml", func() {
@@ -62,7 +65,7 @@ global:
 			cfg, err := GetConfig(strings.NewReader(``))
 			Expect(err).NotTo(HaveOccurred())
 			// Empty YAML should result in zero values
-			Expect(cfg).To(Equal(Config{}))
+			Expect(cfg).To(Equal(stackitconfig.CSIConfig{}))
 		})
 	})
 
@@ -72,7 +75,7 @@ global:
 
 		BeforeEach(func() {
 			var err error
-			tempFile, err = os.CreateTemp("", "test-config-*.yaml")
+			tempFile, err = os.CreateTemp("", "test-stackitconfig-*.yaml")
 			Expect(err).NotTo(HaveOccurred())
 			tempFilePath = tempFile.Name()
 		})

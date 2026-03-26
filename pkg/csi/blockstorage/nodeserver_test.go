@@ -6,7 +6,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,7 +42,7 @@ var _ = Describe("NodeServer", func() {
 			d,
 			mountMock,
 			metadataMock,
-			stackit.BlockStorageOpts{},
+			stackitconfig.BlockStorageOpts{},
 		)
 	})
 
