@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,10 +35,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 )
 
 const (
@@ -103,45 +101,6 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
-		For(&networkingv1.IngressClass{}).
-		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []ctrl.Request {
-			// TODO: Add predicates - watch only for specific changes on nodes
-			ingressClassList := &networkingv1.IngressClassList{}
-			err := r.Client.List(ctx, ingressClassList)
-			if err != nil {
-				panic(err)
-			}
-			requestList := []ctrl.Request{}
-			for i := range ingressClassList.Items {
-				ingressClass := ingressClassList.Items[i]
-				requestList = append(requestList, ctrl.Request{
-					NamespacedName: client.ObjectKeyFromObject(&ingressClass),
-				})
-			}
-			return requestList
-		})).
-		Watches(&networkingv1.Ingress{}, handler.EnqueueRequestsFromMapFunc(func(_ context.Context, o client.Object) []ctrl.Request {
-			ingress, ok := o.(*networkingv1.Ingress)
-			if !ok || ingress.Spec.IngressClassName == nil {
-				return nil
-			}
-
-			return []ctrl.Request{
-				{
-					NamespacedName: types.NamespacedName{
-						Name: *ingress.Spec.IngressClassName,
-					},
-				},
-			}
-		})).
-		Named("ingressclass").
-		Complete(r)
 }
 
 // handleIngressClassWithIngresses handles the state of IngressClass when at least one Ingress resource is referencing it.
