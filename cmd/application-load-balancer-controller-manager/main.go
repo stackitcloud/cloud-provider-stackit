@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -29,8 +28,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	// +kubebuilder:scaffold:scheme
 }
 
 // nolint:funlen // TODO: Refactor into smaller functions.
@@ -125,7 +122,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "IngressClass")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
