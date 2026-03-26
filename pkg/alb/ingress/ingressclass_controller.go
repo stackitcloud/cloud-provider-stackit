@@ -55,10 +55,6 @@ type IngressClassReconciler struct { //nolint:revive // Naming this ClassReconci
 	ALBConfig         stackitconfig.ALBConfig
 }
 
-// +kubebuilder:rbac:groups=networking.k8s.io.stackit.cloud,resources=ingressclasses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=networking.k8s.io.stackit.cloud,resources=ingressclasses/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=networking.k8s.io.stackit.cloud,resources=ingressclasses/finalizers,verbs=update
-
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
