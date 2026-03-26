@@ -11,8 +11,10 @@ type GlobalOpts struct {
 }
 
 type APIEndpoints struct {
-	IaasAPI         string `yaml:"iaasApi"`
-	LoadBalancerAPI string `yaml:"loadBalancerApi"`
+	IaasAPI                               string `yaml:"iaasApi"`
+	LoadBalancerAPI                       string `yaml:"loadBalancerApi"`
+	ApplicationLoadBalancerAPI            string `yaml:"applicationLoadBalancerApi"`
+	ApplicationLoadBalancerCertificateAPI string `yaml:"applicationLoadBalancerCertificateApi"`
 }
 
 type CCMConfig struct {
@@ -34,4 +36,13 @@ type CSIConfig struct {
 
 type BlockStorageOpts struct {
 	RescanOnResize bool `yaml:"rescanOnResize"`
+}
+
+type ALBConfig struct {
+	Global                  GlobalOpts                  `yaml:"global"`
+	Metadata                metadata.Opts               `yaml:"metadata"`
+	ApplicationLoadBalancer ApplicationLoadBalancerOpts `yaml:"applicationLoadBalancer"`
+}
+type ApplicationLoadBalancerOpts struct {
+	NetworkID string `yaml:"networkId"`
 }

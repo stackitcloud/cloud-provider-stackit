@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -79,9 +80,15 @@ var _ = Describe("IngressClassReconciler", func() {
 			Scheme:            scheme.Scheme,
 			ALBClient:         albClient,
 			CertificateClient: certClient,
-			ProjectID:         projectID,
-			Region:            region,
-			NetworkID:         "dummy-network",
+			ALBConfig: stackitconfig.ALBConfig{
+				Global: stackitconfig.GlobalOpts{
+					ProjectID: projectID,
+					Region:    region,
+				},
+				ApplicationLoadBalancer: stackitconfig.ApplicationLoadBalancerOpts{
+					NetworkID: "dummy-network",
+				},
+			},
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 

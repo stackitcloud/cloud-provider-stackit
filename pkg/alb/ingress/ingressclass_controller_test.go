@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	gomock "go.uber.org/mock/gomock"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -213,8 +214,12 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 			r := &IngressClassReconciler{
 				Client:    fakeClient,
 				ALBClient: mockAlbClient,
-				ProjectID: testProjectID,
-				Region:    testRegion,
+				ALBConfig: stackitconfig.ALBConfig{
+					Global: stackitconfig.GlobalOpts{
+						ProjectID: testProjectID,
+						Region:    testRegion,
+					},
+				},
 			}
 
 			if tt.mockK8sClient != nil {
