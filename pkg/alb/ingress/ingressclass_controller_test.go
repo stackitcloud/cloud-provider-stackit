@@ -11,7 +11,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -56,7 +55,7 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status: ptr.To("STATUS_TERMINATING"),
+						Status: new("STATUS_TERMINATING"),
 					}, nil)
 			},
 			wantResult: reconcile.Result{RequeueAfter: 10 * time.Second},
@@ -78,8 +77,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:          ptr.To("STATUS_READY"),
-						ExternalAddress: ptr.To(testPublicIP),
+						Status:          new("STATUS_READY"),
+						ExternalAddress: new(testPublicIP),
 					}, nil)
 			},
 			wantResult: reconcile.Result{},
@@ -101,8 +100,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         ptr.To("STATUS_READY"),
-						PrivateAddress: ptr.To(testPrivateIP),
+						Status:         new("STATUS_READY"),
+						PrivateAddress: new(testPrivateIP),
 					}, nil)
 			},
 			wantResult: reconcile.Result{},
@@ -136,8 +135,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         ptr.To("STATUS_READY"),
-						PrivateAddress: ptr.To(testPublicIP),
+						Status:         new("STATUS_READY"),
+						PrivateAddress: new(testPublicIP),
 					}, nil)
 			},
 			wantResult: reconcile.Result{},
@@ -163,8 +162,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         ptr.To("STATUS_READY"),
-						PrivateAddress: ptr.To(testPublicIP),
+						Status:         new("STATUS_READY"),
+						PrivateAddress: new(testPublicIP),
 					}, nil)
 			},
 			wantResult: reconcile.Result{},
@@ -181,8 +180,8 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status:         ptr.To("STATUS_READY"),
-						PrivateAddress: ptr.To(testPublicIP),
+						Status:         new("STATUS_READY"),
+						PrivateAddress: new(testPublicIP),
 					}, nil)
 			},
 			wantResult: reconcile.Result{},
@@ -197,7 +196,7 @@ func TestIngressClassReconciler_updateStatus(t *testing.T) {
 				m.EXPECT().
 					GetLoadBalancer(gomock.Any(), testProjectID, testRegion, testALBName).
 					Return(&albsdk.LoadBalancer{
-						Status: ptr.To("STATUS_READY"),
+						Status: new("STATUS_READY"),
 					}, nil)
 			},
 			wantResult: reconcile.Result{RequeueAfter: 10 * time.Second},

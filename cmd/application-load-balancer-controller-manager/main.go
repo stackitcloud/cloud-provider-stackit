@@ -7,11 +7,10 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/alb/ingress"
 	albclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,7 +33,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-// nolint:gocyclo,funlen // TODO: Refactor into smaller functions.
+// nolint:funlen // TODO: Refactor into smaller functions.
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool

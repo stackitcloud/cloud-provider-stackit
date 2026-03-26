@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 )
@@ -33,7 +32,7 @@ const (
 func ingressPrefixPath(path, serviceName string) networkingv1.HTTPIngressPath {
 	return networkingv1.HTTPIngressPath{
 		Path:     path,
-		PathType: ptr.To(networkingv1.PathTypePrefix),
+		PathType: new(networkingv1.PathTypePrefix),
 		Backend: networkingv1.IngressBackend{
 			Service: &networkingv1.IngressServiceBackend{
 				Name: serviceName,
@@ -46,7 +45,7 @@ func ingressPrefixPath(path, serviceName string) networkingv1.HTTPIngressPath {
 func ingressExactPath(path, serviceName string) networkingv1.HTTPIngressPath {
 	return networkingv1.HTTPIngressPath{
 		Path:     path,
-		PathType: ptr.To(networkingv1.PathTypeExact),
+		PathType: new(networkingv1.PathTypeExact),
 		Backend: networkingv1.IngressBackend{
 			Service: &networkingv1.IngressServiceBackend{
 				Name: serviceName,
@@ -73,7 +72,7 @@ func fixtureIngressWithParams(name, namespace string, annotations map[string]str
 			Annotations: annotations,
 		},
 		Spec: networkingv1.IngressSpec{
-			IngressClassName: ptr.To(testIngressClassName),
+			IngressClassName: new(testIngressClassName),
 			Rules:            rules,
 		},
 	}
@@ -110,7 +109,7 @@ func fixtureIngress(mods ...func(*networkingv1.Ingress)) *networkingv1.Ingress {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{Name: testIngressName},
 		Spec: networkingv1.IngressSpec{
-			IngressClassName: ptr.To(testIngressClassName),
+			IngressClassName: new(testIngressClassName),
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: testHost,
@@ -119,7 +118,7 @@ func fixtureIngress(mods ...func(*networkingv1.Ingress)) *networkingv1.Ingress {
 							Paths: []networkingv1.HTTPIngressPath{
 								{
 									Path:     testPath,
-									PathType: ptr.To(networkingv1.PathTypePrefix),
+									PathType: new(networkingv1.PathTypePrefix),
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: testServiceName,
@@ -153,22 +152,22 @@ func fixtureIngressClass(mods ...func(*networkingv1.IngressClass)) *networkingv1
 
 func fixtureAlbPayload(mods ...func(*albsdk.CreateLoadBalancerPayload)) *albsdk.CreateLoadBalancerPayload {
 	payload := &albsdk.CreateLoadBalancerPayload{
-		Name: ptr.To("k8s-ingress-" + testIngressClassName),
+		Name: new("k8s-ingress-" + testIngressClassName),
 		Listeners: []albsdk.Listener{
 			{
-				Name:     ptr.To("http"),
-				Port:     ptr.To(int32(80)),
-				Protocol: ptr.To("PROTOCOL_HTTP"),
+				Name:     new("http"),
+				Port:     new(int32(80)),
+				Protocol: new("PROTOCOL_HTTP"),
 				Http: &albsdk.ProtocolOptionsHTTP{
 					Hosts: []albsdk.HostConfig{
 						{
-							Host: ptr.To(testHost),
+							Host: new(testHost),
 							Rules: []albsdk.Rule{
 								{
 									Path: &albsdk.Path{
-										Prefix: ptr.To(testPath),
+										Prefix: new(testPath),
 									},
-									TargetPool: ptr.To("pool-30080"),
+									TargetPool: new("pool-30080"),
 								},
 							},
 						},
@@ -176,10 +175,10 @@ func fixtureAlbPayload(mods ...func(*albsdk.CreateLoadBalancerPayload)) *albsdk.
 				},
 			},
 		},
-		Networks: []albsdk.Network{{NetworkId: ptr.To(testNetworkID), Role: ptr.To("ROLE_LISTENERS_AND_TARGETS")}},
-		Options:  &albsdk.LoadBalancerOptions{EphemeralAddress: ptr.To(true)},
+		Networks: []albsdk.Network{{NetworkId: new(testNetworkID), Role: new("ROLE_LISTENERS_AND_TARGETS")}},
+		Options:  &albsdk.LoadBalancerOptions{EphemeralAddress: new(true)},
 		TargetPools: []albsdk.TargetPool{
-			{Name: ptr.To("pool-30080"), TargetPort: ptr.To(int32(30080)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+			{Name: new("pool-30080"), TargetPort: new(int32(30080)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 		},
 	}
 	for _, mod := range mods {
@@ -218,7 +217,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 			),
 			services: map[string]corev1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
 			want: fixtureAlbPayload(func(payload *albsdk.CreateLoadBalancerPayload) {
-				payload.ExternalAddress = ptr.To("2.2.2.2")
+				payload.ExternalAddress = new("2.2.2.2")
 				payload.Options = &albsdk.LoadBalancerOptions{EphemeralAddress: nil}
 			}),
 		},
@@ -232,7 +231,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 			),
 			services: map[string]corev1.Service{testServiceName: *fixtureServiceWithParams(testServicePort, testNodePort)},
 			want: fixtureAlbPayload(func(payload *albsdk.CreateLoadBalancerPayload) {
-				payload.Options = &albsdk.LoadBalancerOptions{PrivateNetworkOnly: ptr.To(true)}
+				payload.Options = &albsdk.LoadBalancerOptions{PrivateNetworkOnly: new(true)}
 			}),
 		},
 		{
@@ -251,21 +250,21 @@ func Test_albSpecFromIngress(t *testing.T) {
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
 				p.Listeners[0].Http.Hosts = []albsdk.HostConfig{
 					{
-						Host: ptr.To("a-host.com"),
+						Host: new("a-host.com"),
 						Rules: []albsdk.Rule{
-							{Path: &albsdk.Path{Prefix: ptr.To("/a")}, TargetPool: ptr.To("pool-30002")},
+							{Path: &albsdk.Path{Prefix: new("/a")}, TargetPool: new("pool-30002")},
 						},
 					},
 					{
-						Host: ptr.To("z-host.com"),
+						Host: new("z-host.com"),
 						Rules: []albsdk.Rule{
-							{Path: &albsdk.Path{Prefix: ptr.To("/a")}, TargetPool: ptr.To("pool-30001")},
+							{Path: &albsdk.Path{Prefix: new("/a")}, TargetPool: new("pool-30001")},
 						},
 					},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30001"), TargetPort: ptr.To(int32(30001)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30002"), TargetPort: ptr.To(int32(30002)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30001"), TargetPort: new(int32(30001)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30002"), TargetPort: new(int32(30002)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -285,14 +284,14 @@ func Test_albSpecFromIngress(t *testing.T) {
 				"svc2": *fixtureServiceWithParams(testServicePort, 30004),
 			},
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
-				p.Listeners[0].Http.Hosts[0].Host = ptr.To("host.com")
+				p.Listeners[0].Http.Hosts[0].Host = new("host.com")
 				p.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30004")},
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30003")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30004")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30003")},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30003"), TargetPort: ptr.To(int32(30003)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30004"), TargetPort: ptr.To(int32(30004)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30003"), TargetPort: new(int32(30003)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30004"), TargetPort: new(int32(30004)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -312,14 +311,14 @@ func Test_albSpecFromIngress(t *testing.T) {
 				"svc2": *fixtureServiceWithParams(testServicePort, 30006),
 			},
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
-				p.Listeners[0].Http.Hosts[0].Host = ptr.To("host.com")
+				p.Listeners[0].Http.Hosts[0].Host = new("host.com")
 				p.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-					{Path: &albsdk.Path{Prefix: ptr.To("/very/very/long/specific")}, TargetPool: ptr.To("pool-30006")},
-					{Path: &albsdk.Path{Prefix: ptr.To("/short")}, TargetPool: ptr.To("pool-30005")},
+					{Path: &albsdk.Path{Prefix: new("/very/very/long/specific")}, TargetPool: new("pool-30006")},
+					{Path: &albsdk.Path{Prefix: new("/short")}, TargetPool: new("pool-30005")},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30005"), TargetPort: ptr.To(int32(30005)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30006"), TargetPort: ptr.To(int32(30006)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30005"), TargetPort: new(int32(30005)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30006"), TargetPort: new(int32(30006)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -339,14 +338,14 @@ func Test_albSpecFromIngress(t *testing.T) {
 				"svc-prefix": *fixtureServiceWithParams(testServicePort, 30101),
 			},
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
-				p.Listeners[0].Http.Hosts[0].Host = ptr.To("host.com")
+				p.Listeners[0].Http.Hosts[0].Host = new("host.com")
 				p.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-					{Path: &albsdk.Path{ExactMatch: ptr.To("/same")}, TargetPool: ptr.To("pool-30100")},
-					{Path: &albsdk.Path{Prefix: ptr.To("/same")}, TargetPool: ptr.To("pool-30101")},
+					{Path: &albsdk.Path{ExactMatch: new("/same")}, TargetPool: new("pool-30100")},
+					{Path: &albsdk.Path{Prefix: new("/same")}, TargetPool: new("pool-30101")},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30100"), TargetPort: ptr.To(int32(30100)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30101"), TargetPort: ptr.To(int32(30101)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30100"), TargetPort: new(int32(30100)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30101"), TargetPort: new(int32(30101)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -366,14 +365,14 @@ func Test_albSpecFromIngress(t *testing.T) {
 				"svc2": *fixtureServiceWithParams(testServicePort, 30008),
 			},
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
-				p.Listeners[0].Http.Hosts[0].Host = ptr.To("host.com")
+				p.Listeners[0].Http.Hosts[0].Host = new("host.com")
 				p.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30008")},
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30007")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30008")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30007")},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30007"), TargetPort: ptr.To(int32(30007)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30008"), TargetPort: ptr.To(int32(30008)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30007"), TargetPort: new(int32(30007)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30008"), TargetPort: new(int32(30008)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -393,14 +392,14 @@ func Test_albSpecFromIngress(t *testing.T) {
 				"svc2": *fixtureServiceWithParams(testServicePort, 30010),
 			},
 			want: fixtureAlbPayload(func(p *albsdk.CreateLoadBalancerPayload) {
-				p.Listeners[0].Http.Hosts[0].Host = ptr.To("host.com")
+				p.Listeners[0].Http.Hosts[0].Host = new("host.com")
 				p.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30010")},
-					{Path: &albsdk.Path{Prefix: ptr.To("/x")}, TargetPool: ptr.To("pool-30009")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30010")},
+					{Path: &albsdk.Path{Prefix: new("/x")}, TargetPool: new("pool-30009")},
 				}
 				p.TargetPools = []albsdk.TargetPool{
-					{Name: ptr.To("pool-30009"), TargetPort: ptr.To(int32(30009)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
-					{Name: ptr.To("pool-30010"), TargetPort: ptr.To(int32(30010)), Targets: []albsdk.Target{{DisplayName: ptr.To(testNodeName), Ip: ptr.To(testNodeIP)}}},
+					{Name: new("pool-30009"), TargetPort: new(int32(30009)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
+					{Name: new("pool-30010"), TargetPort: new(int32(30010)), Targets: []albsdk.Target{{DisplayName: new(testNodeName), Ip: new(testNodeIP)}}},
 				}
 			}),
 		},
@@ -408,7 +407,7 @@ func Test_albSpecFromIngress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, got, err := r.albSpecFromIngress(context.TODO(), tt.ingresses, tt.ingressClass, ptr.To(testNetworkID), nodes, tt.services)
+			_, got, err := r.albSpecFromIngress(context.TODO(), tt.ingresses, tt.ingressClass, new(testNetworkID), nodes, tt.services)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("got error = %v, wantErr %v", err, tt.wantErr)
 				return
