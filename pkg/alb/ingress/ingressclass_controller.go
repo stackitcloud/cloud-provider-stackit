@@ -18,20 +18,14 @@ package ingress
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
-	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -54,6 +48,7 @@ type IngressClassReconciler struct { //nolint:revive // Naming this ClassReconci
 }
 
 func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
 	ingressClass := &networkingv1.IngressClass{}
 	err := r.Client.Get(ctx, req.NamespacedName, ingressClass)
 	if err != nil {
@@ -66,13 +61,10 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	albIngressList, err := r.getAlbIngressList(ctx, ingressClass)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get the list of Ingresses %s: %w", ingressClass.Name, err)
-	}
+	log.Info("Reconciling IngressClass", "Name", ingressClass.Name)
 
 	if !ingressClass.DeletionTimestamp.IsZero() {
-		err := r.handleIngressClassDeletion(ctx, albIngressList, ingressClass)
+		err := r.handleIngressClassDeletion(ctx, ingressClass)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to handle IngressClass deletion: %w", err)
 		}
@@ -88,95 +80,35 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if len(albIngressList) < 1 {
-		err := r.handleIngressClassWithoutIngresses(ctx, ingressClass)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to reconcile %s IngressClass with no Ingresses: %w", getAlbName(ingressClass), err)
-		}
-		return ctrl.Result{}, nil
-	}
-	_, err = r.handleIngressClassWithIngresses(ctx, albIngressList, ingressClass)
+	alb, errorList, err := r.getAlbSpecForIngressClass(ctx, ingressClass)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile %s IngressClass with Ingresses: %w", getAlbName(ingressClass), err)
+		// todo handle error (write event)
+		log.Error(err, "failed to get alb spec for IngressClass")
 	}
 
-	return ctrl.Result{}, nil
-}
-
-// handleIngressClassWithIngresses handles the state of IngressClass when at least one Ingress resource is referencing it.
-// It ensures that the ALB is created when it is the first ever Ingress
-// referencing the specified IngressClass, and performs updates otherwise.
-func (r *IngressClassReconciler) handleIngressClassWithIngresses(
-	ctx context.Context,
-	ingresses []*networkingv1.Ingress,
-	ingressClass *networkingv1.IngressClass,
-) (ctrl.Result, error) {
-	// Get all nodes and services
-	nodes := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodes)
+	err = r.applyALB(ctx, alb)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get nodes: %w", err)
-	}
-	serviceList := &corev1.ServiceList{}
-	err = r.Client.List(ctx, serviceList)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get services: %w", err)
-	}
-	services := map[string]corev1.Service{}
-	for i := range serviceList.Items {
-		service := serviceList.Items[i]
-		services[service.Name] = service
+		// todo handle error (write event)
+		log.Error(err, "failed to update alb")
 	}
 
-	// Create ALB payload from Ingresses
-	requeueNeeded, albPayload, err := r.albSpecFromIngress(ctx, ingresses, ingressClass, &r.ALBConfig.ApplicationLoadBalancer.NetworkID, nodes.Items, services)
-	if requeueNeeded {
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	}
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to create alb payload: %w", err)
+	for _, errorEvent := range errorList {
+		log.Info(errorEvent.description, "typ", errorEvent.typ, "ingressRef", errorEvent.ingressRef)
 	}
 
-	// Create ALB if it doesn't exist
-	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
-	if errors.Is(err, stackit.ErrorNotFound) {
-		_, err := r.ALBClient.CreateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, albPayload)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to create load balancer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get load balancer: %w", err)
-	}
-
-	// Update ALB if it exists and the configuration has changed
-	if detectChange(alb, albPayload) {
-		updatePayload := &albsdk.UpdateLoadBalancerPayload{
-			Name:            albPayload.Name,
-			ExternalAddress: albPayload.ExternalAddress,
-			Listeners:       albPayload.Listeners,
-			Networks:        albPayload.Networks,
-			Options:         albPayload.Options,
-			TargetPools:     albPayload.TargetPools,
-			Version:         alb.Version,
-		}
-
-		if _, err := r.ALBClient.UpdateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass), updatePayload); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to update load balancer: %w", err)
-		}
-	}
-
-	requeue, err := r.updateStatus(ctx, ingresses, ingressClass)
+	requeue, err := r.updateStatus(ctx, ingressClass)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update ingress status: %w", err)
 	}
+
+	log.Info("Successfully reconciled IngressClass", "Name", ingressClass.Name)
+
 	return requeue, nil
 }
 
 // updateStatus updates the status of the Ingresses with the ALB IP address
-func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*networkingv1.Ingress, ingressClass *networkingv1.IngressClass) (ctrl.Result, error) {
-	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
+func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingressClass *networkingv1.IngressClass) (ctrl.Result, error) {
+	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, string(ingressClass.UID))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get load balancer: %w", err)
 	}
@@ -194,233 +126,77 @@ func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingresses []*
 	}
 
 	if albIP == "" {
-		// ALB ready, but IP not available yet, requeue
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return ctrl.Result{}, fmt.Errorf("alb is ready but has no IPs %v", alb.Name)
+	}
+
+	ingresses, err := r.getIngressesForIngressClass(ctx, ingressClass)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get ingresses: %w", err)
 	}
 
 	for _, ingress := range ingresses {
-		// Fetch the latest Ingress object to check its current status
-		currentIngress := &networkingv1.Ingress{}
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(ingress), currentIngress); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get latest ingress %s/%s: %v", ingress.Namespace, ingress.Name, err)
+		before := ingress.DeepCopy()
+
+		ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{
+			{
+				IP: albIP,
+			},
 		}
 
-		// Check if the IP in the current Ingress status is different
-		shouldUpdate := false
-		if len(currentIngress.Status.LoadBalancer.Ingress) == 0 {
-			shouldUpdate = true
-		} else if currentIngress.Status.LoadBalancer.Ingress[0].IP != albIP {
-			shouldUpdate = true
+		if apiequality.Semantic.DeepEqual(before, ingress) {
+			continue
 		}
-
-		if shouldUpdate {
-			currentIngress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{
-				{IP: albIP},
-			}
-			if err := r.Client.Status().Update(ctx, currentIngress); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to update ingress status %s/%s: %v", currentIngress.Namespace, currentIngress.Name, err)
-			}
+		patch := client.MergeFrom(before)
+		if err := r.Client.Status().Patch(ctx, &ingress, patch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch ingress status object: %w", err)
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// handleIngressClassWithoutIngresses handles the case where an IngressClass exists
-// but is not referenced by any Ingresses. In this scenario, we delete the associated ALB
-// and clean up certificates to avoid billing for unused resources.
-func (r *IngressClassReconciler) handleIngressClassWithoutIngresses(
+// handleIngressClassDeletion handles the deletion of IngressClass resource.
+// It does not wait until all ingresses are deleted. It just removes the status from the ingresses and removes the Alb.
+// If this blocked the IngressClass would be there forever as there is no ownerReference in the ingresses.
+func (r *IngressClassReconciler) handleIngressClassDeletion(
 	ctx context.Context,
 	ingressClass *networkingv1.IngressClass,
 ) error {
-	err := r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
+	ingresses, err := r.getIngressesForIngressClass(ctx, ingressClass)
+	if err != nil {
+		return err
+	}
+
+	for _, ingress := range ingresses {
+		before := ingress.DeepCopy()
+
+		ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{}
+
+		if apiequality.Semantic.DeepEqual(before, ingress) {
+			continue
+		}
+		patch := client.MergeFrom(before)
+		if err := r.Client.Status().Patch(ctx, &ingress, patch); err != nil {
+			return fmt.Errorf("failed to patch shoot object: %w", err)
+		}
+	}
+
+	err = r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, string(ingressClass.UID))
 	if err != nil {
 		return fmt.Errorf("failed to delete load balancer: %w", err)
 	}
-	err = r.cleanupCerts(ctx, ingressClass)
+
+	err = r.deleteAllCertsForClass(ctx, ingressClass)
 	if err != nil {
-		return fmt.Errorf("failed to clean up certificates: %w", err)
+		return err
 	}
 
-	return nil
-}
-
-// handleIngressClassDeletion handles the deletion of IngressClass resource.
-// It ensures that the ALB is deleted only when no other Ingresses
-// are referencing the the same IngressClass.
-func (r *IngressClassReconciler) handleIngressClassDeletion(
-	ctx context.Context,
-	ingresses []*networkingv1.Ingress,
-	ingressClass *networkingv1.IngressClass,
-) error {
-	// Before deleting ALB, ensure no other Ingresses with the same IngressClassName exist
-	if len(ingresses) < 1 {
-		err := r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, getAlbName(ingressClass))
+	if controllerutil.RemoveFinalizer(ingressClass, finalizerName) {
+		err = r.Client.Update(ctx, ingressClass)
 		if err != nil {
-			return fmt.Errorf("failed to delete load balancer: %w", err)
-		}
-		// Remove finalizer from the IngressClass
-		if controllerutil.RemoveFinalizer(ingressClass, finalizerName) {
-			err := r.Client.Update(ctx, ingressClass)
-			if err != nil {
-				return fmt.Errorf("failed to remove finalizer from IngressClass: %w", err)
-			}
+			return fmt.Errorf("failed to remove finalizer from IngressClass: %w", err)
 		}
 	}
 
-	// TODO: Throw en error saying other ingresses are still referencing this ingress class
 	return nil
-}
-
-// detectChange checks if there is any difference between the current and desired ALB configuration.
-func detectChange(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool { //nolint:gocyclo,funlen // We check a lot of fields. Not much complexity.
-	if len(alb.Listeners) != len(albPayload.Listeners) {
-		return true
-	}
-
-	for i := range alb.Listeners {
-		albListener := (alb.Listeners)[i]
-		payloadListener := (albPayload.Listeners)[i]
-
-		if ptr.Deref(albListener.Protocol, "") != ptr.Deref(payloadListener.Protocol, "") ||
-			ptr.Deref(albListener.Port, 0) != ptr.Deref(payloadListener.Port, 0) {
-			return true
-		}
-
-		// WAF config check
-		if ptr.Deref(albListener.WafConfigName, "") != ptr.Deref(payloadListener.WafConfigName, "") {
-			return true
-		}
-
-		// HTTP rules comparison (via Hosts)
-		if albListener.Http != nil && payloadListener.Http != nil {
-			albHosts := albListener.Http.Hosts
-			payloadHosts := payloadListener.Http.Hosts
-
-			if len(albHosts) != len(payloadHosts) {
-				return true
-			}
-
-			for j := range albHosts {
-				albHost := albHosts[j]
-				payloadHost := payloadHosts[j]
-
-				if ptr.Deref(albHost.Host, "") != ptr.Deref(payloadHost.Host, "") {
-					return true
-				}
-
-				if len(albHost.Rules) != len(payloadHost.Rules) {
-					return true
-				}
-
-				for k := range albHost.Rules {
-					albRule := albHost.Rules[k]
-					payloadRule := payloadHost.Rules[k]
-
-					if albRule.Path != nil || payloadRule.Path != nil {
-						if albRule.Path == nil || payloadRule.Path == nil {
-							return true
-						}
-						if ptr.Deref(albRule.Path.Prefix, "") != ptr.Deref(payloadRule.Path.Prefix, "") {
-							return true
-						}
-						if ptr.Deref(albRule.Path.ExactMatch, "") != ptr.Deref(payloadRule.Path.ExactMatch, "") {
-							return true
-						}
-					}
-					if ptr.Deref(albRule.TargetPool, "") != ptr.Deref(payloadRule.TargetPool, "") {
-						return true
-					}
-				}
-			}
-		} else if albListener.Http != nil || payloadListener.Http != nil {
-			// One is nil, one isn't
-			return true
-		}
-
-		// HTTPS certificate comparison
-		if albListener.Https != nil && payloadListener.Https != nil {
-			a := albListener.Https.CertificateConfig
-			b := payloadListener.Https.CertificateConfig
-			if len(a.CertificateIds) != len(b.CertificateIds) {
-				return true
-			}
-		} else if albListener.Https != nil || payloadListener.Https != nil {
-			// One is nil, one isn't
-			return true
-		}
-	}
-
-	// TargetPools comparison
-	if len(alb.TargetPools) != len(albPayload.TargetPools) {
-		return true
-	}
-	for i := range alb.TargetPools {
-		a := alb.TargetPools[i]
-		b := albPayload.TargetPools[i]
-
-		if ptr.Deref(a.Name, "") != ptr.Deref(b.Name, "") ||
-			ptr.Deref(a.TargetPort, 0) != ptr.Deref(b.TargetPort, 0) {
-			return true
-		}
-
-		if len(a.Targets) != len(b.Targets) {
-			return true
-		}
-
-		if (a.TlsConfig == nil) != (b.TlsConfig == nil) {
-			return true
-		}
-		if a.TlsConfig != nil && b.TlsConfig != nil {
-			if ptr.Deref(a.TlsConfig.SkipCertificateValidation, false) != ptr.Deref(b.TlsConfig.SkipCertificateValidation, false) ||
-				ptr.Deref(a.TlsConfig.CustomCa, "") != ptr.Deref(b.TlsConfig.CustomCa, "") {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// getAlbIngressList lists all Ingresses that reference specified IngressClass
-func (r *IngressClassReconciler) getAlbIngressList(
-	ctx context.Context,
-	ingressClass *networkingv1.IngressClass,
-) ([]*networkingv1.Ingress, error) {
-	ingressList := &networkingv1.IngressList{}
-	err := r.Client.List(ctx, ingressList)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all Ingresses: %w", err)
-	}
-
-	ingresses := []*networkingv1.Ingress{}
-	for i := range ingressList.Items {
-		ingress := ingressList.Items[i]
-		if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName == ingressClass.Name {
-			ingresses = append(ingresses, &ingress)
-		}
-	}
-
-	return ingresses, nil
-}
-
-// getAlbName returns the name for the ALB by retrieving the name of the IngressClass
-func getAlbName(ingressClass *networkingv1.IngressClass) string {
-	return fmt.Sprintf("k8s-ingress-%s", ingressClass.Name)
-}
-
-// getCertName generates a unique name for the Certificate using the IngressClass UID, Ingress UID,
-// and TLS Secret UID, ensuring it fits within the Kubernetes 63-character limit.
-func getCertName(ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, tlsSecret *corev1.Secret) string {
-	ingressClassShortUID := generateShortUID(ingressClass.UID)
-	ingressShortUID := generateShortUID(ingress.UID)
-	tlsSecretShortUID := generateShortUID(tlsSecret.UID)
-
-	return fmt.Sprintf("%s-%s-%s", ingressClassShortUID, ingressShortUID, tlsSecretShortUID)
-}
-
-// generateShortUID generates a shortened version of a UID by hashing it.
-func generateShortUID(uid types.UID) string {
-	hash := md5.Sum([]byte(uid))
-	return hex.EncodeToString(hash[:4])
 }
