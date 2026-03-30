@@ -114,6 +114,7 @@ func main() {
 
 	if err = (&ingress.IngressClassReconciler{
 		Client:            mgr.GetClient(),
+		Recorder:          mgr.GetEventRecorderFor("ingressclass-controller"),
 		ALBClient:         albClient,
 		CertificateClient: certificateClient,
 		Scheme:            mgr.GetScheme(),

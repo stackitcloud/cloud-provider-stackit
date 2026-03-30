@@ -2,93 +2,418 @@ package ingress
 
 import (
 	"context"
-	"crypto/x509"
-	"encoding/pem"
+	"errors"
 	"fmt"
-	"net/netip"
 	"sort"
-	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/reference"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 )
 
-const (
-	// externalIPAnnotation references a STACKIT floating IP that should be used by the application load balancer.
-	// If set it will be used instead of an ephemeral IP. The IP must be created by the customer. When the service is deleted,
-	// the floating IP will not be deleted. The IP is ignored if the alb.stackit.cloud/internal-alb is set.
-	// If the annotation is set after the creation it must match the ephemeral IP.
-	// This will promote the ephemeral IP to a static IP.
-	externalIPAnnotation = "alb.stackit.cloud/external-address"
-	// If true, the application load balancer is not exposed via a floating IP.
-	internalIPAnnotation = "alb.stackit.cloud/internal-alb"
-	// If true, the application load balancer enables TLS bridging.
-	// It uses the trusted CAs from the operating system for validation.
-	tlsBridgingTrustedCaAnnotation = "alb.stackit.cloud/tls-bridging-trusted-ca"
-	// If set, the application load balancer enables TLS bridging with a custom CA provided as value.
-	tlsBridgingCustomCaAnnotation = "alb.stackit.cloud/tls-bridging-custom-ca"
-	// If true, the application load balancer enables TLS bridging but skips validation.
-	tlsBridgingSkipValidationAnnotation = "alb.stackit.cloud/tls-bridging-no-validation"
-	// priorityAnnotation is used to set the priority of the Ingress.
-	priorityAnnotation = "alb.stackit.cloud/priority"
-)
+func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
+	ingresses, err := r.getIngressesForIngressClass(ctx, class)
+	if err != nil {
+		return nil, nil, err
+	}
 
-const (
-	// minPriority and maxPriority are the minimum and maximum values for the priority annotation.
-	minPriority = 1
-	maxPriority = 25
-	// defaultPriority is the default priority for Ingress resources that do not have a priority annotation.
-	defaultPriority = 0
-)
-
-type ruleMetadata struct {
-	path             string
-	host             string
-	priority         int
-	pathLength       int
-	pathTypeVal      int
-	ingressName      string
-	ingressNamespace string
-	ruleOrder        int
-	targetPool       string
+	return r.getAlbSpecForIngresses(ctx, class, ingresses)
 }
 
-// albSpecFromIngress generates a complete ALB specification for a given set of Ingress resources that reference the same IngressClass.
-// It merges and sorts all routing rules across the ingresses based on host, priority, path specificity, path type, and ingress origin.
-// The resulting ALB payload includes targets derived from cluster nodes, target pools per backend service, HTTP(S) listeners,
-// and optional TLS certificate bindings. This spec is later used to create or update the actual ALB instance.
-func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // We go through a lot of fields. Not much complexity.
-	ctx context.Context,
-	ingresses []*networkingv1.Ingress,
-	ingressClass *networkingv1.IngressClass,
-	networkID *string,
-	nodes []corev1.Node,
-	services map[string]corev1.Service,
-) (bool, *albsdk.CreateLoadBalancerPayload, error) {
-	targetPools := []albsdk.TargetPool{}
-	targetPoolSeen := map[string]bool{}
-	allCertificateIDs := []string{}
-	ruleMetadataList := []ruleMetadata{}
+func (r *IngressClassReconciler) getAlbSpecForIngresses(ctx context.Context, class *networkingv1.IngressClass, ingresses []networkingv1.Ingress) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
+	errorList := []errorEvents{}
+
+	listeners := albListeners{}
+	certificates := albCertificates{}
+	targetPools := albTargetPools{}
+
+	for _, ingress := range ingresses {
+		var listenerMergeError, targetPoolMergeError []errorEvents
+		ingressListeners, ingressCertificates, ingressTargetPools, ingressErrorList := r.getALBResourcesForIngress(ctx, class, &ingress)
+		errorList = append(errorList, ingressErrorList...)
+
+		certificates = mergeCertificates(certificates, ingressCertificates)
+		targetPools, targetPoolMergeError = mergeTargetPools(targetPools, ingressTargetPools)
+		errorList = append(errorList, targetPoolMergeError...)
+		listeners, listenerMergeError = mergeListeners(listeners, ingressListeners)
+		errorList = append(errorList, listenerMergeError...)
+	}
+
+	certNameToId, certificateErrorEvents := r.applyCertificates(ctx, certificates)
+	errorList = append(errorList, certificateErrorEvents...)
+
+	alb, albSpecErrorList, err := r.getAlbSpecForResources(ctx, class, listeners, targetPools, certNameToId)
+	errorList = append(errorList, albSpecErrorList...)
+	return alb, errorList, err
+}
+
+func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, class *networkingv1.IngressClass, listeners albListeners, targetPools albTargetPools, certNameToId map[string]string) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
+	errorList := []errorEvents{}
 
 	alb := &albsdk.CreateLoadBalancerPayload{
 		Options: &albsdk.LoadBalancerOptions{},
 		Networks: []albsdk.Network{
 			{
-				NetworkId: networkID,
+				NetworkId: new(r.ALBConfig.ApplicationLoadBalancer.NetworkID),
 				Role:      new("ROLE_LISTENERS_AND_TARGETS"),
 			},
 		},
+		Name:                                 new(string(class.UID)),
+		DisableTargetSecurityGroupAssignment: new(true),
 	}
 
-	// Create targets for each node in the cluster
+	externalAddress := getAnnotation(AnnotationExternalIP, "", class)
+	if externalAddress != "" {
+		alb.ExternalAddress = &externalAddress
+	} else {
+		alb.Options.EphemeralAddress = new(true)
+	}
+
+	if getAnnotation(AnnotationInternal, false, class) {
+		alb.Options.PrivateNetworkOnly = new(true)
+	}
+
+	if plan := getAnnotation(AnnotationPlanID, "", class); plan != "" {
+		alb.PlanId = &plan
+	}
+
+	for port, listener := range listeners {
+		albsdkListener := albsdk.Listener{
+			Http:                 nil,
+			Name:                 new(listener.name),
+			Port:                 new(int32(port)),
+			Protocol:             new(listener.protocol),
+			AdditionalProperties: nil,
+		}
+
+		if listener.wafConfigName != "" {
+			albsdkListener.WafConfigName = new(listener.wafConfigName)
+		}
+
+		albsdkHosts := []albsdk.HostConfig{}
+		for host, hostPaths := range listener.hosts {
+			albsdkHost := albsdk.HostConfig{
+				Host: new(host),
+			}
+			for path, rule := range hostPaths.path {
+				albsdkRule := albsdk.Rule{
+					TargetPool: new(rule.targetPoolName),
+					WebSocket:  new(rule.websocket),
+				}
+
+				if rule.cookiePersistenceName != "" {
+					albsdkRule.CookiePersistence = new(albsdk.CookiePersistence{
+						Name: new(rule.cookiePersistenceName),
+						Ttl:  new(fmt.Sprintf("%ds", rule.cookiePersistenceTtlSeconds)),
+					})
+				}
+
+				switch rule.pathTyp {
+				case networkingv1.PathTypeExact:
+					albsdkRule.Path = new(albsdk.Path{
+						ExactMatch: new(path),
+					})
+				default:
+					albsdkRule.Path = new(albsdk.Path{
+						Prefix: new(path),
+					})
+				}
+
+				albsdkHost.Rules = append(albsdkHost.Rules, albsdkRule)
+			}
+			albsdkHosts = append(albsdkHosts, albsdkHost)
+
+			albsdkListener.Http = new(albsdk.ProtocolOptionsHTTP{
+				Hosts: albsdkHosts,
+			})
+		}
+
+		if listener.protocol == "PROTOCOL_HTTPS" {
+			albsdkListener.Https = new(albsdk.ProtocolOptionsHTTPS{
+				CertificateConfig: new(albsdk.CertificateConfig{
+					CertificateIds: []string{},
+				}),
+			})
+			for _, certificateID := range listener.certificateIDs {
+				certUUID, ok := certNameToId[certificateID]
+				if !ok {
+					continue
+				}
+				albsdkListener.Https.CertificateConfig.CertificateIds = append(albsdkListener.Https.CertificateConfig.CertificateIds, certUUID)
+			}
+
+		}
+		if listener.protocol == "PROTOCOL_HTTPS" && len(albsdkListener.Https.CertificateConfig.CertificateIds) == 0 {
+			errorList = append(errorList, errorEvents{
+				ingressRef:  listener.ingressRef,
+				description: "Certificate not found for protocol HTTPS",
+				typ:         "Error",
+			})
+			continue
+		}
+		alb.Listeners = append(alb.Listeners, albsdkListener)
+	}
+
+	targets, err := r.getTargetsOfNodes(ctx)
+	if err != nil {
+		return nil, errorList, err
+	}
+
+	for name, targetPool := range targetPools {
+		albsdkTargetPool := albsdk.TargetPool{
+			Name:              new(name),
+			TargetPort:        new(targetPool.port),
+			Targets:           targets,
+			ActiveHealthCheck: nil, // TODO
+		}
+		alb.TargetPools = append(alb.TargetPools, albsdkTargetPool)
+	}
+
+	return alb, errorList, nil
+}
+
+func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress) (albListeners, albCertificates, albTargetPools, []errorEvents) {
+	ref := getIngressRefForIngress(r.Scheme, ingress)
+
+	certificates := albCertificates{}
+	certificateIDs := []string{}
+	httpsHosts := map[string]struct{}{}
+	errorList := []errorEvents{}
+
+	for _, tls := range ingress.Spec.TLS {
+		for _, host := range tls.Hosts {
+			httpsHosts[host] = struct{}{}
+			name, cert, err := r.getCertificateForSecretName(ctx, class, ingress, tls.SecretName)
+			if err != nil {
+				errorList = append(errorList, errorEvents{
+					ingressRef:  ref,
+					typ:         "error",
+					description: err.Error(),
+				})
+				continue
+			}
+			certificateIDs = append(certificateIDs, name)
+			mergeCertificates(certificates, albCertificates{name: cert})
+		}
+	}
+
+	hosts := map[string]albListenerHost{}
+	targets := albTargetPools{}
+
+	for _, rule := range ingress.Spec.Rules {
+		if _, ok := hosts[rule.Host]; !ok {
+			hosts[rule.Host] = albListenerHost{
+				ingressRef: ref,
+				path:       map[string]albListenerRule{},
+			}
+		}
+		for _, path := range rule.HTTP.Paths {
+			if _, ok := hosts[rule.Host].path[path.Path]; ok {
+				errorList = append(errorList, errorEvents{
+					ingressRef:  ref,
+					typ:         "error",
+					description: fmt.Sprintf("path %q already exists within same ingress", path.Path),
+				})
+				continue
+			}
+
+			poolName, targetPool, err := r.getTargetPoolForPath(ctx, class, ingress, path)
+			if err != nil {
+				errorList = append(errorList, errorEvents{
+					ingressRef:  ref,
+					typ:         "error",
+					description: err.Error(),
+				})
+				continue
+			}
+			var tagetMergeErrors []errorEvents
+			targets, tagetMergeErrors = mergeTargetPools(targets, albTargetPools{poolName: targetPool})
+			errorList = append(errorList, tagetMergeErrors...)
+
+			hosts[rule.Host].path[path.Path] = albListenerRule{
+				ingressRef:                  ref,
+				pathTyp:                     ptr.Deref(path.PathType, networkingv1.PathTypePrefix),
+				cookiePersistenceName:       getAnnotation(AnnotationCookiePersistenceName, "", class, ingress),
+				cookiePersistenceTtlSeconds: getAnnotation(AnnotationCookiePersistenceTTLSeconds, 0, class, ingress),
+				targetPoolName:              poolName,
+				websocket:                   getAnnotation(AnnotationWebSocket, false, class, ingress),
+			}
+		}
+	}
+
+	httpPort := getAnnotation(AnnotationHTTPPort, 80, ingress, class)
+	httpsPort := getAnnotation(AnnotationHTTPSPort, 443, ingress, class)
+
+	httpListener := albListener{
+		ingressRef:    ref,
+		protocol:      "PROTOCOL_HTTP",
+		name:          fmt.Sprintf("%d-http", httpPort),
+		wafConfigName: getAnnotation(AnnotationWAFName, "", class, ingress),
+		hosts:         map[string]albListenerHost{},
+	}
+	httpsListener := albListener{
+		ingressRef:     ref,
+		protocol:       "PROTOCOL_HTTPS",
+		name:           fmt.Sprintf("%d-https", httpsPort),
+		wafConfigName:  getAnnotation(AnnotationWAFName, "", class, ingress),
+		certificateIDs: certificateIDs,
+		hosts:          map[string]albListenerHost{},
+	}
+
+	for host, rules := range hosts {
+		if !getAnnotation(AnnotationHTTPSOnly, false, class, ingress) {
+			httpListener.hosts[host] = rules
+		}
+		if _, ok := httpsHosts[host]; ok {
+			httpsListener.hosts[host] = rules
+		}
+	}
+
+	listeners := albListeners{}
+	if len(httpListener.hosts) > 0 {
+		listeners[httpPort] = httpListener
+	}
+	if len(httpsListener.hosts) > 0 && len(httpsListener.certificateIDs) > 0 {
+		listeners[httpsPort] = httpsListener
+	}
+
+	return listeners, certificates, targets, errorList
+}
+
+func (r *IngressClassReconciler) getSortedIngressesForIngressClass(ctx context.Context, class *networkingv1.IngressClass) ([]networkingv1.Ingress, error) {
+	ingresses, err := r.getIngressesForIngressClass(ctx, class)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.SliceStable(ingresses, func(i, j int) bool {
+		prioI := getAnnotation(AnnotationPriority, 0, class, &ingresses[i])
+		prioJ := getAnnotation(AnnotationPriority, 0, class, &ingresses[j])
+
+		// Sort by Priority (Highest at the beginning)
+		if prioI != prioJ {
+			return prioI > prioJ
+		}
+
+		// Sort by CreationTimestamp (Oldest first) if prio is the same
+		return ingresses[i].CreationTimestamp.Before(&ingresses[j].CreationTimestamp)
+	})
+
+	return ingresses, nil
+}
+
+func (r *IngressClassReconciler) getIngressesForIngressClass(ctx context.Context, class *networkingv1.IngressClass) ([]networkingv1.Ingress, error) {
+	ingressList := &networkingv1.IngressList{}
+	err := r.Client.List(ctx, ingressList)
+	if err != nil {
+		return nil, err
+	}
+
+	var ingresses []networkingv1.Ingress
+
+	for _, ingress := range ingressList.Items {
+		if ptr.Deref(ingress.Spec.IngressClassName, "") == class.Name {
+			ingresses = append(ingresses, ingress)
+		}
+	}
+	return ingresses, nil
+}
+
+func (r *IngressClassReconciler) getTargetPoolForPath(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress, path networkingv1.HTTPIngressPath) (string, albTargetPool, error) {
+	if path.Backend.Service == nil {
+		return "", albTargetPool{}, fmt.Errorf("ingress %q does not have a service backend", ingress.Name)
+	}
+
+	svc := &corev1.Service{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Name:      path.Backend.Service.Name,
+		Namespace: ingress.Namespace,
+	}, svc)
+	if err != nil {
+		return "", albTargetPool{}, err
+	}
+	if svc.Spec.Type != corev1.ServiceTypeNodePort {
+		return "", albTargetPool{}, errors.New("service type is not NodePort")
+	}
+
+	for _, port := range svc.Spec.Ports {
+		if port.Port == path.Backend.Service.Port.Number ||
+			port.Name == path.Backend.Service.Port.Name {
+			return fmt.Sprintf("port-%d", port.NodePort), albTargetPool{
+				ingressRef:                getIngressRefForIngress(r.Scheme, ingress),
+				port:                      port.NodePort,
+				targets:                   nil,
+				tlsEnabled:                getAnnotation(AnnotationTargetPoolTLSEnabled, false, ingress, class, svc),
+				skipCertificateValidation: getAnnotation(AnnotationTargetPoolTLSSkipCertificateValidation, false, ingress, class, svc),
+				customCA:                  getAnnotation(AnnotationTargetPoolTLSCustomCa, "", ingress, class, svc),
+			}, nil
+		}
+	}
+
+	return "", albTargetPool{}, errors.New("no matching port in service found")
+}
+
+func (r *IngressClassReconciler) getCertificateForSecretName(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress, secretName string) (string, albCertificate, error) {
+	secret := &corev1.Secret{}
+	err := r.Client.Get(ctx, client.ObjectKey{
+		Name:      secretName,
+		Namespace: ingress.Namespace,
+	}, secret)
+	if err != nil {
+		return "", albCertificate{}, err
+	}
+	if secret.Type != corev1.SecretTypeTLS {
+		return "", albCertificate{}, errors.New("secret type is not kubernetes.io/tls")
+	}
+
+	return getCertName(class, secret), albCertificate{
+		ingressRefs: []corev1.ObjectReference{getIngressRefForIngress(r.Scheme, ingress)},
+		publicKey:   secret.Data[corev1.TLSCertKey],
+		privateKey:  secret.Data[corev1.TLSPrivateKeyKey],
+	}, nil
+}
+
+func (r *IngressClassReconciler) applyCertificates(ctx context.Context, certificates albCertificates) (map[string]string, []errorEvents) {
+	errorList := []errorEvents{}
+	nameToID := map[string]string{}
+	for name, certificate := range certificates {
+		createCertificatePayload := &certsdk.CreateCertificatePayload{
+			Name:       new(name),
+			ProjectId:  &r.ALBConfig.Global.ProjectID,
+			PrivateKey: new(string(certificate.privateKey)),
+			PublicKey:  new(string(certificate.publicKey)),
+		}
+		response, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
+		if err != nil {
+			for _, ref := range certificate.ingressRefs {
+				errorList = append(errorList, errorEvents{
+					ingressRef:  ref,
+					description: fmt.Sprintf("Error creating certificate for ingress %q: %s", ref, err),
+					typ:         "error",
+				})
+			}
+			continue
+		}
+		nameToID[response.GetName()] = response.GetId()
+	}
+	return nameToID, errorList
+}
+
+func (r *IngressClassReconciler) getTargetsOfNodes(ctx context.Context) ([]albsdk.Target, error) {
+	nodes := &corev1.NodeList{}
+	err := r.Client.List(ctx, nodes)
+	if err != nil {
+		return nil, err
+	}
+
 	targets := []albsdk.Target{}
-	for i := range nodes {
-		node := nodes[i]
+	for _, node := range nodes.Items {
 		for j := range node.Status.Addresses {
 			address := node.Status.Addresses[j]
 			if address.Type == corev1.NodeInternalIP {
@@ -100,373 +425,13 @@ func (r *IngressClassReconciler) albSpecFromIngress( //nolint:funlen,gocyclo // 
 			}
 		}
 	}
+	return targets, nil
+}
 
-	// For each Ingress, add its rules to the combined rule list
-	for _, ingress := range ingresses {
-		priority := getIngressPriority(ingress)
-
-		for _, rule := range ingress.Spec.Rules {
-			for j, path := range rule.HTTP.Paths {
-				nodePort, err := getNodePort(services, path)
-				if err != nil {
-					return false, nil, err
-				}
-
-				targetPoolName := fmt.Sprintf("pool-%d", nodePort)
-				if !targetPoolSeen[targetPoolName] {
-					addTargetPool(ctx, ingress, targetPoolName, &targetPools, nodePort, targets)
-					targetPoolSeen[targetPoolName] = true
-				}
-
-				pathTypeVal := 1
-				if path.PathType != nil && *path.PathType == networkingv1.PathTypeExact {
-					pathTypeVal = 0
-				}
-
-				ruleMetadataList = append(ruleMetadataList, ruleMetadata{
-					path:             path.Path,
-					host:             rule.Host,
-					priority:         priority,
-					pathLength:       len(path.Path),
-					pathTypeVal:      pathTypeVal,
-					ingressName:      ingress.Name,
-					ingressNamespace: ingress.Namespace,
-					ruleOrder:        j,
-					targetPool:       targetPoolName,
-				})
-			}
-		}
-
-		// Apend certificates from the current Ingress to the combined certificates
-		requeueNeeded, certificateIDs, err := r.loadCerts(ctx, ingressClass, ingress)
-		if requeueNeeded {
-			return true, nil, nil
-		}
-		if err != nil {
-			return false, nil, fmt.Errorf("failed to load tls certificates: %w", err)
-		}
-		allCertificateIDs = append(allCertificateIDs, certificateIDs...)
-	}
-
-	// Sort all collected rules
-	sort.SliceStable(ruleMetadataList, func(i, j int) bool {
-		a, b := ruleMetadataList[i], ruleMetadataList[j]
-		// 1. Host name (lexicographically)
-		if a.host != b.host {
-			return a.host < b.host
-		}
-		// 2. Priority annotation (higher priority wins)
-		if a.priority != b.priority {
-			return a.priority > b.priority
-		}
-		// 3. Path specificity (longer paths first)
-		if a.pathLength != b.pathLength {
-			return a.pathLength > b.pathLength
-		}
-		// 4. Path type precedence (Exact < Prefix)
-		if a.pathTypeVal != b.pathTypeVal {
-			return a.pathTypeVal < b.pathTypeVal
-		}
-		// 5. Ingress name tie-breaker
-		if a.ingressName != b.ingressName {
-			return a.ingressName < b.ingressName
-		}
-		// 6. Ingress Namespace tie-breaker
-		if a.ingressNamespace != b.ingressNamespace {
-			return a.ingressNamespace < b.ingressNamespace
-		}
-		return a.ruleOrder < b.ruleOrder
-	})
-
-	// Group rules by host
-	hostToRules := map[string][]albsdk.Rule{}
-	for _, meta := range ruleMetadataList {
-		rule := albsdk.Rule{
-			TargetPool: new(meta.targetPool),
-		}
-		if meta.pathTypeVal == 0 { // Exact path
-			rule.Path = &albsdk.Path{
-				ExactMatch: new(meta.path),
-			}
-		} else { // Prefix path
-			rule.Path = &albsdk.Path{
-				Prefix: new(meta.path),
-			}
-		}
-		hostToRules[meta.host] = append(hostToRules[meta.host], rule)
-	}
-
-	// Build Host configs
-	httpHosts := []albsdk.HostConfig{}
-	hostnames := make([]string, 0, len(hostToRules))
-	for host := range hostToRules {
-		hostnames = append(hostnames, host)
-	}
-	sort.Strings(hostnames)
-
-	for _, host := range hostnames {
-		rulesCopy := hostToRules[host]
-		httpHosts = append(httpHosts, albsdk.HostConfig{
-			Host:  new(host),
-			Rules: rulesCopy,
-		})
-	}
-
-	// Build Listeners
-	// Create a default HTTP rule for the ALB Always create an HTTP listener - neecessary step for acme challenge
-	// Add TLS listener if any Ingress has TLS configured
-	listeners := []albsdk.Listener{
-		{
-			Name:     new("http"),
-			Port:     new(int32(80)),
-			Protocol: new("PROTOCOL_HTTP"),
-			Http: &albsdk.ProtocolOptionsHTTP{
-				Hosts: httpHosts,
-			},
-		},
-	}
-	if len(allCertificateIDs) > 0 {
-		listeners = append(listeners, albsdk.Listener{
-			Name:     new("https"),
-			Port:     new(int32(443)),
-			Protocol: new("PROTOCOL_HTTPS"),
-			Http: &albsdk.ProtocolOptionsHTTP{
-				Hosts: httpHosts,
-			},
-			Https: &albsdk.ProtocolOptionsHTTPS{
-				CertificateConfig: &albsdk.CertificateConfig{
-					CertificateIds: allCertificateIDs,
-				},
-			},
-		})
-	}
-
-	// Set the IP address of the ALB
-	err := setIPAddresses(ingressClass, alb)
+func getIngressRefForIngress(scheme *runtime.Scheme, ingress *networkingv1.Ingress) corev1.ObjectReference {
+	ref, err := reference.GetReference(scheme, ingress)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to set IP address: %w", err)
+		return corev1.ObjectReference{}
 	}
-
-	alb.Name = new(getAlbName(ingressClass))
-	alb.Listeners = listeners
-	alb.TargetPools = targetPools
-
-	return false, alb, nil
-}
-
-// loadCerts loads the tls certificates from Ingress to the Certificates API
-// nolint:gocritic // no named results
-func (r *IngressClassReconciler) loadCerts(
-	ctx context.Context,
-	ingressClass *networkingv1.IngressClass,
-	ingress *networkingv1.Ingress,
-) (bool, []string, error) {
-	certificateIDs := []string{}
-
-	for _, tls := range ingress.Spec.TLS {
-		if tls.SecretName == "" {
-			continue
-		}
-
-		secret := &corev1.Secret{}
-		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: ingress.Namespace, Name: tls.SecretName}, secret); err != nil {
-			return false, nil, fmt.Errorf("failed to get TLS secret: %w", err)
-		}
-
-		complete, err := isCertReady(secret)
-		if err != nil {
-			return false, nil, fmt.Errorf("failed to check if certificate is ready: %w", err)
-		}
-		if !complete {
-			// Requeue: The ACME challenge is still in progress and the certificate is not yet fully issued.
-			return true, nil, fmt.Errorf("certificate is not complete: %w", err)
-		}
-
-		createCertificatePayload := &certsdk.CreateCertificatePayload{
-			Name:       new(getCertName(ingressClass, ingress, secret)),
-			ProjectId:  &r.ALBConfig.Global.ProjectID,
-			PrivateKey: new(string(secret.Data["tls.key"])),
-			PublicKey:  new(string(secret.Data["tls.crt"])),
-		}
-		res, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
-		if err != nil {
-			return false, nil, fmt.Errorf("failed to create certificate: %w", err)
-		}
-
-		certificateIDs = append(certificateIDs, *res.Id)
-	}
-	return false, certificateIDs, nil
-}
-
-// cleanupCerts deletes all certificates from the Certificates API that are associated with this IngressClass.
-func (r *IngressClassReconciler) cleanupCerts(ctx context.Context, ingressClass *networkingv1.IngressClass) error {
-	// We use the IngressClass UID to identify certificates for this specific class.
-	// A shortened version is used because that is how the names were generated on creation.
-	// Note: While a UID collision between clusters is technically possible, it is almost impossible in practice.
-	classPrefix := generateShortUID(ingressClass.UID)
-
-	certificatesList, err := r.CertificateClient.ListCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region)
-	if err != nil {
-		return fmt.Errorf("failed to list certificates: %w", err)
-	}
-
-	if certificatesList == nil || certificatesList.Items == nil {
-		return nil // No certificates to clean up
-	}
-
-	for _, cert := range certificatesList.Items {
-		if strings.HasPrefix(*cert.Name, classPrefix) {
-			err := r.CertificateClient.DeleteCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, *cert.Id)
-			if err != nil {
-				return fmt.Errorf("failed to delete orphaned certificate %s: %v", *cert.Name, err)
-			}
-		}
-	}
-	return nil
-}
-
-// isCertReady checks if the certificate chain is complete (leaf + intermediates).
-// This is required during ACME challenges (e.g., cert-manager), where a race condition
-// can occur where the Secret may temporarily contain only the leaf certificate before the
-// full chain is written. Because the STACKIT Application Load Balancer Certificates API
-// only validates the cryptographic key match and is immutable (no update call),
-// we must wait for the full chain to avoid locking the ALB with an incomplete certificate.
-func isCertReady(secret *corev1.Secret) (bool, error) {
-	tlsCert := secret.Data["tls.crt"]
-	if tlsCert == nil {
-		return false, fmt.Errorf("tls.crt not found in secret")
-	}
-
-	// Split the certificates in the tls.crt by PEM boundary
-	blocks := []*pem.Block{}
-	for len(tlsCert) > 0 {
-		var block *pem.Block
-		block, tlsCert = pem.Decode(tlsCert)
-		if block == nil {
-			return false, fmt.Errorf("failed to decode certificate")
-		}
-		blocks = append(blocks, block)
-	}
-
-	// Parse the certificates using x509
-	certs := []*x509.Certificate{}
-	for _, block := range blocks {
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return false, fmt.Errorf("failed to parse certificate: %v", err)
-		}
-		certs = append(certs, cert)
-	}
-
-	// A valid, trusted chain must contain at least 2 certificates:
-	// the leaf (domain) and at least one intermediate CA.
-	return len(certs) > 1, nil
-}
-
-func addTargetPool(
-	_ context.Context,
-	ingress *networkingv1.Ingress,
-	targetPoolName string,
-	targetPools *[]albsdk.TargetPool,
-	nodePort int32,
-	targets []albsdk.Target,
-) {
-	tlsConfig := &albsdk.TlsConfig{}
-	if val, ok := ingress.Annotations[tlsBridgingTrustedCaAnnotation]; ok && val == "true" {
-		tlsConfig.Enabled = new(true)
-	}
-	if val, ok := ingress.Annotations[tlsBridgingCustomCaAnnotation]; ok && val != "" {
-		tlsConfig.Enabled = new(true)
-		tlsConfig.CustomCa = new(val)
-	}
-	if val, ok := ingress.Annotations[tlsBridgingSkipValidationAnnotation]; ok && val == "true" {
-		tlsConfig.Enabled = new(true)
-		tlsConfig.SkipCertificateValidation = new(true)
-	}
-	if tlsConfig.Enabled == nil {
-		tlsConfig = nil
-	}
-	*targetPools = append(*targetPools, albsdk.TargetPool{
-		Name:       new(targetPoolName),
-		TargetPort: new(nodePort),
-		TlsConfig:  tlsConfig,
-		Targets:    targets,
-	})
-}
-
-// setIPAddresses configures the Application Load Balancer IP address
-// based on IngressClass annotations: internal, ephemeral, or static public IPs.
-func setIPAddresses(ingressClass *networkingv1.IngressClass, alb *albsdk.CreateLoadBalancerPayload) error {
-	isInternalIP, found := ingressClass.Annotations[internalIPAnnotation]
-	if found && isInternalIP == "true" {
-		alb.Options = &albsdk.LoadBalancerOptions{
-			PrivateNetworkOnly: new(true),
-		}
-		return nil
-	}
-	externalAddress, found := ingressClass.Annotations[externalIPAnnotation]
-	if !found {
-		alb.Options = &albsdk.LoadBalancerOptions{
-			EphemeralAddress: new(true),
-		}
-		return nil
-	}
-	err := validateIPAddress(externalAddress)
-	if err != nil {
-		return fmt.Errorf("failed to validate external address: %w", err)
-	}
-	alb.ExternalAddress = new(externalAddress)
-	return nil
-}
-
-func validateIPAddress(ipAddr string) error {
-	ip, err := netip.ParseAddr(ipAddr)
-	if err != nil {
-		return fmt.Errorf("invalid format for external IP: %w", err)
-	}
-	if ip.Is6() {
-		return fmt.Errorf("external IP must be an IPv4 address")
-	}
-	return nil
-}
-
-// getNodePort gets the NodePort of the Service
-func getNodePort(services map[string]corev1.Service, path networkingv1.HTTPIngressPath) (int32, error) {
-	service, found := services[path.Backend.Service.Name]
-	if !found {
-		return 0, fmt.Errorf("service not found: %s", path.Backend.Service.Name)
-	}
-
-	if path.Backend.Service.Port.Name != "" {
-		for _, servicePort := range service.Spec.Ports {
-			if servicePort.Name == path.Backend.Service.Port.Name {
-				if servicePort.NodePort == 0 {
-					return 0, fmt.Errorf("port %q of service %q has no node port", servicePort.Name, path.Backend.Service.Name)
-				}
-				return servicePort.NodePort, nil
-			}
-		}
-	} else {
-		for _, servicePort := range service.Spec.Ports {
-			if servicePort.Port == path.Backend.Service.Port.Number {
-				if servicePort.NodePort == 0 {
-					return 0, fmt.Errorf("port %d of service %q has no node port", servicePort.Port, path.Backend.Service.Name)
-				}
-				return servicePort.NodePort, nil
-			}
-		}
-	}
-	return 0, fmt.Errorf("no matching port found for service %q", path.Backend.Service.Name)
-}
-
-// getIngressPriority retrieves the priority of the Ingress from its annotations.
-func getIngressPriority(ingress *networkingv1.Ingress) int {
-	if val, ok := ingress.Annotations[priorityAnnotation]; ok {
-		if priority, err := strconv.Atoi(val); err == nil {
-			if priority >= minPriority && priority <= maxPriority {
-				return priority
-			}
-		}
-	}
-	return defaultPriority
+	return *ref
 }
