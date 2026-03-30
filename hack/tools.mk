@@ -14,6 +14,7 @@ MOCKGEN_VERSION ?= v0.6.0
 APKO_VERSION ?= v1.2.0
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.18.1
+ENVTEST_VERSION ?= v0.0.0-20260317052337-b8d2b5b862fa
 
 KUBERNETES_TEST_VERSION ?= v1.33.5
 
@@ -52,6 +53,10 @@ $(APKO): $(call tool_version_file,$(APKO),$(APKO_VERSION))
 KO := $(TOOLS_BIN_DIR)/ko
 $(KO): $(call tool_version_file,$(KO),$(KO_VERSION))
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/google/ko@$(KO_VERSION)
+
+ENVTEST := $(TOOLS_BIN_DIR)/setup-envtest
+$(ENVTEST): $(call tool_version_file,$(ENVTEST),$(ENVTEST_VERSION))
+	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 KUBERNETES_TEST := $(TOOLS_BIN_DIR)/e2e.test
 KUBERNETES_TEST_GINKGO := $(TOOLS_BIN_DIR)/ginkgo

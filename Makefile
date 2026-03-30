@@ -2,7 +2,7 @@
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
+BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager application-load-balancer-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*' 2>/dev/null || git rev-parse --short HEAD)
 REGISTRY ?= ghcr.io
@@ -60,7 +60,7 @@ modules: ## Runs go mod to ensure modules are up to date.
 	go mod tidy
 
 .PHONY: test
-test: ## Run tests.
+test: $(ENVTEST) ## Run tests.
 	./hack/test.sh ./cmd/... ./pkg/...
 
 .PHONY: test-cover
@@ -141,6 +141,9 @@ mocks: $(MOCKGEN)
 	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
 	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
 	@$(MOCKGEN) -destination ./pkg/csi/util/mount/mount_mock.go -package mount ./pkg/csi/util/mount IMount
+	@$(MOCKGEN) -destination ./pkg/stackit/applicationloadbalancercertificates_mock.go -package stackit ./pkg/stackit CertificatesClient
+	@$(MOCKGEN) -destination ./pkg/stackit/applicationloadbalancer_mock.go -package stackit ./pkg/stackit ApplicationLoadBalancerClient
+
 
 .PHONY: generate
 generate: mocks

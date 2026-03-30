@@ -24,4 +24,5 @@ else
   timeout_flag="-timeout=2m"
 fi
 
+export KUBEBUILDER_ASSETS="$(pwd)/$(hack/tools/bin/setup-envtest use 1.35.0 --bin-dir hack/tools/bin -p path)" 
 go test ${timeout_flag:+"$timeout_flag"} "$@" "${test_flags[@]}"
