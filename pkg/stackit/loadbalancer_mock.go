@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	v2api "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,10 +42,10 @@ func (m *MockLoadbalancerClient) EXPECT() *MockLoadbalancerClientMockRecorder {
 }
 
 // CreateCredentials mocks base method.
-func (m *MockLoadbalancerClient) CreateCredentials(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+func (m *MockLoadbalancerClient) CreateCredentials(ctx context.Context, projectID string, payload v2api.CreateCredentialsPayload) (*v2api.CreateCredentialsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateCredentials", ctx, projectID, payload)
-	ret0, _ := ret[0].(*loadbalancer.CreateCredentialsResponse)
+	ret0, _ := ret[0].(*v2api.CreateCredentialsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -57,18 +57,18 @@ func (mr *MockLoadbalancerClientMockRecorder) CreateCredentials(ctx, projectID, 
 }
 
 // CreateLoadBalancer mocks base method.
-func (m *MockLoadbalancerClient) CreateLoadBalancer(ctx context.Context, projectID string, arg2 *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+func (m *MockLoadbalancerClient) CreateLoadBalancer(ctx context.Context, projectID string, loadbalancer *v2api.CreateLoadBalancerPayload) (*v2api.LoadBalancer, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateLoadBalancer", ctx, projectID, arg2)
-	ret0, _ := ret[0].(*loadbalancer.LoadBalancer)
+	ret := m.ctrl.Call(m, "CreateLoadBalancer", ctx, projectID, loadbalancer)
+	ret0, _ := ret[0].(*v2api.LoadBalancer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateLoadBalancer indicates an expected call of CreateLoadBalancer.
-func (mr *MockLoadbalancerClientMockRecorder) CreateLoadBalancer(ctx, projectID, arg2 any) *gomock.Call {
+func (mr *MockLoadbalancerClientMockRecorder) CreateLoadBalancer(ctx, projectID, loadbalancer any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateLoadBalancer", reflect.TypeOf((*MockLoadbalancerClient)(nil).CreateLoadBalancer), ctx, projectID, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateLoadBalancer", reflect.TypeOf((*MockLoadbalancerClient)(nil).CreateLoadBalancer), ctx, projectID, loadbalancer)
 }
 
 // DeleteCredentials mocks base method.
@@ -100,10 +100,10 @@ func (mr *MockLoadbalancerClientMockRecorder) DeleteLoadBalancer(ctx, projectID,
 }
 
 // GetCredentials mocks base method.
-func (m *MockLoadbalancerClient) GetCredentials(ctx context.Context, projectID, credentialRef string) (*loadbalancer.GetCredentialsResponse, error) {
+func (m *MockLoadbalancerClient) GetCredentials(ctx context.Context, projectID, credentialRef string) (*v2api.GetCredentialsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCredentials", ctx, projectID, credentialRef)
-	ret0, _ := ret[0].(*loadbalancer.GetCredentialsResponse)
+	ret0, _ := ret[0].(*v2api.GetCredentialsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -115,10 +115,10 @@ func (mr *MockLoadbalancerClientMockRecorder) GetCredentials(ctx, projectID, cre
 }
 
 // GetLoadBalancer mocks base method.
-func (m *MockLoadbalancerClient) GetLoadBalancer(ctx context.Context, projectID, name string) (*loadbalancer.LoadBalancer, error) {
+func (m *MockLoadbalancerClient) GetLoadBalancer(ctx context.Context, projectID, name string) (*v2api.LoadBalancer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLoadBalancer", ctx, projectID, name)
-	ret0, _ := ret[0].(*loadbalancer.LoadBalancer)
+	ret0, _ := ret[0].(*v2api.LoadBalancer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -130,10 +130,10 @@ func (mr *MockLoadbalancerClientMockRecorder) GetLoadBalancer(ctx, projectID, na
 }
 
 // ListCredentials mocks base method.
-func (m *MockLoadbalancerClient) ListCredentials(ctx context.Context, projectID string) (*loadbalancer.ListCredentialsResponse, error) {
+func (m *MockLoadbalancerClient) ListCredentials(ctx context.Context, projectID string) (*v2api.ListCredentialsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCredentials", ctx, projectID)
-	ret0, _ := ret[0].(*loadbalancer.ListCredentialsResponse)
+	ret0, _ := ret[0].(*v2api.ListCredentialsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -145,7 +145,7 @@ func (mr *MockLoadbalancerClientMockRecorder) ListCredentials(ctx, projectID any
 }
 
 // UpdateCredentials mocks base method.
-func (m *MockLoadbalancerClient) UpdateCredentials(ctx context.Context, projectID, credentialRef string, payload loadbalancer.UpdateCredentialsPayload) error {
+func (m *MockLoadbalancerClient) UpdateCredentials(ctx context.Context, projectID, credentialRef string, payload v2api.UpdateCredentialsPayload) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateCredentials", ctx, projectID, credentialRef, payload)
 	ret0, _ := ret[0].(error)
@@ -159,10 +159,10 @@ func (mr *MockLoadbalancerClientMockRecorder) UpdateCredentials(ctx, projectID, 
 }
 
 // UpdateLoadBalancer mocks base method.
-func (m *MockLoadbalancerClient) UpdateLoadBalancer(ctx context.Context, projectID, name string, update *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+func (m *MockLoadbalancerClient) UpdateLoadBalancer(ctx context.Context, projectID, name string, update *v2api.UpdateLoadBalancerPayload) (*v2api.LoadBalancer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateLoadBalancer", ctx, projectID, name, update)
-	ret0, _ := ret[0].(*loadbalancer.LoadBalancer)
+	ret0, _ := ret[0].(*v2api.LoadBalancer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -174,7 +174,7 @@ func (mr *MockLoadbalancerClientMockRecorder) UpdateLoadBalancer(ctx, projectID,
 }
 
 // UpdateTargetPool mocks base method.
-func (m *MockLoadbalancerClient) UpdateTargetPool(ctx context.Context, projectID, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
+func (m *MockLoadbalancerClient) UpdateTargetPool(ctx context.Context, projectID, name, targetPoolName string, payload v2api.UpdateTargetPoolPayload) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateTargetPool", ctx, projectID, name, targetPoolName, payload)
 	ret0, _ := ret[0].(error)
