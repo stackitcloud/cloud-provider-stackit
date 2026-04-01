@@ -9,12 +9,15 @@ import (
 	"github.com/onsi/gomega/types"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+	lbLegacy "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
 var _ = Describe("lbSpecFromService", func() {
 	const (
 		externalAddress = "123.124.88.99"
@@ -221,20 +224,20 @@ var _ = Describe("lbSpecFromService", func() {
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Listeners": PointTo(ConsistOf(
+				"Listeners": ConsistOf(
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("http")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))),
 					}),
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("http-alt")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))),
 					}),
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("dns")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_UDP)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_UDP))),
 					}),
-				)),
+				),
 			})))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
@@ -256,20 +259,20 @@ var _ = Describe("lbSpecFromService", func() {
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Listeners": PointTo(ConsistOf(
+				"Listeners": ConsistOf(
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("http")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))),
 					}),
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("http-alt")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))),
 					}),
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("https")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP))),
 					}),
-				)),
+				),
 			})))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
@@ -289,12 +292,12 @@ var _ = Describe("lbSpecFromService", func() {
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Listeners": PointTo(ConsistOf(
+				"Listeners": ConsistOf(
 					MatchFields(IgnoreExtras, Fields{
 						"DisplayName": PointTo(Equal("http")),
-						"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP)),
+						"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP))),
 					}),
-				)),
+				),
 			})))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
@@ -369,20 +372,20 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("http")),
-					"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP)),
+					"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP))),
 					"Port":        PointTo(BeNumerically("==", 80)),
 					"TargetPool":  PointTo(Equal("http")),
 				}),
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("dns")),
-					"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_UDP)),
+					"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_UDP))),
 					"Port":        PointTo(BeNumerically("==", 53)),
 					"TargetPool":  PointTo(Equal("dns")),
 				}),
-			)))
+			))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
 
@@ -425,7 +428,7 @@ var _ = Describe("lbSpecFromService", func() {
 			}
 			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(havePortName("port-tcp-80"))))
+			Expect(spec.Listeners).To(ConsistOf(havePortName("port-tcp-80")))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
 	})
@@ -451,7 +454,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
 					"AccessControl": PointTo(MatchFields(IgnoreExtras, Fields{
-						"AllowedSourceRanges": PointTo(Equal([]string{"15.0.0.0/8", "16.0.0.0/8"})),
+						"AllowedSourceRanges": Equal([]string{"15.0.0.0/8", "16.0.0.0/8"}),
 					})),
 				})),
 			})))
@@ -470,7 +473,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec).To(PointTo(MatchFields(IgnoreExtras, Fields{
 				"Options": PointTo(MatchFields(IgnoreExtras, Fields{
 					"AccessControl": PointTo(MatchFields(IgnoreExtras, Fields{
-						"AllowedSourceRanges": PointTo(Equal([]string{"2.0.0.0/8", "3.0.0.0/8"})),
+						"AllowedSourceRanges": Equal([]string{"2.0.0.0/8", "3.0.0.0/8"}),
 					})),
 				})),
 			})))
@@ -497,12 +500,12 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.TargetPools).To(PointTo(HaveLen(2)))
-			Expect(spec.TargetPools).To(PointTo(HaveEach(
+			Expect(spec.TargetPools).To(HaveLen(2))
+			Expect(spec.TargetPools).To(HaveEach(
 				haveTargets(ContainElements(loadbalancer.Target{
 					DisplayName: new("node-1"),
 					Ip:          new("10.2.3.4"),
-				})))))
+				}))))
 		})
 
 		It("node without internal IP", func() {
@@ -530,14 +533,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.TargetPools).To(PointTo(ConsistOf(
+			Expect(spec.TargetPools).To(ConsistOf(
 				haveTargets(ConsistOf( // node-2 is missing
 					loadbalancer.Target{
 						DisplayName: new("node-1"),
 						Ip:          new("10.2.3.4"),
 					},
 				)),
-			)))
+			))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
 	})
@@ -631,7 +634,7 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-port")),
 					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
@@ -646,7 +649,7 @@ var _ = Describe("lbSpecFromService", func() {
 				}),
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-proxy-port")),
-					"Protocol":    PointTo(Equal(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)),
+					"Protocol":    PointTo(Equal(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))),
 					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("900s")),
 					})),
@@ -655,7 +658,7 @@ var _ = Describe("lbSpecFromService", func() {
 					"DisplayName": PointTo(Equal("my-udp-port")),
 					"Tcp":         BeNil(),
 				}),
-			)))
+			))
 		})
 
 		It("should set timeout to 60 minutes if no annotation is specified", func() {
@@ -676,14 +679,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-port")),
 					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("3600s")),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should set timeout based on yawol annotation", func() {
@@ -705,14 +708,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-port")),
 					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("180s")),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should error on non-compatible timeouts", func() {
@@ -777,14 +780,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-port")),
 					"Tcp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("3600s")),
 					})),
 				}),
-			)))
+			))
 		})
 	})
 
@@ -930,7 +933,7 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-tcp-port")),
 					"Udp":         BeNil(),
@@ -947,7 +950,7 @@ var _ = Describe("lbSpecFromService", func() {
 						"IdleTimeout": PointTo(Equal("900s")),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should set timeout to 2 minutes if no annotation is specified", func() {
@@ -968,14 +971,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-udp-port")),
 					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("120s")),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should set timeout based on yawol annotation", func() {
@@ -997,14 +1000,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-udp-port")),
 					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("180s")),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should error on non-compatible timeouts", func() {
@@ -1069,14 +1072,14 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.Listeners).To(PointTo(ConsistOf(
+			Expect(spec.Listeners).To(ConsistOf(
 				MatchFields(IgnoreExtras, Fields{
 					"DisplayName": PointTo(Equal("my-udp-port")),
 					"Udp": PointTo(MatchFields(IgnoreExtras, Fields{
 						"IdleTimeout": PointTo(Equal("120s")),
 					})),
 				}),
-			)))
+			))
 		})
 	})
 	Context("Session Persistence", func() {
@@ -1098,13 +1101,13 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.TargetPools).To(PointTo(HaveEach(
+			Expect(spec.TargetPools).To(HaveEach(
 				MatchFields(IgnoreExtras, Fields{
 					"SessionPersistence": PointTo(MatchFields(IgnoreExtras, Fields{
 						"UseSourceIpAddress": PointTo(BeTrue()),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should disable session persistence when annotation is false", func() {
@@ -1125,13 +1128,13 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.TargetPools).To(PointTo(HaveEach(
+			Expect(spec.TargetPools).To(HaveEach(
 				MatchFields(IgnoreExtras, Fields{
 					"SessionPersistence": PointTo(MatchFields(IgnoreExtras, Fields{
 						"UseSourceIpAddress": PointTo(BeFalse()),
 					})),
 				}),
-			)))
+			))
 		})
 
 		It("should error on invalid value for useSourceIpAddress", func() {
@@ -1155,10 +1158,10 @@ var _ = Describe("lbSpecFromService", func() {
 			},
 		}, []*corev1.Node{}, lbOpts, nil)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(spec.Networks).To(PointTo(ConsistOf(MatchFields(IgnoreExtras, Fields{
+		Expect(spec.Networks).To(ConsistOf(MatchFields(IgnoreExtras, Fields{
 			"NetworkId": PointTo(Equal("my-network")),
-			"Role":      PointTo(Equal(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS)),
-		}))))
+			"Role":      PointTo(Equal(string(lbLegacy.NETWORKROLE_LISTENERS_AND_TARGETS))),
+		})))
 	})
 
 	It("should create a load balancer with two networks with dedicated roles", func() {
@@ -1170,16 +1173,16 @@ var _ = Describe("lbSpecFromService", func() {
 			},
 		}, []*corev1.Node{}, lbOpts, nil)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(spec.Networks).To(PointTo(ConsistOf(
+		Expect(spec.Networks).To(ConsistOf(
 			MatchFields(IgnoreExtras, Fields{
 				"NetworkId": PointTo(Equal("my-network")),
-				"Role":      PointTo(Equal(loadbalancer.NETWORKROLE_TARGETS)),
+				"Role":      PointTo(Equal(string(lbLegacy.NETWORKROLE_TARGETS))),
 			}),
 			MatchFields(IgnoreExtras, Fields{
 				"NetworkId": PointTo(Equal("my-listener-network")),
-				"Role":      PointTo(Equal(loadbalancer.NETWORKROLE_LISTENERS)),
+				"Role":      PointTo(Equal(string(lbLegacy.NETWORKROLE_LISTENERS))),
 			}),
-		)))
+		))
 	})
 
 	It("should configure a public service without existing IP as ephemeral", func() {
@@ -1191,7 +1194,7 @@ var _ = Describe("lbSpecFromService", func() {
 
 // haveTargets succeeds if actual is a target pool and the list of targets matches matcher.
 func haveTargets(matcher types.GomegaMatcher) types.GomegaMatcher {
-	return WithTransform(func(pool loadbalancer.TargetPool) *[]loadbalancer.Target { return pool.Targets }, PointTo(matcher))
+	return WithTransform(func(pool loadbalancer.TargetPool) []loadbalancer.Target { return pool.Targets }, matcher)
 }
 
 // havePortName succeeds if actual is a listener whose display name matches name.
@@ -1202,8 +1205,8 @@ func havePortName(name string) types.GomegaMatcher {
 // haveConsistentTargetPool succeeds if the target pools of each listener exist.
 func haveConsistentTargetPool() types.GomegaMatcher {
 	return WithTransform(func(l *loadbalancer.CreateLoadBalancerPayload) bool {
-		for _, lb := range *l.Listeners {
-			contains := slices.ContainsFunc(*l.TargetPools, func(t loadbalancer.TargetPool) bool {
+		for _, lb := range l.Listeners {
+			contains := slices.ContainsFunc(l.TargetPools, func(t loadbalancer.TargetPool) bool {
 				return ptr.Equal(lb.TargetPool, t.Name)
 			})
 			if !contains {
@@ -1221,6 +1224,7 @@ type compareLBwithSpecTest struct {
 	spec                  *loadbalancer.CreateLoadBalancerPayload
 }
 
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
 var _ = DescribeTable("compareLBwithSpec",
 	func(t *compareLBwithSpecTest) {
 		fulfills, immutableChanged := compareLBwithSpec(t.lb, t.spec)
@@ -1367,7 +1371,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{}, {},
 			},
 		},
@@ -1375,7 +1379,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{},
 			},
 		},
@@ -1386,7 +1390,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{DisplayName: new("port-a")},
 			},
 		},
@@ -1394,7 +1398,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{DisplayName: new("port-b")},
 			},
 		},
@@ -1405,16 +1409,16 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
-				{Port: new(int64(80))},
+			Listeners: []loadbalancer.Listener{
+				{Port: new(int32(80))},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
-				{Port: new(int64(443))},
+			Listeners: []loadbalancer.Listener{
+				{Port: new(int32(443))},
 			},
 		},
 	}),
@@ -1424,16 +1428,16 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
-				{Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP)},
+			Listeners: []loadbalancer.Listener{
+				{Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP))},
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
-				{Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY)},
+			Listeners: []loadbalancer.Listener{
+				{Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY))},
 			},
 		},
 	}),
@@ -1443,9 +1447,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP)),
 					Tcp: &loadbalancer.OptionsTCP{
 						IdleTimeout: new("60s"),
 					},
@@ -1456,9 +1460,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP)),
 					Tcp: &loadbalancer.OptionsTCP{
 						IdleTimeout: new("120s"),
 					},
@@ -1472,9 +1476,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_UDP),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_UDP)),
 					Udp: &loadbalancer.OptionsUDP{
 						IdleTimeout: new("60s"),
 					},
@@ -1485,9 +1489,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_UDP),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_UDP)),
 					Udp: &loadbalancer.OptionsUDP{
 						IdleTimeout: new("120s"),
 					},
@@ -1501,9 +1505,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY)),
 					Tcp: &loadbalancer.OptionsTCP{
 						IdleTimeout: new("60s"),
 					},
@@ -1514,9 +1518,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{
-					Protocol: new(loadbalancer.LISTENERPROTOCOL_TCP_PROXY),
+					Protocol: new(string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY)),
 					Tcp: &loadbalancer.OptionsTCP{
 						IdleTimeout: new("120s"),
 					},
@@ -1530,7 +1534,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{TargetPool: new("target-pool-a")},
 			},
 		},
@@ -1538,7 +1542,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Listeners: &[]loadbalancer.Listener{
+			Listeners: []loadbalancer.Listener{
 				{TargetPool: new("target-pool-b")},
 			},
 		},
@@ -1555,7 +1559,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Networks: &[]loadbalancer.Network{
+			Networks: []loadbalancer.Network{
 				{},
 			},
 		},
@@ -1566,7 +1570,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Networks: &[]loadbalancer.Network{
+			Networks: []loadbalancer.Network{
 				{
 					NetworkId: new("my-network"),
 				},
@@ -1576,7 +1580,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Networks: &[]loadbalancer.Network{
+			Networks: []loadbalancer.Network{
 				{
 					NetworkId: new("other-network"),
 				},
@@ -1589,9 +1593,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Networks: &[]loadbalancer.Network{
+			Networks: []loadbalancer.Network{
 				{
-					Role: new(loadbalancer.NETWORKROLE_LISTENERS),
+					Role: new(string(lbLegacy.NETWORKROLE_LISTENERS)),
 				},
 			},
 		},
@@ -1599,9 +1603,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			Networks: &[]loadbalancer.Network{
+			Networks: []loadbalancer.Network{
 				{
-					Role: new(loadbalancer.NETWORKROLE_TARGETS),
+					Role: new(string(lbLegacy.NETWORKROLE_TARGETS)),
 				},
 			},
 		},
@@ -1612,7 +1616,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{},
 			},
 		},
@@ -1620,7 +1624,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{}, {},
 			},
 		},
@@ -1631,7 +1635,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					Name: new("target-pool-a"),
 				},
@@ -1641,7 +1645,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					Name: new("target-pool-b"),
 				},
@@ -1654,9 +1658,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					TargetPort: new(int64(80)),
+					TargetPort: new(int32(80)),
 				},
 			},
 		},
@@ -1664,9 +1668,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					TargetPort: new(int64(443)),
+					TargetPort: new(int32(443)),
 				},
 			},
 		},
@@ -1677,9 +1681,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-a"),
 							Ip:          new("10.0.0.1"),
@@ -1696,9 +1700,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-b"),
 							Ip:          new("10.0.0.2"),
@@ -1718,9 +1722,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-a"),
 							Ip:          new("10.0.0.1"),
@@ -1733,9 +1737,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-b"),
 							Ip:          new("10.0.0.2"),
@@ -1755,9 +1759,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-a"),
 							Ip:          new("10.0.0.1"),
@@ -1770,9 +1774,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{
+					Targets: []loadbalancer.Target{
 						{
 							DisplayName: new("node-a"),
 							Ip:          new("10.0.0.2"),
@@ -1788,7 +1792,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					Targets: nil,
 				},
@@ -1798,9 +1802,9 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
-					Targets: &[]loadbalancer.Target{},
+					Targets: []loadbalancer.Target{},
 				},
 			},
 		},
@@ -1811,7 +1815,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
 						Interval: new("2"),
@@ -1823,7 +1827,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
 						Interval: new("3"),
@@ -1838,7 +1842,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
 						UnhealthyThreshold: nil,
@@ -1850,10 +1854,10 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{
+			TargetPools: []loadbalancer.TargetPool{
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
-						UnhealthyThreshold: new(int64(3)),
+						UnhealthyThreshold: new(int32(3)),
 					},
 				},
 			},
@@ -1890,7 +1894,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: new([]string{"10.0.0.0/24"}),
+					AllowedSourceRanges: []string{"10.0.0.0/24"},
 				},
 			},
 		},
@@ -1906,7 +1910,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: new([]string{"10.5.0.0/24"}),
+					AllowedSourceRanges: []string{"10.5.0.0/24"},
 				},
 			},
 		},
@@ -1914,7 +1918,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 				AccessControl: &loadbalancer.LoadbalancerOptionAccessControl{
-					AllowedSourceRanges: new([]string{"10.0.0.0/24"}),
+					AllowedSourceRanges: []string{"10.0.0.0/24"},
 				},
 			},
 		},
@@ -1925,7 +1929,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(true),
 				},
@@ -1935,7 +1939,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(true),
 				},
@@ -1948,7 +1952,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(false),
 				},
@@ -1958,7 +1962,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(false),
 				},
@@ -1971,7 +1975,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(false),
 				},
@@ -1981,7 +1985,7 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				PrivateNetworkOnly: new(true),
 			},
-			TargetPools: &[]loadbalancer.TargetPool{{
+			TargetPools: []loadbalancer.TargetPool{{
 				SessionPersistence: &loadbalancer.SessionPersistence{
 					UseSourceIpAddress: new(true),
 				},
