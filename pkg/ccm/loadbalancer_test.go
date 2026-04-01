@@ -8,7 +8,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
+	lbwait "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api/wait"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -110,13 +111,13 @@ var _ = Describe("LoadBalancer", func() {
 
 		convertToLB := func(spec *loadbalancer.CreateLoadBalancerPayload) *loadbalancer.LoadBalancer {
 			return &loadbalancer.LoadBalancer{
-				Errors:          &[]loadbalancer.LoadBalancerError{},
+				Errors:          []loadbalancer.LoadBalancerError{},
 				ExternalAddress: spec.ExternalAddress,
 				Listeners:       spec.Listeners,
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
-				Status:          new(loadbalancer.LOADBALANCERSTATUS_READY),
+				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -200,7 +201,7 @@ var _ = Describe("LoadBalancer", func() {
 		It("should create a load balancer with observability configured", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(nil, stackit.ErrorNotFound)
 			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-				Credentials: &[]loadbalancer.CredentialsResponse{},
+				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
 			// TODO: match payload
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).
@@ -231,14 +232,14 @@ var _ = Describe("LoadBalancer", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
-				Errors:          &[]loadbalancer.LoadBalancerError{},
+				Errors:          []loadbalancer.LoadBalancerError{},
 				ExternalAddress: spec.ExternalAddress,
 				Listeners:       spec.Listeners,
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(loadbalancer.LOADBALANCERSTATUS_READY),
+				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 				PlanId:          new("p10"),
@@ -257,14 +258,14 @@ var _ = Describe("LoadBalancer", func() {
 			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
-				Errors:          &[]loadbalancer.LoadBalancerError{},
+				Errors:          []loadbalancer.LoadBalancerError{},
 				ExternalAddress: spec.ExternalAddress,
 				Listeners:       spec.Listeners,
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(loadbalancer.LOADBALANCERSTATUS_READY),
+				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -315,14 +316,14 @@ var _ = Describe("LoadBalancer", func() {
 			spec, _, err := lbSpecFromService(svc, []*corev1.Node{nodeA}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
-				Errors:          &[]loadbalancer.LoadBalancerError{},
+				Errors:          []loadbalancer.LoadBalancerError{},
 				ExternalAddress: spec.ExternalAddress,
 				Listeners:       spec.Listeners,
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(loadbalancer.LOADBALANCERSTATUS_READY),
+				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -351,14 +352,14 @@ var _ = Describe("LoadBalancer", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			myLb := &loadbalancer.LoadBalancer{
-				Errors:          &[]loadbalancer.LoadBalancerError{},
+				Errors:          []loadbalancer.LoadBalancerError{},
 				ExternalAddress: spec.ExternalAddress,
 				Listeners:       spec.Listeners,
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(loadbalancer.LOADBALANCERSTATUS_READY),
+				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -391,7 +392,7 @@ var _ = Describe("LoadBalancer", func() {
 		It("should trigger load balancer deletion", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
 			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-				Credentials: &[]loadbalancer.CredentialsResponse{},
+				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
 			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
@@ -410,7 +411,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should finalize deletion if load balancer is state terminating", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
-				Status: new(loadbalancer.LOADBALANCERSTATUS_TERMINATING),
+				Status: new(lbwait.LOADBALANCERSTATUS_TERMINATING),
 			}, nil)
 
 			err := loadBalancer.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
@@ -430,7 +431,7 @@ var _ = Describe("LoadBalancer", func() {
 		It("should trigger load balancer deletion", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil)
 			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-				Credentials: &[]loadbalancer.CredentialsResponse{},
+				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
 			mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil)
 
@@ -456,7 +457,7 @@ var _ = Describe("LoadBalancer", func() {
 					EphemeralAddress: new(false),
 				},
 				ExternalAddress: new("8.8.4.4"),
-				Listeners:       &[]loadbalancer.Listener{},
+				Listeners:       []loadbalancer.Listener{},
 			}, nil)
 			gomock.InOrder(
 				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, gomock.All(
@@ -464,7 +465,7 @@ var _ = Describe("LoadBalancer", func() {
 				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-					Credentials: &[]loadbalancer.CredentialsResponse{},
+					Credentials: []loadbalancer.CredentialsResponse{},
 				}, nil),
 				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
 			)
@@ -490,7 +491,7 @@ var _ = Describe("LoadBalancer", func() {
 					EphemeralAddress: new(true),
 				},
 				ExternalAddress: new("0.0.0.0 (ephemeral)"),
-				Listeners:       &[]loadbalancer.Listener{},
+				Listeners:       []loadbalancer.Listener{},
 			}, nil)
 			gomock.InOrder(
 				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), projectID, name, gomock.All(
@@ -498,7 +499,7 @@ var _ = Describe("LoadBalancer", func() {
 				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), projectID, sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-					Credentials: &[]loadbalancer.CredentialsResponse{},
+					Credentials: []loadbalancer.CredentialsResponse{},
 				}, nil),
 				mockClient.EXPECT().DeleteLoadBalancer(gomock.Any(), projectID, name).MinTimes(1).Return(nil),
 			)
@@ -584,7 +585,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should create credentials if they do not exist", func() {
 			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-				Credentials: &[]loadbalancer.CredentialsResponse{},
+				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(&loadbalancer.CreateCredentialsResponse{
 				Credential: &loadbalancer.CredentialsResponse{
@@ -607,7 +608,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should return error if creating new credentials fails", func() {
 			mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-				Credentials: &[]loadbalancer.CredentialsResponse{},
+				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
 			errTest := errors.New("delete credentials test error")
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), projectID, gomock.Any()).MinTimes(1).Return(nil, errTest)
@@ -623,7 +624,7 @@ var _ = Describe("LoadBalancer", func() {
 		It("should delete matching and only matching observability credentials", func() {
 			gomock.InOrder(
 				mockClient.EXPECT().ListCredentials(gomock.Any(), projectID).Return(&loadbalancer.ListCredentialsResponse{
-					Credentials: &[]loadbalancer.CredentialsResponse{
+					Credentials: []loadbalancer.CredentialsResponse{
 						{
 							CredentialsRef: new("matching-1"),
 							DisplayName:    new("my-loadbalancer"),
