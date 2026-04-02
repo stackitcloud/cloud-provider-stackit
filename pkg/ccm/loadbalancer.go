@@ -8,8 +8,7 @@ import (
 	"time"
 
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
-	lbwait "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api/wait"
+	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
@@ -159,7 +158,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			PrivateAddress:  spec.PrivateAddress,
 			Region:          spec.Region,
 			Labels:          spec.Labels,
-			Status:          spec.Status,
+			Status:          loadbalancer.UpdateLoadBalancerPayloadGetStatusAttributeType(spec.Status),
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
@@ -179,10 +178,10 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		}
 	}
 
-	if lb.Status != nil && *lb.Status == lbwait.LOADBALANCERSTATUS_ERROR {
+	if *lb.Status == loadbalancer.LOADBALANCERSTATUS_ERROR {
 		return nil, fmt.Errorf("the load balancer is in an error state")
 	}
-	if lb.Status == nil || *lb.Status != lbwait.LOADBALANCERSTATUS_READY {
+	if *lb.Status != loadbalancer.LOADBALANCERSTATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -222,7 +221,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, createErr
 	}
 
-	if lb.Status == nil || *lb.Status != lbwait.LOADBALANCERSTATUS_READY {
+	if lb.Status == nil || *lb.Status != loadbalancer.LOADBALANCERSTATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -246,7 +245,7 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 		l.recorder.Event(service, event.Type, event.Reason, event.Message)
 	}
 
-	for _, pool := range spec.TargetPools {
+	for _, pool := range *spec.TargetPools {
 		err := l.client.UpdateTargetPool(ctx, l.projectID, l.GetLoadBalancerName(ctx, clusterName, service), *pool.Name, loadbalancer.UpdateTargetPoolPayload(pool))
 		if err != nil {
 			return fmt.Errorf("failed to update target pool %q: %w", *pool.Name, err)
@@ -275,16 +274,16 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 		return nil
 	case err != nil:
 		return err
-	case lb.Status != nil && *lb.Status == lbwait.LOADBALANCERSTATUS_TERMINATING:
+	case lb.Status != nil && *lb.Status == loadbalancer.LOADBALANCERSTATUS_TERMINATING:
 		return nil
 	}
 
 	credentialsRef := getMetricsRemoteWriteRef(lb)
 	if credentialsRef != nil {
 		// The load balancer is updated to remove the credentials reference and hence enable their deletion.
-		for i := range lb.Listeners {
+		for i := range *lb.Listeners {
 			// Name is an output only field.
-			lb.Listeners[i].Name = nil
+			(*lb.Listeners)[i].Name = nil
 		}
 		externalAddress := lb.ExternalAddress
 		if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
@@ -404,11 +403,13 @@ func (l *LoadBalancer) cleanUpCredentials(ctx context.Context, name string) erro
 	if err != nil {
 		return fmt.Errorf("failed to list credentials: %w", err)
 	}
-	for _, credentials := range res.Credentials {
-		if credentials.DisplayName != nil && *credentials.DisplayName == name {
-			err = l.client.DeleteCredentials(ctx, l.projectID, *credentials.CredentialsRef)
-			if err != nil {
-				return fmt.Errorf("failed to delete credentials %q: %w", *credentials.CredentialsRef, err)
+	if res.Credentials != nil {
+		for _, credentials := range *res.Credentials {
+			if credentials.DisplayName != nil && *credentials.DisplayName == name {
+				err = l.client.DeleteCredentials(ctx, l.projectID, *credentials.CredentialsRef)
+				if err != nil {
+					return fmt.Errorf("failed to delete credentials %q: %w", *credentials.CredentialsRef, err)
+				}
 			}
 		}
 	}

@@ -9,7 +9,7 @@ import (
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
+	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -139,7 +139,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	if err != nil {
 		return nil, err
 	}
-	client, err := stackit.NewLoadbalancerClient(innerClient.DefaultAPI, cfg.Global.Region)
+	client, err := stackit.NewLoadbalancerClient(innerClient, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
