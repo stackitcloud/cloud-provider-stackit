@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
+	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 )
 
 func (cl lbClient) GetLoadBalancer(ctx context.Context, projectID, name string) (*loadbalancer.LoadBalancer, error) {
-	lb, err := cl.client.GetLoadBalancer(ctx, projectID, cl.region, name).Execute()
+	lb, err := cl.client.GetLoadBalancerExecute(ctx, projectID, cl.region, name)
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
 	}
@@ -17,7 +17,7 @@ func (cl lbClient) GetLoadBalancer(ctx context.Context, projectID, name string) 
 
 // DeleteLoadBalancer returns no error if the load balancer doesn't exist.
 func (cl lbClient) DeleteLoadBalancer(ctx context.Context, projectID, name string) error {
-	_, err := cl.client.DeleteLoadBalancer(ctx, projectID, cl.region, name).Execute()
+	_, err := cl.client.DeleteLoadBalancerExecute(ctx, projectID, cl.region, name)
 	return err
 }
 
@@ -49,11 +49,11 @@ func (cl lbClient) UpdateTargetPool(ctx context.Context, projectID, name, target
 }
 
 func (cl lbClient) ListCredentials(ctx context.Context, projectID string) (*loadbalancer.ListCredentialsResponse, error) {
-	return cl.client.ListCredentials(ctx, projectID, cl.region).Execute()
+	return cl.client.ListCredentialsExecute(ctx, projectID, cl.region)
 }
 
 func (cl lbClient) GetCredentials(ctx context.Context, projectID, credentialsRef string) (*loadbalancer.GetCredentialsResponse, error) {
-	return cl.client.GetCredentials(ctx, projectID, cl.region, credentialsRef).Execute()
+	return cl.client.GetCredentialsExecute(ctx, projectID, cl.region, credentialsRef)
 }
 
 func (cl lbClient) CreateCredentials(ctx context.Context, projectID string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) { //nolint:lll // looks weird when shortened
