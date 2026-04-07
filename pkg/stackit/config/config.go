@@ -5,9 +5,11 @@ import (
 )
 
 type GlobalOpts struct {
-	ProjectID    string       `yaml:"projectId"`
-	Region       string       `yaml:"region"`
-	APIEndpoints APIEndpoints `yaml:"apiEndpoints"`
+	ProjectID      string       `yaml:"projectId"`
+	AreaID         string       `yaml:"areaId"`
+	OrganizationID string       `yaml:"organizationId"`
+	Region         string       `yaml:"region"`
+	APIEndpoints   APIEndpoints `yaml:"apiEndpoints"`
 }
 
 type APIEndpoints struct {
@@ -20,6 +22,7 @@ type CCMConfig struct {
 	Metadata     metadata.Opts    `yaml:"metadata"`
 	LoadBalancer LoadBalancerOpts `yaml:"loadBalancer"`
 	Instance     InstanceOpts     `yaml:"instance"`
+	Route        RouteOpts        `yaml:"route"`
 }
 
 type InstanceOpts struct {
@@ -32,6 +35,10 @@ type InstanceOpts struct {
 type LoadBalancerOpts struct {
 	NetworkID   string            `yaml:"networkId"`
 	ExtraLabels map[string]string `yaml:"extraLabels"`
+}
+
+type RouteOpts struct {
+	RoutingTableID string `yaml:"routingTableId"`
 }
 
 type CSIConfig struct {

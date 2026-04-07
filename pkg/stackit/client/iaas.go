@@ -18,6 +18,8 @@ import (
 type iaasClient struct {
 	Client    iaas.DefaultAPI
 	projectID string
+	orgID     string
+	areaID    string
 	region    string
 }
 
@@ -50,6 +52,11 @@ type IaaSClient interface {
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
+
+	ListRoutes(ctx context.Context, routingTableID string, labels map[string]string) ([]iaas.Route, error)
+	AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error
+	GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error)
+	DeleteRoute(ctx context.Context, routingTableID string, routeID string) error
 }
 
 const (
@@ -96,7 +103,7 @@ const (
 
 var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
-func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
+func NewIaaSClient(region, projectID, orgID, areaID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	apiClient, err := iaas.NewAPIClient(options...)
 	if err != nil {
 		return nil, err
@@ -104,6 +111,8 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 	return &iaasClient{
 		Client:    apiClient.DefaultAPI,
 		projectID: projectID,
+		orgID:     orgID,
+		areaID:    areaID,
 		region:    region,
 	}, nil
 }
@@ -589,4 +598,40 @@ func (i *iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, err
 	diskUsed := volume.ServerId != nil && *volume.ServerId != ""
 
 	return diskUsed, nil
+}
+
+func (i *iaasClient) ListRoutes(ctx context.Context, routingTableID string, labels map[string]string) ([]iaas.Route, error) {
+	return withResponseID(ctx, func(ctx context.Context) ([]iaas.Route, error) {
+		resp, err := i.Client.ListRoutesOfRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID).
+			LabelSelector(LabelSelector(labels)).
+			Execute()
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetItems(), nil
+	})
+}
+
+func (i *iaasClient) AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error {
+	payload := iaas.NewAddRoutesToRoutingTablePayload(routes)
+	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+		_, err := i.Client.AddRoutesToRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID).
+			AddRoutesToRoutingTablePayload(*payload).
+			Execute()
+		return nil, err
+	})
+	return err
+}
+
+func (i *iaasClient) GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error) {
+	return withResponseID(ctx, func(ctx context.Context) (*iaas.RoutingTable, error) {
+		return i.Client.GetRoutingTableOfArea(ctx, i.orgID, i.areaID, i.region, routingTableID).Execute()
+	})
+}
+
+func (i *iaasClient) DeleteRoute(ctx context.Context, routingTableID, routeID string) error {
+	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+		return nil, i.Client.DeleteRouteFromRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID, routeID).Execute()
+	})
+	return err
 }

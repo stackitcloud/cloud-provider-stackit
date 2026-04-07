@@ -118,7 +118,7 @@ func handle() {
 			iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 		}
 
-		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, "", "").IaaS(iaasOpts)
 		if err != nil {
 			klog.Fatalf("Failed to create STACKIT provider: %v", err)
 		}
