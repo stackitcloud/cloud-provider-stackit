@@ -38,6 +38,7 @@ const (
 type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
 	instances    *Instances
+	routes       *Routes
 }
 
 func init() {
@@ -133,7 +134,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
-	loadbalancingClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).LoadBalancing(lbOpts)
+	loadbalancingClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.OrganizationID, cfg.Global.AreaID).LoadBalancing(lbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lb client: %v", err)
 	}
@@ -146,7 +147,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
-	iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
+	iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.OrganizationID, cfg.Global.AreaID).IaaS(iaasOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
@@ -164,6 +165,10 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	ccm := CloudControllerManager{
 		loadBalancer: lb,
 		instances:    instances,
+		routes: &Routes{
+			iaasClient:     iaasClient,
+			routingTableID: cfg.Route.RoutingTableID,
+		},
 	}
 	return &ccm, nil
 }
@@ -198,7 +203,7 @@ func (ccm *CloudControllerManager) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (ccm *CloudControllerManager) Routes() (cloudprovider.Routes, bool) {
-	return nil, false
+	return ccm.routes, true
 }
 
 func (ccm *CloudControllerManager) ProviderName() string {
