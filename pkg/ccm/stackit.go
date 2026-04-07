@@ -40,6 +40,7 @@ const (
 type CloudControllerManager struct {
 	loadBalancer *LoadBalancer
 	instances    *Instances
+	routes       *routes
 }
 
 func init() {
@@ -164,7 +165,10 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	if err != nil {
 		return nil, err
 	}
-
+	routeClient, err := stackit.NewRouteClient(iaasInnerClient, cfg.Global.Region, cfg.Routes.AreaID, cfg.Routes.OrgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Node client: %v", err)
+	}
 	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
 	if err != nil {
 		return nil, err
@@ -173,6 +177,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	ccm := CloudControllerManager{
 		loadBalancer: lb,
 		instances:    instances,
+		routes:       &routes{routeClient},
 	}
 	return &ccm, nil
 }
@@ -207,7 +212,7 @@ func (ccm *CloudControllerManager) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (ccm *CloudControllerManager) Routes() (cloudprovider.Routes, bool) {
-	return nil, false
+	return ccm.routes, true
 }
 
 func (ccm *CloudControllerManager) ProviderName() string {

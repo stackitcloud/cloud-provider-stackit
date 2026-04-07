@@ -201,6 +201,10 @@ func NewNodeClient(cl *iaas.APIClient) (NodeClient, error) {
 	return &nodeClient{client: cl}, nil
 }
 
+func NewRouteClient(cl *iaas.APIClient, region, areaID, orgID string) (*RouteClient, error) {
+	return &RouteClient{iaasClient: cl, region: region, areaID: areaID, orgID: orgID}, nil
+}
+
 func isOpenAPINotFound(err error) bool {
 	apiErr := &oapiError.GenericOpenAPIError{}
 	if !errors.As(err, &apiErr) {

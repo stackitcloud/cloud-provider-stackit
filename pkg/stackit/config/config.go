@@ -19,11 +19,17 @@ type CCMConfig struct {
 	Global       GlobalOpts       `yaml:"global"`
 	Metadata     metadata.Opts    `yaml:"metadata"`
 	LoadBalancer LoadBalancerOpts `yaml:"loadBalancer"`
+	Routes       RouteOpts        `yaml:"routes"`
 }
 
 type LoadBalancerOpts struct {
 	NetworkID   string            `yaml:"networkId"`
 	ExtraLabels map[string]string `yaml:"extraLabels"`
+}
+
+type RouteOpts struct {
+	AreaID string `yaml:"areaID"`
+	OrgID  string `yaml:"orgID"`
 }
 
 type CSIConfig struct {
