@@ -1,6 +1,9 @@
 package client
 
 import (
+	"fmt"
+	"strings"
+
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
@@ -11,6 +14,18 @@ func LabelsFromTags(tags map[string]string) map[string]any {
 	}
 
 	return l
+}
+
+func LabelSelector(l map[string]string) string {
+	sb := strings.Builder{}
+	for k, v := range l {
+		// prevents trailing comma at the end
+		if sb.Len() > 0 {
+			sb.WriteString(",")
+		}
+		fmt.Fprintf(&sb, "%s=%s", k, v)
+	}
+	return sb.String()
 }
 
 func FilterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
