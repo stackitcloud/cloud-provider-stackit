@@ -43,14 +43,18 @@ type Factory interface {
 }
 
 type factory struct {
-	StackitRegion    string
-	StackitProjectID string
+	StackitRegion         string
+	StackitProjectID      string
+	StackitAreaID         string
+	StackitOrganizationID string
 }
 
-func New(region, projectID string) Factory {
+func New(region, projectID, organizationID, areaID string) Factory {
 	return &factory{
-		StackitRegion:    region,
-		StackitProjectID: projectID,
+		StackitRegion:         region,
+		StackitProjectID:      projectID,
+		StackitOrganizationID: organizationID,
+		StackitAreaID:         areaID,
 	}
 }
 
@@ -59,7 +63,7 @@ func (f factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBal
 }
 
 func (f factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
-	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options))
+	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, f.StackitOrganizationID, f.StackitAreaID, withDefaultOptions(options))
 }
 
 func withDefaultOptions(options []sdkconfig.ConfigurationOption) []sdkconfig.ConfigurationOption {
