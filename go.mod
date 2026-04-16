@@ -22,11 +22,11 @@ require (
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.6
-	k8s.io/apimachinery v0.34.6
-	k8s.io/client-go v0.34.6
+	k8s.io/api v0.34.7
+	k8s.io/apimachinery v0.34.7
+	k8s.io/client-go v0.34.7
 	k8s.io/cloud-provider v0.34.6
-	k8s.io/component-base v0.34.6
+	k8s.io/component-base v0.34.7
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.34.6
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
@@ -102,12 +102,12 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
-	go.opentelemetry.io/otel v1.39.0 // indirect
+	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0 // indirect
-	go.opentelemetry.io/otel/metric v1.39.0 // indirect
+	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
-	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
