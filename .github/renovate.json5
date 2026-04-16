@@ -12,7 +12,6 @@
     'release-v1.35',
     'release-v1.34',
     'release-v1.33',
-    'release-v1.32',
   ],
   customManagers: [
     {
@@ -103,16 +102,6 @@
         'release-v1.33',
       ],
       allowedVersions: '<0.34.0',
-      automerge: false,
-    },
-    {
-      matchPackageNames: [
-        '/^k8s.io/',
-      ],
-      matchBaseBranches: [
-        'release-v1.32',
-      ],
-      allowedVersions: '<0.33.0',
       automerge: false,
     },
     {

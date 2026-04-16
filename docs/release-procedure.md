@@ -6,6 +6,8 @@
 - [General Information](#general-information)
 - [Automated Release Process (Primary Method)](#automated-release-process-primary-method)
 - [Manual Release Process (Fallback Method)](#manual-release-process-fallback-method)
+- [Releasing a New Kubernetes Version](#releasing-a-new-kubernetes-version)
+- [Remove a old Kubernetes Version](#remove-a-old-kubernetes-version)
 
 ## Overview
 
@@ -54,3 +56,13 @@ Publishing a new release triggers the same Prow release job that builds and publ
 3. Create a new release branch `release-v1.XX` from `main`.
 4. Update the Renovate configuration via a PR against `main`: add the new release branch to `baseBranchPatterns` and add a new rule in `packageRules` for `/^k8s.io/`. Cherry-pick this PR to all maintained release branches. Example PR: https://github.com/stackitcloud/cloud-provider-stackit/pull/756
 5. Create a manual release for the new branch (note: the release tool will only work if there is already a tag on the branch). Do not generate release notes as they will contain many unrelated changes. Just add `Initial release of v1.xx.0` as release notes.
+6. Add the new version in the `README.md`.
+
+## Remove an Old Kubernetes Version
+
+If a Kubernetes version is EOL and it is not possible to create SKE clusters with that version, the support for Kubernetes version can be removed. 
+
+1. Release the version a last time (if there are changes).
+2. Remove the release branch in `.github/renovate.json5` under `baseBranchPatterns`.
+3. Remove the `packageRules` for the release branch in `.github/renovate.json5`.
+4. Remove the version from the `README.md`.

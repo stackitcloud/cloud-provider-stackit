@@ -19,6 +19,16 @@ Does not include:
 - `readyz` and `healthz`
 - Kubernetes Client with self authorization by `inClusterConfig`
 
+## Version Compatibility
+
+The minor versions of `cloud-provider-stackit` are specifically aligned with the minor versions of `kubernetes/kubernetes`. To ensure compatibility, you must use the cloud provider release that matches your cluster's Kubernetes minor version.
+
+**Currently Supported Kubernetes Versions:**
+
+* `v1.33.x`
+* `v1.34.x`
+* `v1.35.x`
+
 ## User Documentation
 
 - Usage
