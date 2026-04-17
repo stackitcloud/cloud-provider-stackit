@@ -2066,6 +2066,20 @@ func (m *MockApiDeleteVolumeRequest) EXPECT() *MockApiDeleteVolumeRequestMockRec
 	return m.recorder
 }
 
+// Cascade mocks base method.
+func (m *MockApiDeleteVolumeRequest) Cascade(cascade bool) iaas.ApiDeleteVolumeRequest {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Cascade", cascade)
+	ret0, _ := ret[0].(iaas.ApiDeleteVolumeRequest)
+	return ret0
+}
+
+// Cascade indicates an expected call of Cascade.
+func (mr *MockApiDeleteVolumeRequestMockRecorder) Cascade(cascade any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cascade", reflect.TypeOf((*MockApiDeleteVolumeRequest)(nil).Cascade), cascade)
+}
+
 // Execute mocks base method.
 func (m *MockApiDeleteVolumeRequest) Execute() error {
 	m.ctrl.T.Helper()
