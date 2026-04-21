@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"go.uber.org/mock/gomock"
 	"k8s.io/utils/ptr"
 
@@ -19,13 +19,13 @@ var _ = Describe("LBAPI Client", func() {
 		region = "eu01"
 
 		mockCtrl *gomock.Controller
-		mockAPI  *mock.MockDefaultApi
+		mockAPI  *mock.MockDefaultAPI
 		lbClient LoadbalancerClient
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
-		mockAPI = mock.NewMockDefaultApi(mockCtrl)
+		mockAPI = mock.NewMockDefaultAPI(mockCtrl)
 
 		var err error
 		lbClient, err = NewLoadbalancerClient(mockAPI, region)
@@ -36,8 +36,9 @@ var _ = Describe("LBAPI Client", func() {
 		It("should return the received load balancer instance", func() {
 			expectedName := "test LB instance"
 			expectedLB := &loadbalancer.LoadBalancer{Name: new(expectedName)}
-			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any(), "projectID", gomock.Any(), expectedName).
-				Return(expectedLB, nil).Times(1)
+			mockAPI.EXPECT().GetLoadBalancer(gomock.Any(), "projectID", gomock.Any(), expectedName).
+				Return(loadbalancer.ApiGetLoadBalancerRequest{ApiService: mockAPI}).Times(1)
+			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any()).Return(expectedLB, nil).Times(1)
 
 			actualLB, err := lbClient.GetLoadBalancer(context.Background(), "projectID", expectedName)
 			Expect(err).ToNot(HaveOccurred())
@@ -47,16 +48,18 @@ var _ = Describe("LBAPI Client", func() {
 		})
 
 		It("should use the configured STACKIT region", func() {
-			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any(), gomock.Any(), region, gomock.Any()).
-				Return(&loadbalancer.LoadBalancer{}, nil).Times(1)
+			mockAPI.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any(), region, gomock.Any()).
+				Return(loadbalancer.ApiGetLoadBalancerRequest{ApiService: mockAPI}).Times(1)
+			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any()).Return(&loadbalancer.LoadBalancer{}, nil).Times(1)
 
 			_, err := lbClient.GetLoadBalancer(context.Background(), "projectID", "name")
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should return ErrorNotFound if a GenericOpenAPIError with status 404 occurs", func() {
-			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}).Times(1)
+			mockAPI.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(loadbalancer.ApiGetLoadBalancerRequest{ApiService: mockAPI}).Times(1)
+			mockAPI.EXPECT().GetLoadBalancerExecute(gomock.Any()).Return(nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}).Times(1)
 
 			actualLB, err := lbClient.GetLoadBalancer(context.Background(), "projectID", "name")
 			Expect(actualLB).To(BeNil())
