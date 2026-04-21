@@ -9,7 +9,7 @@ import (
 	"time"
 
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
 	lbLegacy "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
