@@ -29,7 +29,7 @@ import (
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -110,7 +110,7 @@ type iaasClient struct {
 }
 
 type lbClient struct {
-	client loadbalancer.DefaultApi
+	client loadbalancer.DefaultAPI
 	region string
 }
 
@@ -190,7 +190,7 @@ func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultApi, error) {
 	return iaas.NewAPIClient(opts...)
 }
 
-func NewLoadbalancerClient(cl loadbalancer.DefaultApi, region string) (LoadbalancerClient, error) {
+func NewLoadbalancerClient(cl loadbalancer.DefaultAPI, region string) (LoadbalancerClient, error) {
 	return &lbClient{
 		client: cl,
 		region: region,

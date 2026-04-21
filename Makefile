@@ -124,7 +124,7 @@ verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/$(REPO)/stackit-csi-plugin-dev:$(VERSION)
 
 # generate mock types for the following services (space-separated list)
-MOCK_SERVICES := iaas loadbalancer
+MOCK_SERVICES := iaas
 
 .PHONY: mocks
 mocks: $(MOCKGEN)
@@ -136,6 +136,9 @@ mocks: $(MOCKGEN)
 		INTERFACES=`go doc -all github.com/stackitcloud/stackit-sdk-go/services/$$service | grep '^type Api.* interface' | sed -n 's/^type \(.*\) interface.*/\1/p' | paste -sd,`,DefaultApi; \
 		$(MOCKGEN) -destination ./pkg/mock/$$service/$$service.go -package $$service github.com/stackitcloud/stackit-sdk-go/services/$$service $$INTERFACES; \
 	done
+
+	@$(MOCKGEN) -destination ./pkg/mock/loadbalancer/loadbalancer.go -package loadbalancer github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api DefaultAPI
+
 	@$(MOCKGEN) -destination ./pkg/stackit/iaas_mock.go -package stackit ./pkg/stackit IaasClient
 	@$(MOCKGEN) -destination ./pkg/stackit/loadbalancer_mock.go -package stackit ./pkg/stackit LoadbalancerClient
 	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
