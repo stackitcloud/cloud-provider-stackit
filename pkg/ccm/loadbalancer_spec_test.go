@@ -9,7 +9,7 @@ import (
 	"github.com/onsi/gomega/types"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 
-	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
 	lbLegacy "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants
 var _ = Describe("lbSpecFromService", func() {
 	const (
 		externalAddress = "123.124.88.99"
@@ -1224,7 +1224,7 @@ type compareLBwithSpecTest struct {
 	spec                  *loadbalancer.CreateLoadBalancerPayload
 }
 
-//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants
 var _ = DescribeTable("compareLBwithSpec",
 	func(t *compareLBwithSpecTest) {
 		fulfills, immutableChanged := compareLBwithSpec(t.lb, t.spec)

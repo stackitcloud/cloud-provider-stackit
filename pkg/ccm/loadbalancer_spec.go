@@ -242,7 +242,7 @@ func getPlanID(service *corev1.Service) (planID *string, msgs []string, err erro
 // The property name will be empty and must be set by the caller to produce a valid payload for the API.
 // An error is returned if the service has invalid options.
 //
-//nolint:gocyclo,funlen,staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+//nolint:gocyclo,funlen,staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
 func lbSpecFromService(
 	service *corev1.Service,
 	nodes []*corev1.Node,
@@ -592,7 +592,7 @@ type resultImmutableChanged struct {
 // If immutableChanged is not nil then spec differs from lb such that an update will fail.
 // Otherwise, fulfills will indicate whether an update is necessary.
 //
-//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants; fixed in next NVP.
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
 func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
 	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
 	fulfills = true
