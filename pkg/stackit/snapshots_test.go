@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/iaas"
@@ -17,7 +17,7 @@ var _ = Describe("Snapshot", func() {
 	var (
 		err           error
 		mockCtrl      *gomock.Controller
-		mockAPI       *mock.MockDefaultApi
+		mockAPI       *mock.MockDefaultAPI
 		stackitClient IaasClient
 		config        *stackitconfig.CSIConfig
 	)
@@ -27,7 +27,7 @@ var _ = Describe("Snapshot", func() {
 	BeforeEach(func() {
 		t := GinkgoT()
 		mockCtrl = gomock.NewController(t)
-		mockAPI = mock.NewMockDefaultApi(mockCtrl)
+		mockAPI = mock.NewMockDefaultAPI(mockCtrl)
 		t.Setenv("STACKIT_REGION", region)
 		Expect(os.Getenv("STACKIT_REGION")).To(Equal(region))
 	})
@@ -35,23 +35,23 @@ var _ = Describe("Snapshot", func() {
 	Context("ListSnapshot", func() {
 
 		snapShotListResponse := iaas.SnapshotListResponse{
-			Items: &[]iaas.Snapshot{
+			Items: []iaas.Snapshot{
 				{
 					Id:       new("fake-snapshot"),
 					Name:     new("fake-snapshot"),
-					VolumeId: new("some-special-volume"),
+					VolumeId: "some-special-volume",
 					Status:   new("ERROR"),
 				},
 				{
 					Id:       new("fake-snapshot2"),
 					Name:     new("fake-snapshot2"),
-					VolumeId: new("some-special-volume"),
+					VolumeId: "some-special-volume",
 					Status:   new("AVAILABLE"),
 				},
 				{
 					Id:       new("wrong snapshot"),
 					Name:     new("wrong snapshot"),
-					VolumeId: new("another-special-volume"),
+					VolumeId: "another-special-volume",
 					Status:   new("AVAILABLE"),
 				},
 			},
@@ -69,9 +69,8 @@ var _ = Describe("Snapshot", func() {
 
 		DescribeTable("should return a filtered list of snapshots",
 			func(filters map[string]string, expectedSnaps []iaas.Snapshot) {
-				listRequest := mock.NewMockApiListSnapshotsInProjectRequest(mockCtrl)
-				listRequest.EXPECT().Execute().Return(&snapShotListResponse, nil)
-				mockAPI.EXPECT().ListSnapshotsInProject(gomock.Any(), config.Global.ProjectID, region).Return(listRequest)
+				mockAPI.EXPECT().ListSnapshotsInProject(gomock.Any(), config.Global.ProjectID, region).Return(iaas.ApiListSnapshotsInProjectRequest{ApiService: mockAPI})
+				mockAPI.EXPECT().ListSnapshotsInProjectExecute(gomock.Any()).Return(&snapShotListResponse, nil)
 
 				snaps, _, err := stackitClient.ListSnapshots(context.Background(), filters)
 				Expect(err).ToNot(HaveOccurred())
@@ -83,13 +82,13 @@ var _ = Describe("Snapshot", func() {
 					{
 						Id:       new("fake-snapshot"),
 						Name:     new("fake-snapshot"),
-						VolumeId: new("some-special-volume"),
+						VolumeId: "some-special-volume",
 						Status:   new("ERROR"),
 					},
 					{
 						Id:       new("fake-snapshot2"),
 						Name:     new("fake-snapshot2"),
-						VolumeId: new("some-special-volume"),
+						VolumeId: "some-special-volume",
 						Status:   new("AVAILABLE"),
 					},
 				},
@@ -100,7 +99,7 @@ var _ = Describe("Snapshot", func() {
 					{
 						Id:       new("fake-snapshot"),
 						Name:     new("fake-snapshot"),
-						VolumeId: new("some-special-volume"),
+						VolumeId: "some-special-volume",
 						Status:   new("ERROR"),
 					},
 				},
@@ -111,14 +110,14 @@ var _ = Describe("Snapshot", func() {
 					{
 						Id:       new("fake-snapshot2"),
 						Name:     new("fake-snapshot2"),
-						VolumeId: new("some-special-volume"),
+						VolumeId: "some-special-volume",
 						Status:   new("AVAILABLE"),
 					},
 				},
 			),
 			Entry("no filters",
 				map[string]string{},
-				*snapShotListResponse.Items,
+				snapShotListResponse.Items,
 			),
 		)
 	})

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
+	wait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
@@ -45,23 +45,19 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	}
 
 	opts := iaas.CreateBackupPayload{
-		Name: new(name),
-		Source: &iaas.BackupSource{
-			Type: new(string(backupSource)),
-			Id:   new(backupSourceID),
+		Name:        new(name),
+		Description: new(backupDescription),
+		Source: iaas.BackupSource{
+			Type: string(backupSource),
+			Id:   backupSourceID,
 		},
 	}
 	if tags != nil {
-		opts.Labels = new(map[string]any(labelsFromTags(tags)))
+		opts.Labels = labelsFromTags(tags)
 	}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	createBackupRequest := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region)
-	if createBackupRequest == nil {
-		return nil, errors.New("failed to create backup request")
-	}
-
-	backup, err := createBackupRequest.CreateBackupPayload(opts).Execute()
+	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region).CreateBackupPayload(opts).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
@@ -86,7 +82,7 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 		return nil, err
 	}
 
-	filteredBackups := filterBackups(*backups.Items, filters)
+	filteredBackups := filterBackups(backups.Items, filters)
 	return filteredBackups, nil
 }
 
@@ -107,7 +103,7 @@ func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 func (os *iaasClient) GetBackupByID(ctx context.Context, backupID string) (*iaas.Backup, error) {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	backup, err := os.iaas.GetBackupExecute(ctxWithHTTPResp, os.projectID, os.region, backupID)
+	backup, err := os.iaas.GetBackup(ctxWithHTTPResp, os.projectID, os.region, backupID).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
