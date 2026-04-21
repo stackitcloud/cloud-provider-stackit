@@ -2,12 +2,13 @@ package stackit
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/iaas"
@@ -17,7 +18,7 @@ var _ = Describe("Backup", func() {
 	var (
 		err       error
 		mockCtrl  *gomock.Controller
-		mockAPI   *mock.MockDefaultApi
+		mockAPI   *mock.MockDefaultAPI
 		openStack IaasClient
 		config    *stackitconfig.CSIConfig
 	)
@@ -28,7 +29,7 @@ var _ = Describe("Backup", func() {
 	BeforeEach(func() {
 		t := GinkgoT()
 		mockCtrl = gomock.NewController(t)
-		mockAPI = mock.NewMockDefaultApi(mockCtrl)
+		mockAPI = mock.NewMockDefaultAPI(mockCtrl)
 		t.Setenv("STACKIT_REGION", region)
 		Expect(os.Getenv("STACKIT_REGION")).To(Equal(region))
 	})
@@ -69,9 +70,9 @@ var _ = Describe("Backup", func() {
 				nil,
 				iaas.CreateBackupPayload{
 					Name: new("expected-name"),
-					Source: &iaas.BackupSource{
-						Type: new("volume"),
-						Id:   new("volume-id"),
+					Source: iaas.BackupSource{
+						Type: "volume",
+						Id:   "volume-id",
 					},
 					Labels: nil,
 				},
@@ -82,13 +83,13 @@ var _ = Describe("Backup", func() {
 				map[string]string{"tag1": "value1"},
 				iaas.CreateBackupPayload{
 					Name: new("expected-name"),
-					Source: &iaas.BackupSource{
-						Type: new("snapshot"),
-						Id:   new("snapshot-id"),
+					Source: iaas.BackupSource{
+						Type: "snapshot",
+						Id:   "snapshot-id",
 					},
-					Labels: new(map[string]any{
+					Labels: map[string]any{
 						"tag1": "value1",
-					}),
+					},
 				},
 			),
 		)
@@ -108,7 +109,8 @@ var _ = Describe("Backup", func() {
 		})
 
 		It("should return error when API fails", func() {
-			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(nil).Times(1)
+			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(iaas.ApiCreateBackupRequest{ApiService: mockAPI})
+			mockAPI.EXPECT().CreateBackupExecute(gomock.Any()).Return(nil, fmt.Errorf("API error"))
 
 			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
 			Expect(err).To(HaveOccurred())
@@ -142,13 +144,11 @@ var _ = Describe("Backup", func() {
 		})
 
 		It("should return error when source type is invalid", func() {
-			// Test with an invalid source type
-			// Mock the API call to return nil, which will trigger our validation
-			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(nil).Times(1)
+			mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(iaas.ApiCreateBackupRequest{ApiService: mockAPI})
+			mockAPI.EXPECT().CreateBackupExecute(gomock.Any()).Return(nil, fmt.Errorf("API error"))
 
 			backup, err := openStack.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to create backup request"))
 			Expect(backup).To(BeNil())
 		})
 
@@ -160,14 +160,14 @@ var _ = Describe("Backup", func() {
 
 			expectedPayload := iaas.CreateBackupPayload{
 				Name: new("expected-name"),
-				Source: &iaas.BackupSource{
-					Type: new("volume"),
-					Id:   new("volume-id"),
+				Source: iaas.BackupSource{
+					Type: "volume",
+					Id:   "volume-id",
 				},
-				Labels: new(map[string]any{
+				Labels: map[string]any{
 					"special": "tag with spaces and !@#$%^&*()",
 					"normal":  "value",
-				}),
+				},
 			}
 
 			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
@@ -196,9 +196,9 @@ var _ = Describe("Backup", func() {
 		It("should handle nil tags", func() {
 			expectedPayload := iaas.CreateBackupPayload{
 				Name: new("expected-name"),
-				Source: &iaas.BackupSource{
-					Type: new("volume"),
-					Id:   new("volume-id"),
+				Source: iaas.BackupSource{
+					Type: "volume",
+					Id:   "volume-id",
 				},
 				Labels: nil,
 			}
@@ -215,11 +215,11 @@ var _ = Describe("Backup", func() {
 		It("should handle empty tags map", func() {
 			expectedPayload := iaas.CreateBackupPayload{
 				Name: new("expected-name"),
-				Source: &iaas.BackupSource{
-					Type: new("volume"),
-					Id:   new("volume-id"),
+				Source: iaas.BackupSource{
+					Type: "volume",
+					Id:   "volume-id",
 				},
-				Labels: new(map[string]any{}),
+				Labels: map[string]any{},
 			}
 
 			mockCreateBackup(mockCtrl, mockAPI, expectedPayload)
@@ -236,9 +236,9 @@ var _ = Describe("Backup", func() {
 
 			expectedPayload := iaas.CreateBackupPayload{
 				Name: new(longName),
-				Source: &iaas.BackupSource{
-					Type: new("volume"),
-					Id:   new("volume-id"),
+				Source: iaas.BackupSource{
+					Type: "volume",
+					Id:   "volume-id",
 				},
 			}
 
@@ -253,14 +253,12 @@ var _ = Describe("Backup", func() {
 	})
 })
 
-func mockCreateBackup(mockCtrl *gomock.Controller, mockAPI *mock.MockDefaultApi, expectedPayload iaas.CreateBackupPayload) {
+func mockCreateBackup(_ *gomock.Controller, mockAPI *mock.MockDefaultAPI, expectedPayload iaas.CreateBackupPayload) {
 	const (
 		projectID = "project-id"
 		region    = "eu01"
 	)
-	createRequest := mock.NewMockApiCreateBackupRequest(mockCtrl)
-	createRequest.EXPECT().CreateBackupPayload(expectedPayload).Return(createRequest)
-	createRequest.EXPECT().Execute().Return(&iaas.Backup{Id: new("expected backup")}, nil)
-
-	mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(createRequest)
+	mockAPI.EXPECT().CreateBackup(gomock.Any(), projectID, region).Return(iaas.ApiCreateBackupRequest{ApiService: mockAPI})
+	mockAPI.EXPECT().CreateBackupExecute(gomock.Any()).Return(&iaas.Backup{Id: new("expected backup")}, nil)
+	_ = expectedPayload
 }

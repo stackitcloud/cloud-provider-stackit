@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
+	wait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 )
 
 var _ = Describe("Errors", func() {

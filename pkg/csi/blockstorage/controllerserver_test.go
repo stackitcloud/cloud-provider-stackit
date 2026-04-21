@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	"github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -69,7 +69,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&iaas.Volume{
 				Id:               new("volume-id"),
 				Name:             new("new volume"),
-				AvailabilityZone: new("eu01"),
+				AvailabilityZone: "eu01",
 				Size:             new(int64(20)),
 			}, nil)
 			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -124,7 +124,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&iaas.Volume{
 				Id:               new("volume-id"),
 				Name:             new("volume name"),
-				AvailabilityZone: new("zone-from-parameters"),
+				AvailabilityZone: "zone-from-parameters",
 				Size:             new(int64(20)),
 			}, nil)
 			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -152,7 +152,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&iaas.Volume{
 				Id:               new("volume-id"),
 				Name:             new("volume name"),
-				AvailabilityZone: new("zone-from-accessibility-reqs"),
+				AvailabilityZone: "zone-from-accessibility-reqs",
 				Size:             new(int64(20)),
 			}, nil)
 			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -189,7 +189,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Name:             new("new volume"),
 					Size:             new(int64(20)),
 					Status:           new(stackit.VolumeAvailableStatus),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 				},
 			}, nil)
 
@@ -213,7 +213,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Name:             new("new volume"),
 					Size:             new(int64(30)),
 					Status:           new(stackit.VolumeAvailableStatus),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 				},
 			}, nil)
 
@@ -235,7 +235,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Name:             new("new volume"),
 					Size:             new(int64(20)),
 					Status:           new(stackit.VolumeAttachedStatus),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 				},
 			}, nil)
 
@@ -299,21 +299,21 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().GetSnapshotByID(gomock.Any(), "snapshot-id").Return(&iaas.Snapshot{
 					Id:       new("snapshot-id"),
 					Status:   new("AVAILABLE"),
-					VolumeId: new("snapshot-volume-id"),
+					VolumeId: "snapshot-volume-id",
 				}, nil)
 				iaasClient.EXPECT().GetVolume(gomock.Any(), "snapshot-volume-id").Return(&iaas.Volume{
 					Id:               new("snapshot-volume-id"),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 				}, nil)
 				iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
 					Do(func(_ context.Context, opts *iaas.CreateVolumePayload) {
-						Expect(*opts.Source.Id).To(Equal("snapshot-id"))
-						Expect(*opts.Source.Type).To(Equal("snapshot"))
+						Expect(opts.Source.Id).To(Equal("snapshot-id"))
+						Expect(opts.Source.Type).To(Equal("snapshot"))
 					}).
 					Return(&iaas.Volume{
 						Id:               new("volume-id"),
 						Name:             new("new volume"),
-						AvailabilityZone: new("eu01"),
+						AvailabilityZone: "eu01",
 						Size:             new(int64(20)),
 					}, nil)
 				iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -377,13 +377,13 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}, nil)
 				iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
 					Do(func(_ context.Context, opts *iaas.CreateVolumePayload) {
-						Expect(*opts.Source.Id).To(Equal("snapshot-id"))
-						Expect(*opts.Source.Type).To(Equal("backup"))
+						Expect(opts.Source.Id).To(Equal("snapshot-id"))
+						Expect(opts.Source.Type).To(Equal("backup"))
 					}).
 					Return(&iaas.Volume{
 						Id:               new("volume-id"),
 						Name:             new("new volume"),
-						AvailabilityZone: new("eu01"),
+						AvailabilityZone: "eu01",
 						Size:             new(int64(20)),
 					}, nil)
 				iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -408,12 +408,12 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 				iaasClient.EXPECT().GetSnapshotByID(gomock.Any(), "snapshot-id").Return(&iaas.Snapshot{
 					Id:       new("snapshot-id"),
-					VolumeId: new("volume-id"),
+					VolumeId: "volume-id",
 					Status:   new("AVAILABLE"),
 				}, nil)
 				iaasClient.EXPECT().GetVolume(gomock.Any(), "volume-id").Return(&iaas.Volume{
 					Status:           new("AVAILABLE"),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 					Id:               new("volume-id"),
 				}, nil)
 
@@ -482,17 +482,17 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().GetVolume(gomock.Any(), "volume-source-id").Return(&iaas.Volume{
 					Id:               new("volume-source-id"),
 					Status:           new("AVAILABLE"),
-					AvailabilityZone: new("eu01"),
+					AvailabilityZone: "eu01",
 				}, nil)
 				iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
 					Do(func(_ context.Context, opts *iaas.CreateVolumePayload) {
-						Expect(*opts.Source.Id).To(Equal("volume-source-id"))
-						Expect(*opts.Source.Type).To(Equal("volume"))
+						Expect(opts.Source.Id).To(Equal("volume-source-id"))
+						Expect(opts.Source.Type).To(Equal("volume"))
 					}).
 					Return(&iaas.Volume{
 						Id:               new("volume-id"),
 						Name:             new("new volume"),
-						AvailabilityZone: new("eu01"),
+						AvailabilityZone: "eu01",
 						Size:             new(int64(20)),
 					}, nil)
 				iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
@@ -569,7 +569,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&iaas.Volume{
 				Id:               new("volume-id"),
 				Name:             new("new volume"),
-				AvailabilityZone: new("eu01"),
+				AvailabilityZone: "eu01",
 				Size:             new(int64(20)),
 			}, nil)
 			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).
@@ -876,7 +876,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				expectedSnap := &iaas.Snapshot{
 					Id:        new("fake-snapshot"),
 					Name:      new("fake-snapshot45"),
-					VolumeId:  new("fake"),
+					VolumeId:  "fake",
 					Size:      new(int64(10)),
 					CreatedAt: new(time.Now()),
 				}
@@ -895,7 +895,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				expectedSnap := &iaas.Snapshot{
 					Id:        new("fake-snapshot"),
 					Name:      new("fake-snapshot45"),
-					VolumeId:  new("fake"),
+					VolumeId:  "fake",
 					Status:    new("AVAILABLE"),
 					Size:      new(int64(10)),
 					CreatedAt: new(time.Now()),
@@ -927,7 +927,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{
 					{
 						Id:       new("fake-snapshot"),
-						VolumeId: new("something-different"),
+						VolumeId: "something-different",
 					},
 				}, "", nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
@@ -956,7 +956,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			}
 			iaasClient.EXPECT().GetSnapshotByID(gomock.Any(), "special-snapshot").Return(&iaas.Snapshot{
 				Id:        new("special-snapshot"),
-				VolumeId:  new("fake"),
+				VolumeId:  "fake",
 				Size:      new(int64(10)),
 				CreatedAt: new(snapShotCreationTime),
 			}, nil)
@@ -984,7 +984,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 			iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{{
 				Id:        new("fake-snapshot"),
-				VolumeId:  new("something-different"),
+				VolumeId:  "something-different",
 				Size:      new(int64(10)),
 				CreatedAt: new(snapShotCreationTime),
 			}}, "", nil)

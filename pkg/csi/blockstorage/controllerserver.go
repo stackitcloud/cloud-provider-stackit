@@ -27,7 +27,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -130,7 +130,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if *vols[0].Status != stackit.VolumeAvailableStatus {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
-		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, *vols[0].AvailabilityZone, *vols[0].Size)
+		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, vols[0].AvailabilityZone, *vols[0].Size)
 		return getCreateVolumeResponse(&vols[0]), nil
 	} else if len(vols) > 1 {
 		klog.V(3).Infof("found multiple existing volumes with selected name (%s) during create", volName)
@@ -175,8 +175,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume of snapshot %s: %v", sourceSnapshotID, err)
 			}
-			if *snapshotVolSrc.AvailabilityZone != volAvailability {
-				return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Snapshot. Got %s Required: %s", volAvailability, *snapshotVolSrc.AvailabilityZone)
+			if snapshotVolSrc.AvailabilityZone != volAvailability {
+				return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Snapshot. Got %s Required: %s", volAvailability, snapshotVolSrc.AvailabilityZone)
 			}
 		}
 
@@ -208,8 +208,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			}
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume %s: %v", sourceVolID, err)
 		}
-		if volAvailability != *sourceVolume.AvailabilityZone {
-			return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Volume. Got %s Required: %s", volAvailability, *sourceVolume.AvailabilityZone)
+		if volAvailability != sourceVolume.AvailabilityZone {
+			return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Volume. Got %s Required: %s", volAvailability, sourceVolume.AvailabilityZone)
 		}
 		volumeSourceType = stackit.VolumeSource
 	}
@@ -218,7 +218,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		Name:             new(volName),
 		PerformanceClass: volParams.PerformanceClass,
 		Size:             new(volSizeGB),
-		AvailabilityZone: new(volAvailability),
+		AvailabilityZone: volAvailability,
 		//TODO: IaaS API does not allow dots or slashes. Additionally we would like to actually use metadata/annotations
 		//Labels:           new(util.ConvertMapStringToInterface(properties)),
 	}
@@ -233,8 +233,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeSourceID := determineSourceIDForSourceType(volumeSourceType, sourceSnapshotID, sourceVolID)
 		klog.V(4).Infof("Creating volume from %s source", volumeSourceType)
 		opts.Source = &iaas.VolumeSource{
-			Id:   new(volumeSourceID),
-			Type: new(string(volumeSourceType)),
+			Id:   volumeSourceID,
+			Type: string(volumeSourceType),
 		}
 	}
 
@@ -272,7 +272,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
 	}
 
-	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, *vol.AvailabilityZone, *vol.Size)
+	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, vol.AvailabilityZone, *vol.Size)
 
 	return getCreateVolumeResponse(vol), nil
 }
@@ -289,10 +289,10 @@ func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *st
 	}
 
 	encryptionConfig := &iaas.VolumeEncryptionParameter{
-		KekKeyId:       volParams.KMSKeyID,
-		KekKeyVersion:  new(int64(kmsKeyVersionInt)),
-		KekKeyringId:   volParams.KMSKeyringID,
-		ServiceAccount: volParams.KMSServiceAccount,
+		KekKeyId:       *volParams.KMSKeyID,
+		KekKeyVersion:  int64(kmsKeyVersionInt),
+		KekKeyringId:   *volParams.KMSKeyringID,
+		ServiceAccount: *volParams.KMSServiceAccount,
 	}
 
 	if volParams.KMSProjectID != nil {
@@ -571,7 +571,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 			Snapshot: &csi.Snapshot{
 				SnapshotId:     *snap.Id,
 				SizeBytes:      *snap.Size * util.GIBIBYTE,
-				SourceVolumeId: *snap.VolumeId,
+				SourceVolumeId: snap.VolumeId,
 				CreationTime:   ctime,
 				ReadyToUse:     true,
 			},
@@ -643,7 +643,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.Ia
 	// Verify a snapshot with the provided name doesn't already exist for this tenant
 	if len(snapshots) == 1 {
 		snap := &snapshots[0]
-		if *snap.VolumeId != volumeID {
+		if snap.VolumeId != volumeID {
 			return nil, status.Error(codes.AlreadyExists, "Snapshot with given name already exists, with different source volume ID")
 		}
 
@@ -754,7 +754,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			Snapshot: &csi.Snapshot{
 				SizeBytes:      *snap.Size * util.GIBIBYTE,
 				SnapshotId:     *snap.Id,
-				SourceVolumeId: *snap.VolumeId,
+				SourceVolumeId: snap.VolumeId,
 				CreationTime:   ctime,
 				ReadyToUse:     true,
 			},
@@ -798,7 +798,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			Snapshot: &csi.Snapshot{
 				SizeBytes:      *v.Size * util.GIBIBYTE,
 				SnapshotId:     *v.Id,
-				SourceVolumeId: *v.VolumeId,
+				SourceVolumeId: v.VolumeId,
 				CreationTime:   ctime,
 				ReadyToUse:     true,
 			},
@@ -967,7 +967,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	volCnx := map[string]string{}
 
 	if vol.Source != nil {
-		volumeSourceType = stackit.VolumeSourceTypes(*vol.Source.Type)
+		volumeSourceType = stackit.VolumeSourceTypes(vol.Source.Type)
 		switch volumeSourceType {
 		case stackit.VolumeSource:
 			volCnx[ResizeRequired] = "true"
@@ -975,7 +975,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Volume{
 					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: *vol.Source.Id,
+						VolumeId: vol.Source.Id,
 					},
 				},
 			}
@@ -985,7 +985,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Snapshot{
 					Snapshot: &csi.VolumeContentSource_SnapshotSource{
-						SnapshotId: *vol.Source.Id,
+						SnapshotId: vol.Source.Id,
 					},
 				},
 			}
@@ -995,7 +995,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Snapshot{
 					Snapshot: &csi.VolumeContentSource_SnapshotSource{
-						SnapshotId: *vol.Source.Id,
+						SnapshotId: vol.Source.Id,
 					},
 				},
 			}
@@ -1004,7 +1004,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 
 	accessibleTopology := []*csi.Topology{
 		{
-			Segments: map[string]string{topologyKey: ptr.Deref(vol.AvailabilityZone, "")},
+			Segments: map[string]string{topologyKey: vol.AvailabilityZone},
 		},
 	}
 
