@@ -9,7 +9,9 @@ import (
 	"time"
 
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
+	lbLegacy "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
+	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
@@ -239,7 +241,9 @@ func getPlanID(service *corev1.Service) (planID *string, msgs []string, err erro
 // lbSpecFromService returns a load balancer specification in the form of a create payload matching the specification of the service, nodes and network.
 // The property name will be empty and must be set by the caller to produce a valid payload for the API.
 // An error is returned if the service has invalid options.
-func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
+//
+//nolint:gocyclo,funlen,staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
+func lbSpecFromService(
 	service *corev1.Service,
 	nodes []*corev1.Node,
 	opts stackitconfig.LoadBalancerOpts,
@@ -247,28 +251,28 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 ) (*loadbalancer.CreateLoadBalancerPayload, []Event, error) {
 	lb := &loadbalancer.CreateLoadBalancerPayload{
 		Options: &loadbalancer.LoadBalancerOptions{},
-		Networks: &[]loadbalancer.Network{
+		Networks: []loadbalancer.Network{
 			{
-				Role:      new(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
+				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS_AND_TARGETS)),
 				NetworkId: &opts.NetworkID,
 			},
 		},
 	}
 
 	if listenerNetwork := service.Annotations[listenerNetworkAnnotation]; listenerNetwork != "" {
-		lb.Networks = &[]loadbalancer.Network{
+		lb.Networks = []loadbalancer.Network{
 			{
-				Role:      new(loadbalancer.NETWORKROLE_TARGETS),
+				Role:      new(string(lbLegacy.NETWORKROLE_TARGETS)),
 				NetworkId: &opts.NetworkID,
 			}, {
-				Role:      new(loadbalancer.NETWORKROLE_LISTENERS),
+				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS)),
 				NetworkId: &listenerNetwork,
 			},
 		}
 	} else {
-		lb.Networks = &[]loadbalancer.Network{
+		lb.Networks = []loadbalancer.Network{
 			{
-				Role:      new(loadbalancer.NETWORKROLE_LISTENERS_AND_TARGETS),
+				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS_AND_TARGETS)),
 				NetworkId: &opts.NetworkID,
 			},
 		}
@@ -493,22 +497,22 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 			name = fmt.Sprintf("port-%s-%d", strings.ToLower(string(port.Protocol)), port.Port)
 		}
 
-		var protocol loadbalancer.ListenerProtocol
+		var protocol lbLegacy.ListenerProtocol
 		var tcpOptions *loadbalancer.OptionsTCP
 		var udpOptions *loadbalancer.OptionsUDP
 
 		switch port.Protocol {
 		case corev1.ProtocolTCP:
 			if proxyProtocolEnableForPort(tcpProxyProtocolEnabled, tcpProxyProtocolPortFilter, port.Port) {
-				protocol = loadbalancer.LISTENERPROTOCOL_TCP_PROXY
+				protocol = lbLegacy.LISTENERPROTOCOL_TCP_PROXY
 			} else {
-				protocol = loadbalancer.LISTENERPROTOCOL_TCP
+				protocol = lbLegacy.LISTENERPROTOCOL_TCP
 			}
 			tcpOptions = &loadbalancer.OptionsTCP{
 				IdleTimeout: new(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
 			}
 		case corev1.ProtocolUDP:
-			protocol = loadbalancer.LISTENERPROTOCOL_UDP
+			protocol = lbLegacy.LISTENERPROTOCOL_UDP
 			udpOptions = &loadbalancer.OptionsUDP{
 				IdleTimeout: new(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
 			}
@@ -518,33 +522,33 @@ func lbSpecFromService( //nolint:funlen,gocyclo // It is long but not complex.
 
 		listeners = append(listeners, loadbalancer.Listener{
 			DisplayName: &name,
-			Port:        new(int64(port.Port)),
+			Port:        new(port.Port),
 			TargetPool:  &name,
-			Protocol:    new(protocol),
+			Protocol:    new(string(protocol)),
 			Tcp:         tcpOptions,
 			Udp:         udpOptions,
 		})
 
 		targetPools = append(targetPools, loadbalancer.TargetPool{
 			Name:       &name,
-			TargetPort: new(int64(port.NodePort)),
-			Targets:    &targets,
+			TargetPort: new(port.NodePort),
+			Targets:    targets,
 			SessionPersistence: &loadbalancer.SessionPersistence{
 				UseSourceIpAddress: new(useSourceIP),
 			},
 		})
 	}
-	lb.Listeners = &listeners
-	lb.TargetPools = &targetPools
+	lb.Listeners = listeners
+	lb.TargetPools = targetPools
 
 	lb.Options.AccessControl = &loadbalancer.LoadbalancerOptionAccessControl{}
 	// For backwards-compatibility, the spec takes precedence over the annotation.
 	if sourceRanges, found := service.Annotations[yawolLoadBalancerSourceRangesAnnotation]; found {
 		r := strings.Split(sourceRanges, ",")
-		lb.Options.AccessControl.AllowedSourceRanges = &r
+		lb.Options.AccessControl.AllowedSourceRanges = r
 	}
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 {
-		lb.Options.AccessControl.AllowedSourceRanges = &service.Spec.LoadBalancerSourceRanges
+		lb.Options.AccessControl.AllowedSourceRanges = service.Spec.LoadBalancerSourceRanges
 	}
 
 	if event := checkUnsupportedAnnotations(service); event != nil {
@@ -587,6 +591,8 @@ type resultImmutableChanged struct {
 // compareLBwithSpec checks whether the load balancer fulfills the specification.
 // If immutableChanged is not nil then spec differs from lb such that an update will fail.
 // Otherwise, fulfills will indicate whether an update is necessary.
+//
+//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
 func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
 	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
 	fulfills = true
@@ -637,11 +643,11 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		return false, &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation}
 	}
 
-	if cmp.LenSlicePtr(lb.Listeners) != cmp.LenSlicePtr(spec.Listeners) {
+	if len(lb.Listeners) != len(spec.Listeners) {
 		fulfills = false
-	} else if lb.Listeners != nil && spec.Listeners != nil {
-		for i, x := range *lb.Listeners {
-			y := (*spec.Listeners)[i]
+	} else {
+		for i, x := range lb.Listeners {
+			y := spec.Listeners[i]
 			if !cmp.PtrValEqual(x.DisplayName, y.DisplayName) {
 				fulfills = false
 			}
@@ -654,13 +660,13 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 			if !cmp.PtrValEqual(x.TargetPool, y.TargetPool) {
 				fulfills = false
 			}
-			if (cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_TCP || cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_TCP_PROXY) &&
+			if (cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_TCP) || cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY)) &&
 				!cmp.PtrValEqualFn(x.Tcp, y.Tcp, func(a, b loadbalancer.OptionsTCP) bool {
 					return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 				}) {
 				fulfills = false
 			}
-			if cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_UDP && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
+			if cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_UDP) && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
 				return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 			}) {
 				fulfills = false
@@ -668,26 +674,24 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		}
 	}
 
-	if cmp.LenSlicePtr(lb.Networks) != cmp.LenSlicePtr(spec.Networks) {
+	if len(lb.Networks) != len(spec.Networks) {
 		return false, &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation}
 	}
-	if cmp.LenSlicePtr(lb.Networks) > 0 {
-		for i, x := range *lb.Networks {
-			y := (*spec.Networks)[i]
-			if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
-				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i), annotation: listenerNetworkAnnotation}
-			}
-			if !cmp.PtrValEqual(x.Role, y.Role) {
-				return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i), annotation: listenerNetworkAnnotation}
-			}
+	for i, x := range lb.Networks {
+		y := spec.Networks[i]
+		if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
+			return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i), annotation: listenerNetworkAnnotation}
+		}
+		if !cmp.PtrValEqual(x.Role, y.Role) {
+			return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i), annotation: listenerNetworkAnnotation}
 		}
 	}
 
-	if cmp.LenSlicePtr(lb.TargetPools) != cmp.LenSlicePtr(spec.TargetPools) {
+	if len(lb.TargetPools) != len(spec.TargetPools) {
 		fulfills = false
-	} else if lb.TargetPools != nil && spec.TargetPools != nil {
-		for i, x := range *lb.TargetPools {
-			y := (*spec.TargetPools)[i]
+	} else {
+		for i, x := range lb.TargetPools {
+			y := spec.TargetPools[i]
 			if !cmp.PtrValEqual(x.Name, y.Name) {
 				fulfills = false
 			}
@@ -717,13 +721,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 			}) {
 				fulfills = false
 			}
-			if x.Targets == nil || y.Targets == nil {
-				// At this point one pointer is nil.
-				// We consider nil pointer to be equal to a nil slice and an empty slice.
-				if cmp.LenSlicePtr(x.Targets) != cmp.LenSlicePtr(y.Targets) {
-					fulfills = false
-				}
-			} else if !cmp.SliceEqualUnordered(*x.Targets, *y.Targets, func(a, b loadbalancer.Target) bool {
+			if !cmp.SliceEqualUnordered(x.Targets, y.Targets, func(a, b loadbalancer.Target) bool {
 				if !cmp.PtrValEqual(a.DisplayName, b.DisplayName) {
 					return false
 				}
@@ -745,8 +743,8 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	}
 
 	if !cmp.SliceEqual(
-		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessControl).AllowedSourceRanges),
-		cmp.UnpackPtr(cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessControl).AllowedSourceRanges),
+		cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessControl).AllowedSourceRanges,
+		cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessControl).AllowedSourceRanges,
 	) {
 		fulfills = false
 	}
