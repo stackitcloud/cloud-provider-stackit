@@ -25,12 +25,32 @@ const (
 )
 
 func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+	opts, err := buildCreateBackupPayload(name, volID, snapshotID, tags)
+	if err != nil {
+		return nil, err
+	}
+
+	var httpResp *http.Response
+	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region).CreateBackupPayload(opts).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+		return nil, err
+	}
+
+	return backup, nil
+}
+
+func buildCreateBackupPayload(name, volID, snapshotID string, tags map[string]string) (iaas.CreateBackupPayload, error) {
 	if name == "" {
-		return nil, errors.New("backup name cannot be empty")
+		return iaas.CreateBackupPayload{}, errors.New("backup name cannot be empty")
 	}
 
 	if volID == "" && snapshotID == "" {
-		return nil, errors.New("either volID or snapshotID must be provided")
+		return iaas.CreateBackupPayload{}, errors.New("either volID or snapshotID must be provided")
 	}
 
 	var backupSource VolumeSourceTypes
@@ -55,18 +75,8 @@ func (os *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID 
 	if tags != nil {
 		opts.Labels = labelsFromTags(tags)
 	}
-	var httpResp *http.Response
-	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	backup, err := os.iaas.CreateBackup(ctxWithHTTPResp, os.projectID, os.region).CreateBackupPayload(opts).Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-		return nil, err
-	}
 
-	return backup, nil
+	return opts, nil
 }
 
 func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
