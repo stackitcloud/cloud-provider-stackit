@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	config "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	v2api "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	gomock "go.uber.org/mock/gomock"
 	wait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -59,10 +59,10 @@ func (mr *MockIaasClientMockRecorder) AttachVolume(ctx, instanceID, volumeID any
 }
 
 // CreateBackup mocks base method.
-func (m *MockIaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+func (m *MockIaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*v2api.Backup, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateBackup", ctx, name, volID, snapshotID, tags)
-	ret0, _ := ret[0].(*iaas.Backup)
+	ret0, _ := ret[0].(*v2api.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -74,10 +74,10 @@ func (mr *MockIaasClientMockRecorder) CreateBackup(ctx, name, volID, snapshotID,
 }
 
 // CreateSnapshot mocks base method.
-func (m *MockIaasClient) CreateSnapshot(ctx context.Context, name, volID string, tags map[string]string) (*iaas.Snapshot, error) {
+func (m *MockIaasClient) CreateSnapshot(ctx context.Context, name, volID string, tags map[string]string) (*v2api.Snapshot, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSnapshot", ctx, name, volID, tags)
-	ret0, _ := ret[0].(*iaas.Snapshot)
+	ret0, _ := ret[0].(*v2api.Snapshot)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -89,10 +89,10 @@ func (mr *MockIaasClientMockRecorder) CreateSnapshot(ctx, name, volID, tags any)
 }
 
 // CreateVolume mocks base method.
-func (m *MockIaasClient) CreateVolume(arg0 context.Context, arg1 *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+func (m *MockIaasClient) CreateVolume(arg0 context.Context, arg1 *v2api.CreateVolumePayload) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateVolume", arg0, arg1)
-	ret0, _ := ret[0].(*iaas.Volume)
+	ret0, _ := ret[0].(*v2api.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -174,10 +174,10 @@ func (mr *MockIaasClientMockRecorder) ExpandVolume(ctx, volumeID, status, size a
 }
 
 // GetBackupByID mocks base method.
-func (m *MockIaasClient) GetBackupByID(ctx context.Context, backupID string) (*iaas.Backup, error) {
+func (m *MockIaasClient) GetBackupByID(ctx context.Context, backupID string) (*v2api.Backup, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBackupByID", ctx, backupID)
-	ret0, _ := ret[0].(*iaas.Backup)
+	ret0, _ := ret[0].(*v2api.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -203,10 +203,10 @@ func (mr *MockIaasClientMockRecorder) GetBlockStorageOpts() *gomock.Call {
 }
 
 // GetInstanceByID mocks base method.
-func (m *MockIaasClient) GetInstanceByID(ctx context.Context, instanceID string) (*iaas.Server, error) {
+func (m *MockIaasClient) GetInstanceByID(ctx context.Context, instanceID string) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetInstanceByID", ctx, instanceID)
-	ret0, _ := ret[0].(*iaas.Server)
+	ret0, _ := ret[0].(*v2api.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -218,10 +218,10 @@ func (mr *MockIaasClientMockRecorder) GetInstanceByID(ctx, instanceID any) *gomo
 }
 
 // GetSnapshotByID mocks base method.
-func (m *MockIaasClient) GetSnapshotByID(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
+func (m *MockIaasClient) GetSnapshotByID(ctx context.Context, snapshotID string) (*v2api.Snapshot, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSnapshotByID", ctx, snapshotID)
-	ret0, _ := ret[0].(*iaas.Snapshot)
+	ret0, _ := ret[0].(*v2api.Snapshot)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -233,10 +233,10 @@ func (mr *MockIaasClientMockRecorder) GetSnapshotByID(ctx, snapshotID any) *gomo
 }
 
 // GetVolume mocks base method.
-func (m *MockIaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
+func (m *MockIaasClient) GetVolume(ctx context.Context, volumeID string) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetVolume", ctx, volumeID)
-	ret0, _ := ret[0].(*iaas.Volume)
+	ret0, _ := ret[0].(*v2api.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -248,10 +248,10 @@ func (mr *MockIaasClientMockRecorder) GetVolume(ctx, volumeID any) *gomock.Call 
 }
 
 // GetVolumeByName mocks base method.
-func (m *MockIaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error) {
+func (m *MockIaasClient) GetVolumeByName(ctx context.Context, name string) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetVolumeByName", ctx, name)
-	ret0, _ := ret[0].(*iaas.Volume)
+	ret0, _ := ret[0].(*v2api.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -263,10 +263,10 @@ func (mr *MockIaasClientMockRecorder) GetVolumeByName(ctx, name any) *gomock.Cal
 }
 
 // GetVolumesByName mocks base method.
-func (m *MockIaasClient) GetVolumesByName(ctx context.Context, name string) ([]iaas.Volume, error) {
+func (m *MockIaasClient) GetVolumesByName(ctx context.Context, name string) ([]v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetVolumesByName", ctx, name)
-	ret0, _ := ret[0].([]iaas.Volume)
+	ret0, _ := ret[0].([]v2api.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -278,10 +278,10 @@ func (mr *MockIaasClientMockRecorder) GetVolumesByName(ctx, name any) *gomock.Ca
 }
 
 // ListBackups mocks base method.
-func (m *MockIaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
+func (m *MockIaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]v2api.Backup, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListBackups", ctx, filters)
-	ret0, _ := ret[0].([]iaas.Backup)
+	ret0, _ := ret[0].([]v2api.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -293,10 +293,10 @@ func (mr *MockIaasClientMockRecorder) ListBackups(ctx, filters any) *gomock.Call
 }
 
 // ListSnapshots mocks base method.
-func (m *MockIaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+func (m *MockIaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]v2api.Snapshot, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListSnapshots", ctx, filters)
-	ret0, _ := ret[0].([]iaas.Snapshot)
+	ret0, _ := ret[0].([]v2api.Snapshot)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -309,10 +309,10 @@ func (mr *MockIaasClientMockRecorder) ListSnapshots(ctx, filters any) *gomock.Ca
 }
 
 // ListVolumes mocks base method.
-func (m *MockIaasClient) ListVolumes(ctx context.Context, limit int, startingToken string) ([]iaas.Volume, string, error) {
+func (m *MockIaasClient) ListVolumes(ctx context.Context, limit int, startingToken string) ([]v2api.Volume, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListVolumes", ctx, limit, startingToken)
-	ret0, _ := ret[0].([]iaas.Volume)
+	ret0, _ := ret[0].([]v2api.Volume)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

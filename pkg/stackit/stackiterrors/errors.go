@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
+	wait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 )
 
 var ErrNotFound = errors.New("failed to find object")

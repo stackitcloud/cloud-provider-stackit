@@ -9,8 +9,8 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
-	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/wait"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
+	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -136,7 +136,7 @@ func (os *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.
 		return nil, "", err
 	}
 
-	return *volumes.Items, "", err
+	return volumes.Items, "", err
 }
 
 func (os *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
@@ -270,7 +270,7 @@ func (os *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]i
 	}
 
 	filterMap := map[string]string{"Name": volName}
-	filteredVolumes := filterVolumes(*volumes.Items, filterMap)
+	filteredVolumes := filterVolumes(volumes.Items, filterMap)
 
 	return filteredVolumes, nil
 }
@@ -323,7 +323,7 @@ func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID strin
 }
 
 func (os *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, newSize int64) error {
-	extendOpts := iaas.ResizeVolumePayload{Size: new(newSize)}
+	extendOpts := iaas.ResizeVolumePayload{Size: newSize}
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 

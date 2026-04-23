@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	v2api "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,10 +42,10 @@ func (m *MockNodeClient) EXPECT() *MockNodeClientMockRecorder {
 }
 
 // CreateServer mocks base method.
-func (m *MockNodeClient) CreateServer(ctx context.Context, projectID, region string, create *iaas.CreateServerPayload) (*iaas.Server, error) {
+func (m *MockNodeClient) CreateServer(ctx context.Context, projectID, region string, create *v2api.CreateServerPayload) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateServer", ctx, projectID, region, create)
-	ret0, _ := ret[0].(*iaas.Server)
+	ret0, _ := ret[0].(*v2api.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -71,10 +71,10 @@ func (mr *MockNodeClientMockRecorder) DeleteServer(ctx, projectID, region, serve
 }
 
 // GetServer mocks base method.
-func (m *MockNodeClient) GetServer(ctx context.Context, projectID, region, serverID string) (*iaas.Server, error) {
+func (m *MockNodeClient) GetServer(ctx context.Context, projectID, region, serverID string) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetServer", ctx, projectID, region, serverID)
-	ret0, _ := ret[0].(*iaas.Server)
+	ret0, _ := ret[0].(*v2api.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -86,10 +86,10 @@ func (mr *MockNodeClientMockRecorder) GetServer(ctx, projectID, region, serverID
 }
 
 // ListServers mocks base method.
-func (m *MockNodeClient) ListServers(ctx context.Context, projectID, region string) (*[]iaas.Server, error) {
+func (m *MockNodeClient) ListServers(ctx context.Context, projectID, region string) (*[]v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListServers", ctx, projectID, region)
-	ret0, _ := ret[0].(*[]iaas.Server)
+	ret0, _ := ret[0].(*[]v2api.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -101,10 +101,10 @@ func (mr *MockNodeClientMockRecorder) ListServers(ctx, projectID, region any) *g
 }
 
 // UpdateServer mocks base method.
-func (m *MockNodeClient) UpdateServer(ctx context.Context, projectID, region, serverID string, update *iaas.UpdateServerPayload) (*iaas.Server, error) {
+func (m *MockNodeClient) UpdateServer(ctx context.Context, projectID, region, serverID string, update *v2api.UpdateServerPayload) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateServer", ctx, projectID, region, serverID, update)
-	ret0, _ := ret[0].(*iaas.Server)
+	ret0, _ := ret[0].(*v2api.Server)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
