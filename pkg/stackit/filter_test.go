@@ -3,7 +3,7 @@ package stackit
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
 var _ = Describe("Filter", func() {
@@ -96,9 +96,9 @@ var _ = Describe("Filter", func() {
 
 		BeforeEach(func() {
 			snapshots = []iaas.Snapshot{
-				{Status: new("available"), VolumeId: new("vol-1"), Name: new("snapshot-1")},
-				{Status: new("error"), VolumeId: new("vol-2"), Name: new("snapshot-2")},
-				{Status: new("available"), VolumeId: new("vol-1"), Name: new("snapshot-3")},
+				{Status: new("available"), VolumeId: "vol-1", Name: new("snapshot-1")},
+				{Status: new("error"), VolumeId: "vol-2", Name: new("snapshot-2")},
+				{Status: new("available"), VolumeId: "vol-1", Name: new("snapshot-3")},
 			}
 			filters = make(map[string]string)
 		})

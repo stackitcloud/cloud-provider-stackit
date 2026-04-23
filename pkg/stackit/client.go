@@ -28,7 +28,7 @@ import (
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -103,7 +103,7 @@ type NodeClient interface {
 }
 
 type iaasClient struct {
-	iaas      iaas.DefaultApi
+	iaas      iaas.DefaultAPI
 	projectID string
 	region    string
 	bsOpts    stackitconfig.BlockStorageOpts
@@ -155,7 +155,7 @@ func GetConfigFromFile(path string) (stackitconfig.CSIConfig, error) {
 }
 
 // CreateSTACKITProvider creates STACKIT Instance
-func CreateSTACKITProvider(client iaas.DefaultApi, cfg *stackitconfig.CSIConfig) (IaasClient, error) {
+func CreateSTACKITProvider(client iaas.DefaultAPI, cfg *stackitconfig.CSIConfig) (IaasClient, error) {
 	region := os.Getenv("STACKIT_REGION")
 	if region == "" {
 		panic("STACKIT_REGION environment variable not set")
@@ -171,7 +171,7 @@ func CreateSTACKITProvider(client iaas.DefaultApi, cfg *stackitconfig.CSIConfig)
 	return instance, nil
 }
 
-func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultApi, error) {
+func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultAPI, error) {
 	var userAgent []string
 	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))
@@ -187,7 +187,11 @@ func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultApi, error) {
 
 	opts = append(opts, sdkconfig.WithUserAgent(strings.Join(userAgent, " ")))
 
-	return iaas.NewAPIClient(opts...)
+	client, err := iaas.NewAPIClient(opts...)
+	if err != nil {
+		return nil, err
+	}
+	return client.DefaultAPI, nil
 }
 
 func NewLoadbalancerClient(cl loadbalancer.DefaultAPI, region string) (LoadbalancerClient, error) {
