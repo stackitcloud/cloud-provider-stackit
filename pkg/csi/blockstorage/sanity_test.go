@@ -20,7 +20,7 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 )
 
@@ -171,7 +171,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					Status:    new(stackit.SnapshotReadyStatus),
 					CreatedAt: new(time.Now()),
 					Size:      new(int64(10)), // 10 GiB
-					VolumeId:  new(volID),
+					VolumeId:  volID,
 				}
 				createdSnapshots[*newSnap.Id] = newSnap
 				return newSnap, nil
@@ -201,7 +201,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 				for _, value := range createdSnapshots {
 					if volumeIDFilter != "" {
-						if value.VolumeId != nil && *value.VolumeId == volumeIDFilter {
+						if value.VolumeId == volumeIDFilter {
 							snapshots = append(snapshots, *value)
 							break
 						}

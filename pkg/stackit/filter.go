@@ -1,7 +1,7 @@
 package stackit
 
 import (
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
 // TODO: Remove this once the IaaS API supports filtering by name, status, and volume ID.
