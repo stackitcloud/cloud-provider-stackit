@@ -25,7 +25,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/stackit-sdk-go/services/iaas"
+	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 
 	corev1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
@@ -105,27 +105,30 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 	if len(server.GetNics()) == 0 {
 		return nil, fmt.Errorf("server has no network interfaces")
 	}
-	for _, nic := range server.GetNics() {
-		if ipv4, ok := nic.GetIpv4Ok(); ok {
+
+	nics := server.GetNics()
+	for i := range nics {
+		nic := &nics[i]
+		if nic.HasIpv4() {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
-					Address: ipv4,
+					Address: nic.GetIpv4(),
 					Type:    corev1.NodeInternalIP,
 				})
 		}
 
-		if ipv6, ok := nic.GetIpv6Ok(); ok {
+		if nic.HasIpv6() {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
-					Address: ipv6,
+					Address: nic.GetIpv6(),
 					Type:    corev1.NodeInternalIP,
 				})
 		}
 
-		if publicIP, ok := nic.GetPublicIpOk(); ok {
+		if nic.HasPublicIp() {
 			addToNodeAddresses(&addresses,
 				corev1.NodeAddress{
-					Address: publicIP,
+					Address: nic.GetPublicIp(),
 					Type:    corev1.NodeExternalIP,
 				})
 		}
@@ -214,7 +217,7 @@ func getServerByName(ctx context.Context, client stackit.NodeClient, name, proje
 	// TODO: Implement field selector for ListServers so we don't have to do the following
 	for i := range serverList {
 		server := serverList[i]
-		if serverName, ok := server.GetNameOk(); ok && serverName == name {
+		if server.GetName() == name {
 			return &server, nil
 		}
 	}
