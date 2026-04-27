@@ -31,6 +31,16 @@
   ],
   packageRules: [
     {
+      'matchPackageNames': ['github.com/stackitcloud/stackit-sdk-go/core'],
+      'changelogUrl': 'https://github.com/stackitcloud/stackit-sdk-go/blob/main/core/CHANGELOG.md#{{{lowercase (replace '[.]' '' newVersion)}}}'
+    },
+    {
+      'matchPackageNames': [
+        '/^github.com/stackitcloud/stackit-sdk-go/services/'
+      ],
+      'changelogUrl': 'https://github.com/stackitcloud/stackit-sdk-go/blob/main/services/{{{ lookup (split packageName '/') 4 }}}/CHANGELOG.md#{{{lowercase (replace '[.]' '' newVersion)}}}'
+    },
+    {
       matchPackageNames: [
         '/^github.com/stackitcloud/stackit-sdk-go/',
       ],
