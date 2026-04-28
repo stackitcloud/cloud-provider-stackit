@@ -322,9 +322,14 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] Unable to retrieve availability zone of node %v", err)
 	}
 
+	topoKey := topologyKey
+	if ns.Driver.legacyDriver {
+		topoKey = legacyTopologyKey
+	}
+
 	//TODO: support well-known topology key "topology.kubernetes.io/zone"
 	segments := map[string]string{
-		topologyKey: zone,
+		topoKey: zone,
 	}
 
 	nodeInfo.AccessibleTopology = &csi.Topology{Segments: segments}
