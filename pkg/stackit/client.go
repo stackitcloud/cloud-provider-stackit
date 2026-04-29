@@ -58,7 +58,7 @@ type IaasClient interface {
 	WaitDiskAttached(ctx context.Context, instanceID string, volumeID string) error
 	DetachVolume(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID string, volumeID string) error
-	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
+	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string, tSize int64) error
 	GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error)
 	GetVolumesByName(ctx context.Context, name string) ([]iaas.Volume, error)
 	GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error)
