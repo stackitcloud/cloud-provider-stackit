@@ -78,7 +78,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	cloud := cs.Instance
 
 	if cs.Driver.blockVolumeCreation {
-		return nil, status.Error(codes.FailedPrecondition, "CSI driver is in read/update-only mode")
+		return nil, status.Errorf(codes.FailedPrecondition, "The %s driver is update/read-only mode please migrate to the new driver", legacyDriverName)
 	}
 
 	// Volume Name
@@ -485,7 +485,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	cloud := cs.Instance
 
 	if cs.Driver.blockVolumeCreation {
-		return nil, status.Error(codes.FailedPrecondition, "The old driver is update/read-only mode please migrate to the new driver")
+		return nil, status.Errorf(codes.FailedPrecondition, "The %s driver is update/read-only mode please migrate to the new driver", legacyDriverName)
 	}
 
 	name := req.Name
