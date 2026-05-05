@@ -52,6 +52,7 @@ const (
 	// If not set, the SKE network is used for listening.
 	// The value must be a network ID, not a subnet.
 	// The annotation can neither be changed nor be added or removed after service creation.
+	// This annotation is currently not supported by STACKIT and only works in very specific circumstances.
 	listenerNetworkAnnotation = "lb.stackit.cloud/listener-network"
 )
 
