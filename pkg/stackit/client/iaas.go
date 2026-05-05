@@ -2,11 +2,18 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	stackitv1alpha1 "github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/apis/stackit/v1alpha1"
 	"github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/stackit"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 type IaaSClient interface {
@@ -27,7 +34,27 @@ type IaaSClient interface {
 	DeleteBackup(ctx context.Context, backupID string) error
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
 	WaitBackupReady(ctx context.Context, backupID string) (*string, error)
+
+	// add all volume public methods from the file below like DetachVolume(ctx context.Context, serverID, volumeID string) error
+
 }
+
+const (
+	VolumeAvailableStatus    = "AVAILABLE"
+	VolumeAttachedStatus     = "ATTACHED"
+	operationFinishInitDelay = 1 * time.Second
+	operationFinishFactor    = 1.1
+	operationFinishSteps     = 10
+	diskAttachInitDelay      = 1 * time.Second
+	diskAttachFactor         = 1.2
+	diskAttachSteps          = 15
+	diskDetachInitDelay      = 1 * time.Second
+	diskDetachFactor         = 1.2
+	diskDetachSteps          = 13
+	VolumeDescription        = "Created by STACKIT CSI driver"
+)
+
+var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
 type iaasClient struct {
 	Client    iaas.DefaultAPI
@@ -175,5 +202,219 @@ func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string) (*stri
 		return backup.Status, nil
 	}
 
-	new("Failed to get backup status"), nil
+	return new("Failed to get backup status"), nil
+}
+
+func (i iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+	payload.Description = new(VolumeDescription)
+	volume, err := i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(payload).Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	return volume, nil
+}
+
+func (i iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
+	used, err := i.diskIsUsed(ctx, volumeID)
+	if err != nil {
+		return err
+	}
+	if used {
+		return fmt.Errorf("cannot delete the volume %q, it's still attached to a node", volumeID)
+	}
+
+	return i.Client.DeleteVolume(ctx, i.projectID, i.region, volumeID).Execute()
+}
+
+func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error) {
+	volume, err := i.GetVolume(ctx, volumeID)
+	if err != nil {
+		return "", err
+	}
+	if volume.ServerId != nil && serverID == *volume.ServerId {
+		klog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, serverID)
+		return *volume.Id, nil
+	}
+	payload.DeleteOnTermination = new(false)
+
+	if _, err = i.Client.AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
+		AddVolumeToServerPayload(payload).
+		Execute(); err != nil {
+		return "", nil
+	}
+
+	return volume.GetId(), nil
+}
+
+func (i iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
+	volume, err := i.Client.GetVolume(ctx, i.projectID, i.region, volumeID).Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	return volume, nil
+}
+
+func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error) {
+	volumes, err := i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	filterMap := map[string]string{"Name": volName}
+	filteredVolumes := filterVolumes(volumes.Items, filterMap)
+
+	return filteredVolumes, nil
+}
+
+// GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error)
+func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error) {
+	vols, err := i.GetVolumesByName(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vols) == 0 {
+		return nil, stackiterrors.ErrNotFound
+	}
+
+	if len(vols) > 1 {
+		return nil, fmt.Errorf("found %d volumes with name %q", len(vols), name)
+	}
+
+	return &vols[0], nil
+}
+
+func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, error) {
+	volumes, err := i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	return volumes.Items, nil
+}
+
+// ExpandVolume(ctx context.Context, volumeID, volumeStatus string, newSize int64) error
+func (i iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {
+	switch volumeStatus {
+	case VolumeAttachedStatus, VolumeAvailableStatus:
+		return i.Client.ResizeVolume(ctx, i.projectID, i.region, volumeID).ResizeVolumePayload(payload).Execute()
+	default:
+		return fmt.Errorf("volume cannot be resized, when status is %s", volumeStatus)
+	}
+}
+
+func (i iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+	backoff := wait.Backoff{
+		Duration: operationFinishInitDelay,
+		Factor:   operationFinishFactor,
+		Steps:    operationFinishSteps,
+	}
+
+	waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		vol, err := i.GetVolume(ctx, volumeID)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(tStatus, *vol.Status) {
+			return true, nil
+		}
+		for _, eState := range volumeErrorStates {
+			if *vol.Status == eState {
+				return false, fmt.Errorf("volume is in Error State : %s", ptr.Deref(vol.Status, ""))
+			}
+		}
+		return false, nil
+	})
+
+	if wait.Interrupted(waitErr) {
+		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+	}
+
+	return waitErr
+}
+
+func (i iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: diskAttachInitDelay,
+		Factor:   diskAttachFactor,
+		Steps:    diskAttachSteps,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		attached, err := i.diskIsAttached(ctx, instanceID, volumeID)
+		if err != nil && !stackiterrors.IsNotFound(err) {
+			// if this is a race condition indicate the volume is deleted
+			// during sleep phase, ignore the error and return attach=false
+			return false, err
+		}
+		return attached, nil
+	})
+
+	if wait.Interrupted(err) {
+		err = fmt.Errorf("volume %q failed to be attached within the allowed time", volumeID)
+	}
+
+	return err
+}
+
+func (i iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: diskDetachInitDelay,
+		Factor:   diskDetachFactor,
+		Steps:    diskDetachSteps,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		attached, err := i.diskIsAttached(ctx, instanceID, volumeID)
+		if err != nil {
+			return false, err
+		}
+		return !attached, nil
+	})
+
+	if wait.Interrupted(err) {
+		err = fmt.Errorf("volume %q failed to detach within the allowed time", volumeID)
+	}
+
+	return err
+}
+
+func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string) error {
+	volume, err := i.GetVolume(ctx, volumeID)
+	if err != nil {
+		return err
+	}
+
+	if *volume.Status != VolumeAvailableStatus {
+		return fmt.Errorf("can not detach volume %s, its status is %s", *volume.Name, *volume.Status)
+	}
+
+	return i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
+}
+
+// diskIsAttached queries if a volume is attached to a compute instance
+func (i iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID string) (bool, error) {
+	volume, err := i.GetVolume(ctx, volumeID)
+	if err != nil {
+		return false, err
+	}
+
+	if volume.ServerId != nil && *volume.ServerId == instanceID {
+		return true, nil
+	}
+	return false, nil
+}
+
+// diskIsUsed returns true whether a disk is attached to any node
+func (i iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, error) {
+	volume, err := i.GetVolume(ctx, volumeID)
+	if err != nil {
+		return false, err
+	}
+
+	diskUsed := volume.ServerId != nil && *volume.ServerId != ""
+
+	return diskUsed, nil
 }
