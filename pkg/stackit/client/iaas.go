@@ -35,8 +35,18 @@ type IaaSClient interface {
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
 	WaitBackupReady(ctx context.Context, backupID string) (*string, error)
 
-	// add all volume public methods from the file below like DetachVolume(ctx context.Context, serverID, volumeID string) error
-
+	CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error)
+	DeleteVolume(ctx context.Context, volumeID string) error
+	AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error)
+	DetachVolume(ctx context.Context, serverID, volumeID string) error
+	GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error)
+	GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error)
+	GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error)
+	ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, error)
+	ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error
+	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
+	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
+	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
 }
 
 const (
