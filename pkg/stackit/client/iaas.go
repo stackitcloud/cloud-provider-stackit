@@ -24,13 +24,13 @@ type IaaSClient interface {
 	ListServers(ctx context.Context) (*[]iaas.Server, error)
 
 	CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
-	ListSnapshots(ctx context.Context) ([]iaas.Snapshot, error)
+	ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, error)
 	DeleteSnapshot(ctx context.Context, snapshotID string) error
 	GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error)
 	WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error)
 
 	CreateBackup(ctx context.Context, payload iaas.CreateBackupPayload) (*iaas.Backup, error)
-	ListBackups(ctx context.Context) ([]iaas.Backup, error)
+	ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error)
 	DeleteBackup(ctx context.Context, backupID string) error
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
 	WaitBackupReady(ctx context.Context, backupID string) (*string, error)
@@ -136,13 +136,15 @@ func (i iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnaps
 	return snapshot, nil
 }
 
-func (i iaasClient) ListSnapshots(ctx context.Context) ([]iaas.Snapshot, error) {
+func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, error) {
 	snaps, err := i.Client.ListSnapshotsInProject(ctx, i.projectID, i.region).Execute()
 	if err != nil {
 		return nil, err
 	}
 
-	return snaps.Items, nil
+	filteredSnapshots := filterSnapshots(snaps.Items, filters)
+
+	return filteredSnapshots, nil
 }
 
 func (i iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
@@ -180,13 +182,15 @@ func (i iaasClient) CreateBackup(ctx context.Context, payload iaas.CreateBackupP
 	return backup, nil
 }
 
-func (i iaasClient) ListBackups(ctx context.Context) ([]iaas.Backup, error) {
+func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
 	backups, err := i.Client.ListBackups(ctx, i.projectID, i.region).Execute()
 	if err != nil {
 		return nil, err
 	}
 
-	return backups.Items, nil
+	filteredBackups := filterBackups(backups.Items, filters)
+
+	return filteredBackups, nil
 }
 
 func (i iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
