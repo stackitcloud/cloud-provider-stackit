@@ -97,7 +97,7 @@ func DetermineMaxVolumesByFlavor(flavor string) int64 {
 		return 159
 	default:
 		// All other flavors can mount 28 volumes
-		return 25
+		return 28
 	}
 }
 
