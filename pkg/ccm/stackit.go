@@ -1,15 +1,16 @@
 package ccm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -135,13 +136,9 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
-	innerClient, err := loadbalancer.NewAPIClient(lbOpts...)
+	loadbalancingClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).LoadBalancing(context.Background())
 	if err != nil {
-		return nil, err
-	}
-	client, err := stackit.NewLoadbalancerClient(innerClient.DefaultAPI, cfg.Global.Region)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create Load Balancing client: %v", err)
 	}
 
 	iaasOpts := []sdkconfig.ConfigurationOption{
@@ -165,7 +162,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(client, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
+	lb, err := NewLoadBalancer(loadbalancingClient, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
 	if err != nil {
 		return nil, err
 	}

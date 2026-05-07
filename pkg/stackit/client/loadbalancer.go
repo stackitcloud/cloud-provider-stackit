@@ -3,18 +3,18 @@ package client
 import (
 	"context"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
-
-	stackitv1alpha1 "github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/apis/stackit/v1alpha1"
-	"github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/stackit"
 )
 
 type LoadBalancingClient interface {
+	CreateLoadBalancer(ctx context.Context, payload loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, lbName string) error
 	GetLoadBalancer(ctx context.Context, id string) (*loadbalancer.LoadBalancer, error)
 	UpdateLoadBalancer(ctx context.Context, lbName string, updates loadbalancer.UpdateLoadBalancerPayload) error
+	UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 
 	CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error)
 	GetCredentials(ctx context.Context, credentialsRef string) (*loadbalancer.GetCredentialsResponse, error)
@@ -29,11 +29,10 @@ type loadBalancingClient struct {
 	region    string
 }
 
-func NewLoadBalancingClient(_ context.Context, region string, endpoints stackitv1alpha1.APIEndpoints, credentials *stackit.Credentials) (LoadBalancingClient, error) {
-	options := clientOptions(endpoints, credentials)
-
-	if endpoints.LoadBalancer != nil {
-		options = append(options, sdkconfig.WithEndpoint(*endpoints.LoadBalancer))
+func NewLoadBalancingClient(_ context.Context, region, projectID string, endpoints config.APIEndpoints) (LoadBalancingClient, error) {
+	options := []sdkconfig.ConfigurationOption{}
+	if endpoints.LoadBalancerAPI != "" {
+		options = append(options, sdkconfig.WithEndpoint(endpoints.LoadBalancerAPI))
 	}
 
 	apiClient, err := loadbalancer.NewAPIClient(options...)
@@ -42,9 +41,17 @@ func NewLoadBalancingClient(_ context.Context, region string, endpoints stackitv
 	}
 	return &loadBalancingClient{
 		Client:    apiClient.DefaultAPI,
-		projectID: credentials.ProjectID,
+		projectID: projectID,
 		region:    region,
 	}, nil
+}
+
+func (l loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	lb, err := l.Client.CreateLoadBalancer(ctx, l.projectID, l.region).CreateLoadBalancerPayload(payload).Execute()
+	if isOpenAPINotFound(err) {
+		return lb, ErrorNotFound
+	}
+	return lb, err
 }
 
 func (l loadBalancingClient) ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error) {
@@ -70,6 +77,11 @@ func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName stri
 	}
 
 	return nil
+}
+
+func (l loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
+	_, err := l.Client.UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
+	return err
 }
 
 func (l loadBalancingClient) UpdateTargatPool(ctx context.Context, lbName, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {

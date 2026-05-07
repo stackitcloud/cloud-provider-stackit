@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
@@ -39,7 +40,7 @@ type MetricsRemoteWrite struct {
 
 // LoadBalancer is used for creating and maintaining load balancers.
 type LoadBalancer struct {
-	client    stackit.LoadbalancerClient
+	client    stackitclient.LoadBalancingClient
 	recorder  record.EventRecorder // set in CloudControllerManager.Initialize
 	projectID string
 	opts      stackitconfig.LoadBalancerOpts
@@ -49,7 +50,7 @@ type LoadBalancer struct {
 
 var _ cloudprovider.LoadBalancer = (*LoadBalancer)(nil)
 
-func NewLoadBalancer(client stackit.LoadbalancerClient, projectID string, opts stackitconfig.LoadBalancerOpts, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
+func NewLoadBalancer(client stackitclient.LoadBalancingClient, projectID string, opts stackitconfig.LoadBalancerOpts, metricsRemoteWrite *MetricsRemoteWrite) (*LoadBalancer, error) { //nolint:lll // looks weird when shortened
 	// LoadBalancer.recorder is set in CloudControllerManager.Initialize
 	return &LoadBalancer{
 		client:             client,
@@ -66,7 +67,7 @@ func NewLoadBalancer(client stackit.LoadbalancerClient, projectID string, opts s
 func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *corev1.Service) (
 	status *corev1.LoadBalancerStatus, exists bool, err error,
 ) {
-	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, l.GetLoadBalancerName(ctx, clusterName, service))
+	lb, err := l.client.GetLoadBalancer(ctx, l.GetLoadBalancerName(ctx, clusterName, service))
 	switch {
 	case stackit.IsNotFound(err):
 		// Also for non-STACKIT load balancers in "update" & "updateAndCreate" mode return with no error if not found.
@@ -111,7 +112,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 	nodes []*corev1.Node,
 ) (*corev1.LoadBalancerStatus, error) {
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
-	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
+	lb, err := l.client.GetLoadBalancer(ctx,  name)
 	if err != nil && !stackit.IsNotFound(err) {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		// However, we need to copy over the version because it is required on every update.
 		spec.Version = lb.Version
 		spec.Name = &name
-		updatePayload := &loadbalancer.UpdateLoadBalancerPayload{
+		updatePayload := loadbalancer.UpdateLoadBalancerPayload{
 			Errors:          spec.Errors,
 			ExternalAddress: spec.ExternalAddress,
 			Listeners:       spec.Listeners,
@@ -162,8 +163,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
-		lb, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, updatePayload)
-		if err != nil {
+		if err := l.client.UpdateLoadBalancer(ctx, name, updatePayload); err != nil {
 			return nil, fmt.Errorf("failed to update load balancer: %w", err)
 		}
 		// Clean up observability credentials if Argus extension is enabled.
@@ -171,7 +171,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		// At the latest, they will be removed when the service is deleted or Argus is enabled again.
 		// This is preferred over listing all credentials in the project on each reconciliation.
 		if l.metricsRemoteWrite == nil && credentialsRefBeforeUpdate != nil {
-			err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRefBeforeUpdate)
+			err = l.client.DeleteCredentials(ctx, *credentialsRefBeforeUpdate)
 			if err != nil {
 				return nil, fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRefBeforeUpdate, err)
 			}
@@ -216,7 +216,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	}
 	spec.Name = &name
 
-	lb, createErr := l.client.CreateLoadBalancer(ctx, l.projectID, spec)
+	lb, createErr := l.client.CreateLoadBalancer(ctx, *spec)
 	if createErr != nil {
 		return nil, createErr
 	}
@@ -246,7 +246,7 @@ func (l *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName strin
 	}
 
 	for _, pool := range spec.TargetPools {
-		err := l.client.UpdateTargetPool(ctx, l.projectID, l.GetLoadBalancerName(ctx, clusterName, service), *pool.Name, loadbalancer.UpdateTargetPoolPayload(pool))
+		err := l.client.UpdateTargetPool(ctx, l.GetLoadBalancerName(ctx, clusterName, service), *pool.Name, loadbalancer.UpdateTargetPoolPayload(pool))
 		if err != nil {
 			return fmt.Errorf("failed to update target pool %q: %w", *pool.Name, err)
 		}
@@ -268,7 +268,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 ) error {
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 
-	lb, err := l.client.GetLoadBalancer(ctx, l.projectID, name)
+	lb, err := l.client.GetLoadBalancer(ctx, name)
 	switch {
 	case stackit.IsNotFound(err):
 		return nil
@@ -308,11 +308,11 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 			PlanId:      lb.PlanId,
 			Labels:      lb.Labels,
 		}
-		_, err = l.client.UpdateLoadBalancer(ctx, l.projectID, name, payload)
+		err = l.client.UpdateLoadBalancer(ctx, name, *payload)
 		if err != nil {
 			return fmt.Errorf("failed to update load balancer: %w", err)
 		}
-		if err = l.client.DeleteCredentials(ctx, l.projectID, *credentialsRef); err != nil {
+		if err = l.client.DeleteCredentials(ctx, *credentialsRef); err != nil {
 			return fmt.Errorf("delete metricsRemoteWrite credentials %q: %w", *credentialsRef, err)
 		}
 	}
@@ -328,7 +328,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 		return fmt.Errorf("failed to clean up orphaned observability credentials: %w", err)
 	}
 
-	err = l.client.DeleteLoadBalancer(ctx, l.projectID, name)
+	err = l.client.DeleteLoadBalancer(ctx, name)
 	// Deleting a load balancer doesn't return an error if the load balancer cannot be found.
 	if err != nil {
 		return err
@@ -366,7 +366,7 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 			Username:    &l.metricsRemoteWrite.username,
 			Password:    &l.metricsRemoteWrite.password,
 		}
-		c, err := l.client.CreateCredentials(ctx, l.projectID, payload)
+		c, err := l.client.CreateCredentials(ctx, payload)
 		if err != nil {
 			return nil, fmt.Errorf("create credentials: %w", err)
 		}
@@ -384,7 +384,7 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 		Username:    &l.metricsRemoteWrite.username,
 		Password:    &l.metricsRemoteWrite.password,
 	}
-	if err := l.client.UpdateCredentials(ctx, l.projectID, *credentialsRef, payload); err != nil {
+	if err := l.client.UpdateCredentials(ctx, *credentialsRef, payload); err != nil {
 		return nil, fmt.Errorf("update credentials %q: %w", *credentialsRef, err)
 	}
 	return &loadbalancer.LoadbalancerOptionObservability{
@@ -399,13 +399,13 @@ func (l *LoadBalancer) reconcileObservabilityCredentials(
 // This call is expensive.
 // Make sure that no credentials are referenced, otherwise the deletion fails.
 func (l *LoadBalancer) cleanUpCredentials(ctx context.Context, name string) error {
-	res, err := l.client.ListCredentials(ctx, l.projectID)
+	res, err := l.client.ListCredentials(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list credentials: %w", err)
 	}
 	for _, credentials := range res.Credentials {
 		if credentials.DisplayName != nil && *credentials.DisplayName == name {
-			err = l.client.DeleteCredentials(ctx, l.projectID, *credentials.CredentialsRef)
+			err = l.client.DeleteCredentials(ctx, *credentials.CredentialsRef)
 			if err != nil {
 				return fmt.Errorf("failed to delete credentials %q: %w", *credentials.CredentialsRef, err)
 			}
