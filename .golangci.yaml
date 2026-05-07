@@ -42,6 +42,9 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 5
+      ignore-string-values:
+        - 'true'
+        - 'false'
     gocritic:
       disabled-checks:
         - dupImport
