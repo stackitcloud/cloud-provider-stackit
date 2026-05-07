@@ -308,8 +308,16 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	}
 
 	maxVolumesPerNode := DetermineMaxVolumesByFlavor(flavor)
-	// Subtract 1 for root disk and another for configDrive/spare
-	maxVolumesPerNode -= 2
+
+	// Subtract already mounted Volumes
+	emptyPCIeRootPorts, err := mount.CountNonVirtioBlockDevices()
+	if err != nil {
+		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports %v", err)
+		emptyPCIeRootPorts = 0
+	}
+
+	maxVolumesPerNode -= emptyPCIeRootPorts
+	klog.V(4).Infof("Determined %d PCIe ports occupied by non virtio block devices", emptyPCIeRootPorts)
 	klog.V(4).Infof("Determined node to support %d volumes", maxVolumesPerNode)
 
 	nodeInfo := &csi.NodeGetInfoResponse{
