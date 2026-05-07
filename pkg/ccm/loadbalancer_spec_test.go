@@ -796,7 +796,7 @@ var _ = Describe("lbSpecFromService", func() {
 			spec, _, err := lbSpecFromService(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"lb.stackit.cloud/service-plan-id": "p250",
+						"lb.stackit.cloud/service-plan-id": p250,
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -810,7 +810,7 @@ var _ = Describe("lbSpecFromService", func() {
 				},
 			}, []*corev1.Node{}, lbOpts, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo("p250")))
+			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo(p250)))
 		})
 		It("should not create an LB with a custom plan when service-plan-id annotation is set to an invalid value", func() {
 			_, _, err := lbSpecFromService(&corev1.Service{
@@ -855,7 +855,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(events[0].Message).To(Equal(`Flavors are deprecated in favor of service plans. Picking load balancer service plan p250 for flavor 72f11e14-2825-471d-a237-b1afa775fdad. Use the annotation lb.stackit.cloud/service-plan-id to explicitly choose a service plan.`))
 			Expect(events[0].Type).To(Equal(corev1.EventTypeWarning))
 			Expect(events[0].Reason).To(Equal(EventReasonSelectedPlanID))
-			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo("p250")))
+			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo(p250)))
 		})
 
 		It("should create an LB with a custom plan when flavor ID annotation is set to a valid value but doesn't match a service plan ID", func() {
@@ -881,7 +881,7 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(events[0].Message).To(Equal(`Flavors are deprecated in favor of service plans. Picking load balancer service plan p50 for flavor aa603f7b-4214-486c-81ce-369535cef8ed. Use the annotation lb.stackit.cloud/service-plan-id to explicitly choose a service plan.`))
 			Expect(events[0].Type).To(Equal(corev1.EventTypeWarning))
 			Expect(events[0].Reason).To(Equal(EventReasonSelectedPlanID))
-			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo("p50")))
+			Expect(spec.PlanId).To(HaveValue(BeEquivalentTo(p50)))
 		})
 		It("should not create an LB with a custom plan when flavorId annotation is set to an invalid value", func() {
 			_, _, err := lbSpecFromService(&corev1.Service{
@@ -1305,13 +1305,13 @@ var _ = DescribeTable("compareLBwithSpec",
 		wantFulfilled:         false,
 		wantImmutabledChanged: nil,
 		lb: &loadbalancer.LoadBalancer{
-			PlanId: new("p10"),
+			PlanId: new(p10),
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: new(true),
 			},
 		},
 		spec: &loadbalancer.CreateLoadBalancerPayload{
-			PlanId: new("p250"),
+			PlanId: new(p250),
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: new(true),
 			},
