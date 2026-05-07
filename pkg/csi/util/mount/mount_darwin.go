@@ -17,3 +17,8 @@ func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
 		UsedInodes:      int64(statfs.Files) - int64(statfs.Ffree),
 	}
 }
+
+func CountNonVirtioBlockDevices() (int64, error) {
+	// not implemented
+	return 0, nil
+}
