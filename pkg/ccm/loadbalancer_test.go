@@ -242,7 +242,7 @@ var _ = Describe("LoadBalancer", func() {
 				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
-				PlanId:          new("p10"),
+				PlanId:          new(p10),
 			}
 
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
