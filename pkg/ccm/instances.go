@@ -25,8 +25,8 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-
 	corev1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
@@ -47,12 +47,12 @@ var oldProviderIDRegexp = regexp.MustCompile(`^` + oldProviderName + `://([^/]*)
 // Instances encapsulates an implementation of Instances for OpenStack.
 type Instances struct {
 	regionProviderID bool
-	iaasClient       stackit.NodeClient
+	iaasClient       stackitclient.IaaSClient
 	projectID        string
 	region           string
 }
 
-func NewInstance(client stackit.NodeClient, projectID, region string) (*Instances, error) {
+func NewInstance(client stackitclient.IaaSClient, projectID, region string) (*Instances, error) {
 	return &Instances{
 		iaasClient:       client,
 		projectID:        projectID,

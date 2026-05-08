@@ -6,9 +6,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
-	stackitv1alpha1 "github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/apis/stackit/v1alpha1"
-	"github.com/stackitcloud/gardener-extension-provider-stackit/v2/pkg/stackit"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -72,11 +71,10 @@ type iaasClient struct {
 	region    string
 }
 
-func NewIaaSClient(region string, endpoints stackitv1alpha1.APIEndpoints, credentials *stackit.Credentials) (IaaSClient, error) {
-	options := clientOptions(endpoints, credentials)
-
-	if endpoints.IaaS != nil {
-		options = append(options, sdkconfig.WithEndpoint(*endpoints.IaaS))
+func NewIaaSClient(region, projectID string, endpoints config.APIEndpoints) (IaaSClient, error) {
+	options := []sdkconfig.ConfigurationOption{}
+	if endpoints.IaasAPI != "" {
+		options = append(options, sdkconfig.WithEndpoint(endpoints.IaasAPI))
 	}
 
 	if endpoints.TokenEndpoint != nil {
@@ -89,7 +87,7 @@ func NewIaaSClient(region string, endpoints stackitv1alpha1.APIEndpoints, creden
 	}
 	return &iaasClient{
 		Client:    apiClient.DefaultAPI,
-		projectID: credentials.ProjectID,
+		projectID: projectID,
 		region:    region,
 	}, nil
 }

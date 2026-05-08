@@ -10,7 +10,6 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
-	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -20,7 +19,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 )
 
 const (
@@ -149,15 +147,12 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
-	iaasInnerClient, err := iaas.NewAPIClient(iaasOpts...)
+	iaasClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
-	nodeClient, err := stackit.NewNodeClient(iaasInnerClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Node client: %v", err)
-	}
-	instances, err := NewInstance(nodeClient, cfg.Global.ProjectID, cfg.Global.Region)
+
+	instances, err := NewInstance(iaasClient, cfg.Global.ProjectID, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
