@@ -203,8 +203,8 @@ func instanceIDFromProviderID(providerID string) (instanceID, region string, err
 	}
 }
 
-func getServerByName(ctx context.Context, client stackit.NodeClient, name, projectID, region string) (*iaas.Server, error) {
-	servers, err := client.ListServers(ctx, projectID, region)
+func getServerByName(ctx context.Context, client stackitclient.IaaSClient, name, projectID, region string) (*iaas.Server, error) {
+	servers, err := client.ListServers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
@@ -239,7 +239,7 @@ func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.S
 		return nil, fmt.Errorf("ProviderID \"%s\" didn't match supported region \"%s\"", node.Spec.ProviderID, i.region)
 	}
 
-	server, err := i.iaasClient.GetServer(ctx, i.projectID, i.region, instanceID)
+	server, err := i.iaasClient.GetServer(ctx, instanceID)
 	if stackit.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}

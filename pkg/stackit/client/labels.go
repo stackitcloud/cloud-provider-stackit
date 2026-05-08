@@ -1,8 +1,8 @@
 package client
 
-type labels map[string]any
+type Labels map[string]any
 
-func labelsFromTags(tags map[string]string) labels {
+func LabelsFromTags(tags map[string]string) Labels {
 	// Create a new map of type map[string]any
 	l := make(map[string]any, len(tags))
 
@@ -11,5 +11,5 @@ func labelsFromTags(tags map[string]string) labels {
 		l[key] = value
 	}
 
-	return labels(l)
+	return Labels(l)
 }

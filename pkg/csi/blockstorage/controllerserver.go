@@ -27,6 +27,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,7 +43,7 @@ import (
 
 type controllerServer struct {
 	Driver   *Driver
-	Instance stackit.IaasClient
+	Instance stackitclient.IaaSClient
 	csi.UnimplementedControllerServer
 }
 
@@ -160,7 +161,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		// By default, we try to clone volumes from snapshots
 		volumeSourceType = stackit.SnapshotSource
 
-		snap, err := cloud.GetSnapshotByID(ctx, sourceSnapshotID)
+		snap, err := cloud.GetSnapshot(ctx, sourceSnapshotID)
 		if stackiterrors.IgnoreNotFound(err) != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
 		}
@@ -184,7 +185,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		// check if a Backup with the same ID exists
 		if stackiterrors.IsNotFound(err) {
 			var back *iaas.Backup
-			back, err = cloud.GetBackupByID(ctx, sourceBackupID)
+			back, err = cloud.GetBackup(ctx, sourceBackupID)
 			if err != nil {
 				// If there is an error getting the backup as well, fail.
 				return nil, status.Errorf(codes.NotFound, "VolumeContentSource Snapshot or Backup with ID %s not found", sourceBackupID)
@@ -360,7 +361,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] get volume failed with error %v", err)
 	}
 
-	_, err = cloud.GetInstanceByID(ctx, instanceID)
+	_, err = cloud.GetServer(ctx, instanceID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
@@ -368,7 +369,10 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
 	}
 
-	_, err = cloud.AttachVolume(ctx, instanceID, volumeID)
+	payload := iaas.AddVolumeToServerPayload{
+		DeleteOnTermination: new(false),
+	}
+	_, err = cloud.AttachVolume(ctx, instanceID, volumeID, payload)
 	if err != nil {
 		klog.Errorf("Failed to AttachVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error %v", err)
@@ -397,7 +401,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "[ControllerUnpublishVolume] Volume ID must be provided")
 	}
-	_, err := cloud.GetInstanceByID(ctx, instanceID)
+	_, err := cloud.GetServer(ctx, instanceID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because node %s does not exist", volumeID, instanceID)
@@ -449,7 +453,7 @@ func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	var volumeList []iaas.Volume
 	// TODO: There is not pagination for listing volumes so we will just pass empty to startingToken
 	// It's not used anyway.
-	volumeList, _, err = cloud.ListVolumes(ctx, maxEntries, "")
+	volumeList, err = cloud.ListVolumes(ctx, maxEntries, "")
 	if err != nil {
 		klog.Errorf("Failed to ListVolumes: %v", err)
 		if stackiterrors.IsInvalidError(err) {
@@ -546,7 +550,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	// Create the snapshot if the backup does not already exist and wait for it to be ready
 	if !backupAlreadyExists {
-		snap, err = cs.createSnapshot(ctx, cloud, name, volumeID, req.Parameters)
+		snap, err = cs.createSnapshot(ctx, name, volumeID, req.Parameters)
 		if err != nil {
 			return nil, err
 		}
@@ -599,7 +603,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	// Necessary to get all the backup information, including size.
-	backup, err = cloud.GetBackupByID(ctx, *backup.Id)
+	backup, err = cloud.GetBackup(ctx, *backup.Id)
 	if err != nil {
 		klog.Errorf("Failed to GetBackupByID after backup creation: %v", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("GetBackupByID failed with error %v", err))
@@ -622,12 +626,12 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}, nil
 }
 
-func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.IaasClient, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
 	filters := map[string]string{}
 	filters["Name"] = name
 
 	// List existing snapshots with the same name
-	snapshots, _, err := cloud.ListSnapshots(ctx, filters)
+	snapshots, err := cs.Instance.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to query for existing Snapshot during CreateSnapshot: %v", err)
 		return nil, status.Error(codes.Internal, "Failed to get snapshots")
@@ -665,7 +669,15 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.Ia
 		}
 	}
 
-	snap, err := cloud.CreateSnapshot(ctx, name, volumeID, properties)
+	payload := iaas.CreateSnapshotPayload{
+		Name:     new(name),
+		VolumeId: volumeID,
+	}
+	if properties != nil {
+		payload.Labels = stackitclient.LabelsFromTags(properties)
+	}
+
+	snap, err := cs.Instance.CreateSnapshot(ctx, payload)
 	if err != nil {
 		klog.Errorf("Failed to Create snapshot: %v", err)
 		return nil, status.Errorf(codes.Internal, "CreateSnapshot failed with error %v", err)
@@ -712,7 +724,7 @@ func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	}
 
 	// If volumeSnapshot object was linked to a cinder backup, delete the backup.
-	back, err := cloud.GetBackupByID(ctx, id)
+	back, err := cloud.GetBackup(ctx, id)
 	if err == nil && back != nil {
 		err = cloud.DeleteBackup(ctx, id)
 		if err != nil {
@@ -739,7 +751,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 	snapshotID := req.GetSnapshotId()
 	if snapshotID != "" {
-		snap, err := cloud.GetSnapshotByID(ctx, snapshotID)
+		snap, err := cloud.GetSnapshot(ctx, snapshotID)
 		if err != nil {
 			if stackiterrors.IsNotFound(err) {
 				klog.V(3).Infof("Snapshot %s not found", snapshotID)
@@ -782,7 +794,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 	// Only retrieve snapshots that are available
 	filters["Status"] = stackit.SnapshotReadyStatus
-	slist, nextPageToken, err = cloud.ListSnapshots(ctx, filters)
+	slist, err = cloud.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to ListSnapshots: %v", err)
 		return nil, status.Errorf(codes.Internal, "ListSnapshots failed with error %v", err)
@@ -940,7 +952,10 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		}, nil
 	}
 
-	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, volSizeGB)
+	payload := iaas.ResizeVolumePayload{
+		Size: volSizeGB,
+	}
+	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, payload)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q to size %v: %v", volumeID, volSizeGB, err)
 	}

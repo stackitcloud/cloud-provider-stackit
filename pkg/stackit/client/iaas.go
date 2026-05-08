@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -32,7 +33,7 @@ type IaaSClient interface {
 	ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error)
 	DeleteBackup(ctx context.Context, backupID string) error
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
-	WaitBackupReady(ctx context.Context, backupID string) (*string, error)
+	WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error)
 
 	CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error)
 	DeleteVolume(ctx context.Context, volumeID string) error
@@ -61,6 +62,16 @@ const (
 	diskDetachFactor         = 1.2
 	diskDetachSteps          = 13
 	VolumeDescription        = "Created by STACKIT CSI driver"
+)
+
+const (
+	backupReadyStatus                    = "AVAILABLE"
+	backupErrorStatus                    = "error"
+	backupDescription                    = "Created by STACKIT CSI driver"
+	BackupMaxDurationSecondsPerGBDefault = 20
+	BackupMaxDurationPerGB               = "backup-max-duration-seconds-per-gb"
+	backupBaseDurationSeconds            = 30
+	backupReadyCheckIntervalSeconds      = 7 =
 )
 
 var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
@@ -204,17 +215,65 @@ func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backu
 	return backup, nil
 }
 
-func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string) (*string, error) {
+func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
+	var err error
+
+	duration := time.Duration(int64(backupMaxDurationSecondsPerGB)*snapshotSize + backupBaseDurationSeconds)
+	err = i.waitBackupReadyWithContext(backupID, duration)
+	if errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("timeout, Backup %s is still not Ready: %v", backupID, err)
+	}
+
 	backup, err := i.GetBackup(ctx, backupID)
 	if err != nil {
 		return nil, err
 	}
 
 	if backup != nil {
-		return backup.Status, nil
+		return backup.Status, err
 	}
 
-	return new("Failed to get backup status"), nil
+	return new("Failed to get backup status"), err
+}
+
+func (i iaasClient) waitBackupReadyWithContext(backupID string, duration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), duration*time.Second)
+	defer cancel()
+	var done bool
+	var err error
+	ticker := time.NewTicker(backupReadyCheckIntervalSeconds * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			done, err = i.backupIsReady(ctx, backupID)
+			if err != nil {
+				return err
+			}
+
+			if done {
+				return nil
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// Supporting function for waitBackupReadyWithContext().
+// Returns true when the backup is ready.
+func (i iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, error) {
+	backup, err := i.GetBackup(ctx, backupID)
+	if err != nil {
+		return false, err
+	}
+
+	if *backup.Status == backupErrorStatus {
+		return false, errors.New("backup is in error state")
+	}
+
+	return *backup.Status == backupReadyStatus, nil
 }
 
 func (i iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
