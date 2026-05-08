@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
 
@@ -94,17 +95,12 @@ func handle() {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIaaSClient(&cfg)
+		iaasClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
 		if err != nil {
-			klog.Fatalf("Failed to create IaaS client: %v", err)
+			klog.Fatalf("Failed to create STACKIT client: %v", err)
 		}
 
-		stackitProvider, err := stackit.CreateSTACKITProvider(iaasClient, &cfg)
-		if err != nil {
-			klog.Fatalf("Failed to create STACKIT provider: %v", err)
-		}
-
-		d.SetupControllerService(stackitProvider)
+		d.SetupControllerService(iaasClient)
 	}
 
 	if provideNodeService {
