@@ -254,7 +254,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	vol, err := cloud.CreateVolume(ctx, opts)
+	vol, err := cloud.CreateVolume(ctx, *opts)
 	if err != nil {
 		klog.Errorf("Failed to CreateVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "CreateVolume failed with error %v", err)
@@ -688,7 +688,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 	return snap, nil
 }
 
-func (cs *controllerServer) createBackup(ctx context.Context, cloud stackit.IaasClient, name, volumeID string, snap *iaas.Snapshot, parameters map[string]string) (*iaas.Backup, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createBackup(ctx context.Context, cloud stackitclient.IaaSClient, name, volumeID string, snap *iaas.Snapshot, parameters map[string]string) (*iaas.Backup, error) { //nolint:lll // looks weird when shortened
 	// Add cluster ID to the snapshot metadata
 	// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}

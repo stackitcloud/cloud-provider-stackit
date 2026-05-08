@@ -29,7 +29,7 @@ type IaaSClient interface {
 	GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error)
 	WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error)
 
-	CreateBackup(ctx context.Context, payload iaas.CreateBackupPayload) (*iaas.Backup, error)
+	CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error)
 	ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error)
 	DeleteBackup(ctx context.Context, backupID string) error
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
@@ -47,6 +47,7 @@ type IaaSClient interface {
 	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
+	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
 }
 
 const (
@@ -72,6 +73,14 @@ const (
 	BackupMaxDurationPerGB               = "backup-max-duration-seconds-per-gb"
 	backupBaseDurationSeconds            = 30
 	backupReadyCheckIntervalSeconds      = 7 =
+)
+
+type VolumeSourceTypes string
+
+const (
+	VolumeSource   VolumeSourceTypes = "volume"
+	SnapshotSource VolumeSourceTypes = "snapshot"
+	BackupSource   VolumeSourceTypes = "backup"
 )
 
 var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
@@ -182,13 +191,53 @@ func (i iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*
 	return new("Failed to get Snapshot status"), nil
 }
 
-func (i iaasClient) CreateBackup(ctx context.Context, payload iaas.CreateBackupPayload) (*iaas.Backup, error) {
+func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+	payload, err := buildCreateBackupPayload(name, volID, snapshotID, tags)
+	if err != nil {
+		return nil, err
+	}
+
 	backup, err := i.Client.CreateBackup(ctx, i.projectID, i.region).CreateBackupPayload(payload).Execute()
 	if err != nil {
 		return nil, err
 	}
 
 	return backup, nil
+}
+
+func buildCreateBackupPayload(name, volID, snapshotID string, tags map[string]string) (iaas.CreateBackupPayload, error) {
+	if name == "" {
+		return iaas.CreateBackupPayload{}, errors.New("backup name cannot be empty")
+	}
+
+	if volID == "" && snapshotID == "" {
+		return iaas.CreateBackupPayload{}, errors.New("either volID or snapshotID must be provided")
+	}
+
+	var backupSource VolumeSourceTypes
+	var backupSourceID string
+	if volID != "" {
+		backupSource = VolumeSource
+		backupSourceID = volID
+	}
+	if snapshotID != "" {
+		backupSource = SnapshotSource
+		backupSourceID = snapshotID
+	}
+
+	opts := iaas.CreateBackupPayload{
+		Name:        new(name),
+		Description: new(backupDescription),
+		Source: iaas.BackupSource{
+			Type: string(backupSource),
+			Id:   backupSourceID,
+		},
+	}
+	if tags != nil {
+		opts.Labels = LabelsFromTags(tags)
+	}
+
+	return opts, nil
 }
 
 func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
@@ -463,6 +512,30 @@ func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string)
 	}
 
 	return i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
+}
+
+func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error  {
+	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
+		vol, err := i.GetVolume(ctx, volumeID)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(tStatus, *vol.Status) {
+			return true, nil
+		}
+		for _, eState := range volumeErrorStates {
+			if *vol.Status == eState {
+				return false, fmt.Errorf("volume is in error state: %s", *vol.Status)
+			}
+		}
+		return false, nil
+	})
+
+	if wait.Interrupted(waitErr) {
+		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+	}
+
+	return waitErr
 }
 
 // diskIsAttached queries if a volume is attached to a compute instance
