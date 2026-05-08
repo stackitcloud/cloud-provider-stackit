@@ -26,8 +26,10 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,10 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-
-	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
 
 type controllerServer struct {
@@ -128,7 +126,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if volSizeGB != *vols[0].Size {
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
-		if *vols[0].Status != stackit.VolumeAvailableStatus {
+		if *vols[0].Status != stackitclient.VolumeAvailableStatus {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, vols[0].AvailabilityZone, *vols[0].Size)
@@ -152,21 +150,21 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	var sourceVolID string
 	var sourceBackupID string
 	var sourceSnapshotID string
-	var volumeSourceType stackit.VolumeSourceTypes
+	var volumeSourceType stackitclient.VolumeSourceTypes
 
 	if content != nil && content.GetSnapshot() != nil {
 		// Backups and Snapshots are the same for Kubernetes
 		sourceSnapshotID = content.GetSnapshot().GetSnapshotId()
 		sourceBackupID = content.GetSnapshot().GetSnapshotId()
 		// By default, we try to clone volumes from snapshots
-		volumeSourceType = stackit.SnapshotSource
+		volumeSourceType = stackitclient.SnapshotSource
 
 		snap, err := cloud.GetSnapshot(ctx, sourceSnapshotID)
 		if stackiterrors.IgnoreNotFound(err) != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
 		}
 		// If the snapshot exists but is not yet available, fail.
-		if err == nil && *snap.Status != stackit.SnapshotReadyStatus {
+		if err == nil && *snap.Status != stackitclient.SnapshotReadyStatus {
 			return nil, status.Errorf(codes.Unavailable, "VolumeContentSource Snapshot %s is not yet available. status: %s", sourceSnapshotID, *snap.Status)
 		}
 		// Only continue checking if the Snapshot is found
@@ -190,12 +188,12 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 				// If there is an error getting the backup as well, fail.
 				return nil, status.Errorf(codes.NotFound, "VolumeContentSource Snapshot or Backup with ID %s not found", sourceBackupID)
 			}
-			if *back.Status != stackit.SnapshotReadyStatus {
+			if *back.Status != stackitclient.SnapshotReadyStatus {
 				// If the backup exists but is not yet available, fail.
 				return nil, status.Errorf(codes.Unavailable, "VolumeContentSource Backup %s is not yet available. status: %s", sourceBackupID, *back.Status)
 			}
 			// If an available backup is found, create the volume from the backup. Implies that a Snapshot was not found.
-			volumeSourceType = stackit.BackupSource
+			volumeSourceType = stackitclient.BackupSource
 		}
 	}
 
@@ -212,7 +210,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if volAvailability != sourceVolume.AvailabilityZone {
 			return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Volume. Got %s Required: %s", volAvailability, sourceVolume.AvailabilityZone)
 		}
-		volumeSourceType = stackit.VolumeSource
+		volumeSourceType = stackitclient.VolumeSource
 	}
 
 	opts := &iaas.CreateVolumePayload{
@@ -226,7 +224,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Only set CreateVolumePayload.Source when actually creating volume from source/snapshot/backup
 	if volumeSourceType != "" {
-		if volumeSourceType == stackit.SnapshotSource || volumeSourceType == stackit.VolumeSource {
+		if volumeSourceType == stackitclient.SnapshotSource || volumeSourceType == stackitclient.VolumeSource {
 			// Changing the performance class while restoring from Snapshot or Volume is not supported
 			opts.PerformanceClass = nil
 		}
@@ -242,7 +240,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// The encryption config is already set for volumes created from snapshot or volume. We MUST never set it when
 	// restoring from snapshot or volume.
 	// TODO: Unclear if BackupSource is the same as the above or is actually changeable. IaaS is testing.
-	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackit.BackupSource) {
+	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackitclient.BackupSource) {
 		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")
@@ -260,7 +258,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.Internal, "CreateVolume failed with error %v", err)
 	}
 
-	targetStatus := []string{stackit.VolumeAvailableStatus}
+	targetStatus := []string{stackitclient.VolumeAvailableStatus}
 	// Recheck after: 0s (immediate), 20s, 45.6s, 78.36s, 120.31s
 	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, *vol.Id, targetStatus,
 		&wait.Backoff{
@@ -478,9 +476,9 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	name := req.Name
 	volumeID := req.GetSourceVolumeId()
-	snapshotType := req.Parameters[stackit.SnapshotType]
+	snapshotType := req.Parameters[stackitclient.SnapshotType]
 	filters := map[string]string{"Name": name}
-	backupMaxDurationSecondsPerGB := stackit.BackupMaxDurationSecondsPerGBDefault
+	backupMaxDurationSecondsPerGB := stackitclient.BackupMaxDurationSecondsPerGBDefault
 
 	// Current time, used for CreatedAt
 	var ctime *timestamppb.Timestamp
@@ -539,7 +537,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		}
 
 		// Get the max duration to wait in seconds per GB of snapshot and fail if parsing fails
-		if item, ok := (req.Parameters)[stackit.BackupMaxDurationPerGB]; ok {
+		if item, ok := (req.Parameters)[stackitclient.BackupMaxDurationPerGB]; ok {
 			backupMaxDurationSecondsPerGB, err = strconv.Atoi(item)
 			if err != nil {
 				klog.Errorf("Setting backup-max-duration-seconds-per-gb failed due to a parsing error: %v", err)
@@ -696,7 +694,7 @@ func (cs *controllerServer) createBackup(ctx context.Context, cloud stackitclien
 
 	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
 	// Also, we don't want to tag every param, but we do honor the RecognizedCSISnapshotterParams
-	for _, mKey := range append(sharedcsi.RecognizedCSISnapshotterParams, stackit.SnapshotType) {
+	for _, mKey := range append(sharedcsi.RecognizedCSISnapshotterParams, stackitclient.SnapshotType) {
 		if v, ok := parameters[mKey]; ok {
 			properties[mKey] = v
 		}
@@ -793,7 +791,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}
 
 	// Only retrieve snapshots that are available
-	filters["Status"] = stackit.SnapshotReadyStatus
+	filters["Status"] = stackitclient.SnapshotReadyStatus
 	slist, err = cloud.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to ListSnapshots: %v", err)
@@ -961,7 +959,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	}
 
 	// we need wait for the volume to be available or InUse, it might be error_extending in some scenario
-	targetStatus := []string{stackit.VolumeAvailableStatus, stackit.VolumeAttachedStatus}
+	targetStatus := []string{stackitclient.VolumeAvailableStatus, stackitclient.VolumeAttachedStatus}
 	err = cloud.WaitVolumeTargetStatus(ctx, volumeID, targetStatus)
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", volumeID, err)
@@ -978,13 +976,13 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	var volsrc *csi.VolumeContentSource
-	var volumeSourceType stackit.VolumeSourceTypes
+	var volumeSourceType stackitclient.VolumeSourceTypes
 	volCnx := map[string]string{}
 
 	if vol.Source != nil {
-		volumeSourceType = stackit.VolumeSourceTypes(vol.Source.Type)
+		volumeSourceType = stackitclient.VolumeSourceTypes(vol.Source.Type)
 		switch volumeSourceType {
-		case stackit.VolumeSource:
+		case stackitclient.VolumeSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -994,7 +992,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 					},
 				},
 			}
-		case stackit.BackupSource:
+		case stackitclient.BackupSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -1004,7 +1002,7 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 					},
 				},
 			}
-		case stackit.SnapshotSource:
+		case stackitclient.SnapshotSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -1036,14 +1034,14 @@ func getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	return resp
 }
 
-// determineSourceIDForSourceType returns the correct sourceID for the given stackit.VolumeSourceTypes
-func determineSourceIDForSourceType(srcType stackit.VolumeSourceTypes, sourceSnapshotID, sourceVolID string) string {
+// determineSourceIDForSourceType returns the correct sourceID for the given stackitclient.VolumeSourceTypes
+func determineSourceIDForSourceType(srcType stackitclient.VolumeSourceTypes, sourceSnapshotID, sourceVolID string) string {
 	switch srcType {
-	case stackit.BackupSource:
+	case stackitclient.BackupSource:
 		return sourceSnapshotID
-	case stackit.SnapshotSource:
+	case stackitclient.SnapshotSource:
 		return sourceSnapshotID
-	case stackit.VolumeSource:
+	case stackitclient.VolumeSource:
 		return sourceVolID
 	default:
 		return ""

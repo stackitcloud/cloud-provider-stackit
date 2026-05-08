@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"gopkg.in/yaml.v3"
@@ -134,9 +134,9 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
-	loadbalancingClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).LoadBalancing(context.Background())
+	loadbalancingClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).LoadBalancing(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Load Balancing client: %v", err)
+		return nil, fmt.Errorf("failed to create Load Balancing stackitclient: %v", err)
 	}
 
 	iaasOpts := []sdkconfig.ConfigurationOption{
@@ -147,9 +147,9 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
-	iaasClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
+	iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
+		return nil, fmt.Errorf("failed to create IaaS stackitclient: %v", err)
 	}
 
 	instances, err := NewInstance(iaasClient, cfg.Global.ProjectID, cfg.Global.Region)

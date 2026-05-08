@@ -151,3 +151,7 @@ func filterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Back
 
 	return filteredBackups
 }
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, ErrorNotFound)
+}

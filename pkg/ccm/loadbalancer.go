@@ -14,9 +14,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
-
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 )
 
 const (
@@ -69,7 +67,7 @@ func (l *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, 
 ) {
 	lb, err := l.client.GetLoadBalancer(ctx, l.GetLoadBalancerName(ctx, clusterName, service))
 	switch {
-	case stackit.IsNotFound(err):
+	case stackitclient.IsNotFound(err):
 		// Also for non-STACKIT load balancers in "update" & "updateAndCreate" mode return with no error if not found.
 		return nil, false, nil
 	case err != nil:
@@ -113,10 +111,10 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 ) (*corev1.LoadBalancerStatus, error) {
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
 	lb, err := l.client.GetLoadBalancer(ctx,  name)
-	if err != nil && !stackit.IsNotFound(err) {
+	if err != nil && !stackitclient.IsNotFound(err) {
 		return nil, err
 	}
-	if stackit.IsNotFound(err) {
+	if stackitclient.IsNotFound(err) {
 		return l.createLoadBalancer(ctx, clusterName, service, nodes)
 	}
 
@@ -270,7 +268,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 
 	lb, err := l.client.GetLoadBalancer(ctx, name)
 	switch {
-	case stackit.IsNotFound(err):
+	case stackitclient.IsNotFound(err):
 		return nil
 	case err != nil:
 		return err

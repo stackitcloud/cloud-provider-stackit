@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	corev1 "k8s.io/api/core/v1"
@@ -240,7 +239,7 @@ func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.S
 	}
 
 	server, err := i.iaasClient.GetServer(ctx, instanceID)
-	if stackit.IsNotFound(err) {
+	if stackitclient.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if err != nil {

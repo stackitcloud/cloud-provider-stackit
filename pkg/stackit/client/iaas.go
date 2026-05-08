@@ -72,7 +72,12 @@ const (
 	BackupMaxDurationSecondsPerGBDefault = 20
 	BackupMaxDurationPerGB               = "backup-max-duration-seconds-per-gb"
 	backupBaseDurationSeconds            = 30
-	backupReadyCheckIntervalSeconds      = 7 =
+	backupReadyCheckIntervalSeconds      = 7
+)
+
+const (
+	SnapshotReadyStatus = "AVAILABLE"
+	SnapshotType        = "type"
 )
 
 type VolumeSourceTypes string
@@ -514,7 +519,7 @@ func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string)
 	return i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
 }
 
-func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error  {
+func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
 		vol, err := i.GetVolume(ctx, volumeID)
 		if err != nil {

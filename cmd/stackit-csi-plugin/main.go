@@ -6,16 +6,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
-	"k8s.io/component-base/cli"
-	"k8s.io/klog/v2"
-
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
+	"k8s.io/component-base/cli"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -74,7 +72,7 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&provideNodeService, "provide-node-service", true,
 		"If set to true then the CSI driver does provide the node service (default: true)")
 
-	stackit.AddExtraFlags(pflag.CommandLine)
+	stackitclient.AddExtraFlags(pflag.CommandLine)
 
 	code := cli.Run(cmd)
 	os.Exit(code)
@@ -90,14 +88,14 @@ func handle() {
 
 	if provideControllerService {
 		var err error
-		cfg, err := stackit.GetConfigFromFile(cloudConfig)
+		cfg, err := stackitclient.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := client.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
 		if err != nil {
-			klog.Fatalf("Failed to create STACKIT client: %v", err)
+			klog.Fatalf("Failed to create STACKIT stackitclient: %v", err)
 		}
 
 		d.SetupControllerService(iaasClient)
@@ -107,7 +105,7 @@ func handle() {
 		// Initialize mount
 		mountProvider := mount.GetMountProvider()
 
-		cfg, err := stackit.GetConfigFromFile(cloudConfig)
+		cfg, err := stackitclient.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
