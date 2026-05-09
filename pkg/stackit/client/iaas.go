@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
@@ -96,16 +95,7 @@ type iaasClient struct {
 	region    string
 }
 
-func NewIaaSClient(region, projectID string, endpoints config.APIEndpoints) (IaaSClient, error) {
-	options := []sdkconfig.ConfigurationOption{}
-	if endpoints.IaasAPI != "" {
-		options = append(options, sdkconfig.WithEndpoint(endpoints.IaasAPI))
-	}
-
-	if endpoints.TokenEndpoint != nil {
-		options = append(options, sdkconfig.WithTokenEndpoint(*endpoints.TokenEndpoint))
-	}
-
+func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	apiClient, err := iaas.NewAPIClient(options...)
 	if err != nil {
 		return nil, err

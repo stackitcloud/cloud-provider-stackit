@@ -1,13 +1,13 @@
 package client
 
 import (
-	"context"
 	"errors"
 	"io"
 	"os"
 
 	"github.com/spf13/pflag"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"gopkg.in/yaml.v3"
 	"k8s.io/klog/v2"
 )
@@ -26,36 +26,33 @@ var (
 	ErrorNotFound = errors.New("not found")
 )
 
-
 // Factory produces clients for various STACKIT services.
 type Factory interface {
 	// LoadBalancing returns a STACKIT load balancing service client.
-	LoadBalancing(context.Context) (LoadBalancingClient, error)
+	LoadBalancing(ptions []sdkconfig.ConfigurationOption) (LoadBalancingClient, error)
 
 	// IaaS returns a STACKIT IaaS service client.
-	IaaS() (IaaSClient, error)
+	IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error)
 }
 
 type factory struct {
-	StackitRegion       string
-	StackitProjectID    string
-	StackitAPIEndpoints stackitconfig.APIEndpoints
+	StackitRegion    string
+	StackitProjectID string
 }
 
-func New(region, projectID string, apiEndpoints stackitconfig.APIEndpoints) Factory {
+func New(region, projectID string) Factory {
 	return &factory{
-		StackitRegion:       region,
-		StackitProjectID:    projectID,
-		StackitAPIEndpoints: apiEndpoints,
+		StackitRegion:    region,
+		StackitProjectID: projectID,
 	}
 }
 
-func (f factory) LoadBalancing(ctx context.Context) (LoadBalancingClient, error) {
-	return NewLoadBalancingClient(ctx, f.StackitRegion, f.StackitProjectID, f.StackitAPIEndpoints)
+func (f factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBalancingClient, error) {
+	return NewLoadBalancingClient(f.StackitRegion, f.StackitProjectID, options)
 }
 
-func (f factory) IaaS() (IaaSClient, error) {
-	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, f.StackitAPIEndpoints)
+func (f factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
+	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, options)
 }
 
 func GetConfigFromFile(path string) (stackitconfig.CSIConfig, error) {

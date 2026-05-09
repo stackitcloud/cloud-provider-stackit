@@ -9,9 +9,11 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
 )
@@ -93,7 +95,15 @@ func handle() {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.APIEndpoints).IaaS()
+		iaasOpts := []sdkconfig.ConfigurationOption{
+			sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()), // TODO: Ask if this is needed or not
+		}
+
+		if cfg.Global.APIEndpoints.IaasAPI != "" {
+			iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
+		}
+
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
 		if err != nil {
 			klog.Fatalf("Failed to create STACKIT stackitclient: %v", err)
 		}

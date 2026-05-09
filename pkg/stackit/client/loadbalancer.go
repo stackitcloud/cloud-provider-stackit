@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 )
@@ -29,12 +28,7 @@ type loadBalancingClient struct {
 	region    string
 }
 
-func NewLoadBalancingClient(_ context.Context, region, projectID string, endpoints config.APIEndpoints) (LoadBalancingClient, error) {
-	options := []sdkconfig.ConfigurationOption{}
-	if endpoints.LoadBalancerAPI != "" {
-		options = append(options, sdkconfig.WithEndpoint(endpoints.LoadBalancerAPI))
-	}
-
+func NewLoadBalancingClient(region, projectID string, options []sdkconfig.ConfigurationOption) (LoadBalancingClient, error) {
 	apiClient, err := loadbalancer.NewAPIClient(options...)
 	if err != nil {
 		return nil, err
