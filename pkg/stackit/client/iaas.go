@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
@@ -91,6 +92,7 @@ var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
 type iaasClient struct {
 	Client    iaas.DefaultAPI
+	bsOpts    stackitconfig.BlockStorageOpts
 	projectID string
 	region    string
 }
