@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	albsdk "github.com/stackitcloud/stackit-sdk-go/services/alb/v2api"
@@ -160,6 +161,15 @@ func updateNeeded(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 				return true
 			}
 		}
+	}
+
+	// Label comparison
+	// normalize pointers to prevent nil vs empty map issue
+	currentLabels := ptr.Deref(alb.Labels, map[string]string{})
+	desiredLabels := ptr.Deref(albPayload.Labels, map[string]string{})
+
+	if !reflect.DeepEqual(currentLabels, desiredLabels) {
+		return true
 	}
 
 	return false

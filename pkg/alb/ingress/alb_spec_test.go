@@ -142,6 +142,19 @@ var _ = Describe("Node Controller", func() {
 			Expect(*spec).To(BeEquivalentTo(albSpec))
 		})
 
+		It("should work with labels", func() {
+
+			reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels = map[string]string{"managed-by": "alb-ingressClass"}
+			spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+			Expect(err).To(Succeed())
+			Expect(errorEventList).To(BeEmpty())
+
+			albSpec.Labels = new(map[string]string{"managed-by": "alb-ingressClass"})
+
+			Expect(spec).ToNot(BeNil())
+			Expect(*spec).To(BeEquivalentTo(albSpec))
+		})
+
 		It("should work with 2 ingresses different path", func() {
 			ingress2 := testIngress(&ingressClass, &service)
 			ingress2.Name = "ingress2"

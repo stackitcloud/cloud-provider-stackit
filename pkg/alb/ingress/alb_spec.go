@@ -17,6 +17,15 @@ import (
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 )
 
+const (
+	// prefixCustomerLabel is the api prefix for all custom labels
+	prefixCustomerLabel = "lb.customer.label/"
+
+	// LabelIngressClassUID is the unique key that identifies resources
+	// owned by a specific IngressClass.
+	LabelIngressClassUID = prefixCustomerLabel + "ingress-class-uid"
+)
+
 func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
 	ingresses, err := r.getIngressesForIngressClass(ctx, class)
 	if err != nil {
@@ -45,7 +54,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(ctx context.Context, cla
 		errorList = append(errorList, listenerMergeError...)
 	}
 
-	certNameToId, certificateErrorEvents := r.applyCertificates(ctx, certificates)
+	certNameToId, certificateErrorEvents := r.applyCertificates(ctx, class, certificates)
 	errorList = append(errorList, certificateErrorEvents...)
 
 	alb, albSpecErrorList, err := r.getAlbSpecForResources(ctx, class, listeners, targetPools, certNameToId)
@@ -82,6 +91,28 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	if plan := getAnnotation(AnnotationPlanID, "", class); plan != "" {
 		alb.PlanId = &plan
 	}
+
+	mergedLabels := make(map[string]string)
+
+	// Add user labels, mind the limit
+	for k, v := range class.Labels {
+		if len(mergedLabels) < 64 {
+			mergedLabels[k] = v
+		}
+	}
+
+	// Merge with existing global config labels
+	if r.ALBConfig.ApplicationLoadBalancer.ExtraLabels != nil {
+		for k, v := range r.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
+			if len(mergedLabels) < 64 {
+				mergedLabels[k] = v
+			}
+		}
+	}
+
+	// Add ownership label
+	mergedLabels[LabelIngressClassUID] = string(class.UID)
+	alb.Labels = &mergedLabels
 
 	for port, listener := range listeners {
 		albsdkListener := albsdk.Listener{
@@ -379,7 +410,7 @@ func (r *IngressClassReconciler) getCertificateForSecretName(ctx context.Context
 	}, nil
 }
 
-func (r *IngressClassReconciler) applyCertificates(ctx context.Context, certificates albCertificates) (map[string]string, []errorEvents) {
+func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *networkingv1.IngressClass, certificates albCertificates) (map[string]string, []errorEvents) {
 	errorList := []errorEvents{}
 	nameToID := map[string]string{}
 	for name, certificate := range certificates {
@@ -388,6 +419,9 @@ func (r *IngressClassReconciler) applyCertificates(ctx context.Context, certific
 			ProjectId:  &r.ALBConfig.Global.ProjectID,
 			PrivateKey: new(string(certificate.privateKey)),
 			PublicKey:  new(string(certificate.publicKey)),
+			Labels: &map[string]string{
+				LabelIngressClassUID: string(class.UID),
+			},
 		}
 		response, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {

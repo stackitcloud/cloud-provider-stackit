@@ -19,8 +19,16 @@ func (r *IngressClassReconciler) deleteAllCertsForClass(ctx context.Context, cla
 		return nil // No certificates to clean up
 	}
 
+	// using labels for certificates
+	targetUID := string(class.UID)
+
 	for _, cert := range certificatesList.Items {
-		if strings.HasPrefix(*cert.Name, shortUUID(string(class.UID))) {
+		if cert.Labels == nil {
+			// This part will go away when Labels are supported by Cert API
+			// do I need to check if nil
+		}
+
+		if val, ok := (*cert.Labels)[LabelIngressClassUID]; ok && val == targetUID {
 			err := r.CertificateClient.DeleteCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, *cert.Id)
 			if err != nil {
 				return fmt.Errorf("failed to delete orphaned certificate %s: %v", *cert.Name, err)
