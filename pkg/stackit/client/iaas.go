@@ -66,9 +66,9 @@ const (
 )
 
 const (
+	BackupDescription                    = "Created by STACKIT CSI driver"
 	backupReadyStatus                    = "AVAILABLE"
 	backupErrorStatus                    = "error"
-	backupDescription                    = "Created by STACKIT CSI driver"
 	BackupMaxDurationSecondsPerGBDefault = 20
 	BackupMaxDurationPerGB               = "backup-max-duration-seconds-per-gb"
 	backupBaseDurationSeconds            = 30
@@ -189,7 +189,7 @@ func (i iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*
 }
 
 func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
-	payload, err := buildCreateBackupPayload(name, volID, snapshotID, tags)
+	payload, err := BuildCreateBackupPayload(name, volID, snapshotID, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID st
 	return backup, nil
 }
 
-func buildCreateBackupPayload(name, volID, snapshotID string, tags map[string]string) (iaas.CreateBackupPayload, error) {
+func BuildCreateBackupPayload(name, volID, snapshotID string, tags map[string]string) (iaas.CreateBackupPayload, error) {
 	if name == "" {
 		return iaas.CreateBackupPayload{}, errors.New("backup name cannot be empty")
 	}
@@ -224,7 +224,7 @@ func buildCreateBackupPayload(name, volID, snapshotID string, tags map[string]st
 
 	opts := iaas.CreateBackupPayload{
 		Name:        new(name),
-		Description: new(backupDescription),
+		Description: new(BackupDescription),
 		Source: iaas.BackupSource{
 			Type: string(backupSource),
 			Id:   backupSourceID,

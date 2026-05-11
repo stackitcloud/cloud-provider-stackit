@@ -1,4 +1,4 @@
-package client
+package client_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
 )
 
@@ -45,7 +46,7 @@ var _ = Describe("Server", func() {
 		It("returns ErrorNotFound when API returns 404", func() {
 			mockIaaSClient.EXPECT().
 				GetServer(gomock.Any(), gomock.Any()).
-				Return(nil, ErrorNotFound)
+				Return(nil, client.ErrorNotFound)
 
 			_, err := mockIaaSClient.GetServer(context.Background(), "my-server")
 			Expect(err).To(HaveOccurred())
@@ -224,18 +225,18 @@ var _ = Describe("Backup", func() {
 	Context("buildCreateBackupPayload", func() {
 		DescribeTable("successful payload variants",
 			func(name, volID, snapshotID string, tags map[string]string, expectedPayload iaas.CreateBackupPayload) {
-				actualPayload, err := buildCreateBackupPayload(name, volID, snapshotID, tags)
+				actualPayload, err := client.BuildCreateBackupPayload(name, volID, snapshotID, tags)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(actualPayload).To(Equal(expectedPayload))
 			},
 			Entry("with volume source", "expected-name", "volume-id", "", nil, iaas.CreateBackupPayload{
 				Name:        new("expected-name"),
-				Description: new(backupDescription),
+				Description: new(client.BackupDescription),
 				Source:      iaas.BackupSource{Type: "volume", Id: "volume-id"},
 			}),
 			Entry("with snapshot source", "expected-name", "", "snapshot-id", nil, iaas.CreateBackupPayload{
 				Name:        new("expected-name"),
-				Description: new(backupDescription),
+				Description: new(client.BackupDescription),
 				Source:      iaas.BackupSource{Type: "snapshot", Id: "snapshot-id"},
 			}),
 		)
