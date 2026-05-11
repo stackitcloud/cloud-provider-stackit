@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
@@ -14,7 +15,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/cmp"
 )
 
 const (
@@ -110,7 +110,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 	nodes []*corev1.Node,
 ) (*corev1.LoadBalancerStatus, error) {
 	name := l.GetLoadBalancerName(ctx, clusterName, service)
-	lb, err := l.client.GetLoadBalancer(ctx,  name)
+	lb, err := l.client.GetLoadBalancer(ctx, name)
 	if err != nil && !stackitclient.IsNotFound(err) {
 		return nil, err
 	}
