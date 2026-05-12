@@ -22,11 +22,11 @@ require (
 	google.golang.org/grpc v1.81.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.34.7
-	k8s.io/apimachinery v0.34.7
-	k8s.io/client-go v0.34.7
+	k8s.io/api v0.34.8
+	k8s.io/apimachinery v0.34.8
+	k8s.io/client-go v0.34.8
 	k8s.io/cloud-provider v0.34.7
-	k8s.io/component-base v0.34.7
+	k8s.io/component-base v0.34.8
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.34.7
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
