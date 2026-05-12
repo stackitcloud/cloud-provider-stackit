@@ -1,8 +1,9 @@
-package client
+package client_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 )
 
 var _ = Describe("Labels", func() {
@@ -13,7 +14,7 @@ var _ = Describe("Labels", func() {
 				"key2": "value2",
 			}
 
-			labels := LabelsFromTags(tags)
+			labels := client.LabelsFromTags(tags)
 
 			Expect(labels).To(HaveKeyWithValue("key1", "value1"))
 			Expect(labels).To(HaveKeyWithValue("key2", "value2"))
@@ -22,7 +23,7 @@ var _ = Describe("Labels", func() {
 		It("should handle empty tags", func() {
 			tags := map[string]string{}
 
-			labels := LabelsFromTags(tags)
+			labels := client.LabelsFromTags(tags)
 
 			Expect(labels).To(BeEmpty())
 		})
@@ -30,7 +31,7 @@ var _ = Describe("Labels", func() {
 		It("should handle nil tags", func() {
 			var tags map[string]string
 
-			labels := LabelsFromTags(tags)
+			labels := client.LabelsFromTags(tags)
 
 			Expect(labels).To(BeEmpty())
 		})
