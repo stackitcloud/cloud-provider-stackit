@@ -6,14 +6,7 @@ import (
 
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-type objectWithGVK interface {
-	runtime.Object
-	SetGroupVersionKind(gvk schema.GroupVersionKind)
-}
 
 func isOpenAPINotFound(err error) bool {
 	apiErr := &oapiError.GenericOpenAPIError{}
@@ -23,7 +16,7 @@ func isOpenAPINotFound(err error) bool {
 	return apiErr.StatusCode == http.StatusNotFound
 }
 
-func filterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
+func FilterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
 	filteredVolumes := make([]iaas.Volume, 0)
 
 	if filters == nil {
@@ -42,7 +35,7 @@ func filterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volu
 }
 
 //nolint:dupl // We don't feel like doing generics to undupe this.
-func filterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaas.Snapshot {
+func FilterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaas.Snapshot {
 	filteredSnapshots := make([]iaas.Snapshot, 0)
 
 	if filters == nil {
@@ -66,7 +59,7 @@ func filterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaa
 }
 
 //nolint:dupl // We don't feel like doing generics to undupe this.
-func filterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Backup {
+func FilterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Backup {
 	filteredBackups := make([]iaas.Backup, 0)
 
 	if filters == nil {

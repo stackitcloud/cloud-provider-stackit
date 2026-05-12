@@ -157,7 +157,7 @@ func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string
 		return nil, err
 	}
 
-	filteredSnapshots := filterSnapshots(snaps.Items, filters)
+	filteredSnapshots := FilterSnapshots(snaps.Items, filters)
 
 	return filteredSnapshots, nil
 }
@@ -243,7 +243,7 @@ func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) 
 		return nil, err
 	}
 
-	filteredBackups := filterBackups(backups.Items, filters)
+	filteredBackups := FilterBackups(backups.Items, filters)
 
 	return filteredBackups, nil
 }
@@ -380,7 +380,7 @@ func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaa
 	}
 
 	filterMap := map[string]string{"Name": volName}
-	filteredVolumes := filterVolumes(volumes.Items, filterMap)
+	filteredVolumes := FilterVolumes(volumes.Items, filterMap)
 
 	return filteredVolumes, nil
 }
