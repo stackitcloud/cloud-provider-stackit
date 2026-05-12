@@ -269,7 +269,7 @@ var _ = Describe("LoadBalancer", func() {
 				Version:         new("current-version"),
 			}
 
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(myLb, nil)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
 			// For simplicity, we return the original load balancer. In reality, the updated load balancer should be returned.
 			mockClient.EXPECT().UpdateLoadBalancer(
 				gomock.Any(),

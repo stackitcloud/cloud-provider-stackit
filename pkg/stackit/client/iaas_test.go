@@ -36,7 +36,7 @@ var _ = Describe("Server", func() {
 		It("returns a server on success", func() {
 			mockIaaSClient.EXPECT().
 				GetServer(gomock.Any(), gomock.Any()).
-				Return(&iaas.Server{Id: new(serverID), Name: new("my-server")}, nil)
+				Return(&iaas.Server{Id: new(serverID), Name: "my-server"}, nil)
 
 			server, err := mockIaaSClient.GetServer(context.Background(), "my-server")
 			Expect(err).ToNot(HaveOccurred())
@@ -58,8 +58,8 @@ var _ = Describe("Server", func() {
 			mockIaaSClient.EXPECT().
 				CreateServer(gomock.Any(), gomock.Any()).
 				Return(iaas.Server{
-					Id: new(serverID), Name: new("new-server")}, nil)
-			payload := iaas.CreateServerPayload{Name: new("new-server")}
+					Id: new(serverID), Name: "new-server"}, nil)
+			payload := iaas.CreateServerPayload{Name: "new-server"}
 
 			server, err := mockIaaSClient.CreateServer(context.Background(), payload)
 			Expect(err).ToNot(HaveOccurred())
@@ -81,7 +81,7 @@ var _ = Describe("Server", func() {
 	Context("ListServers", func() {
 		It("returns a list of servers with details", func() {
 			mockItems := []iaas.Server{
-				{Id: new("id-1"), Name: new("server-1")},
+				{Id: new("id-1"), Name: "server-1"},
 			}
 
 			mockIaaSClient.EXPECT().
@@ -101,7 +101,7 @@ var _ = Describe("Server", func() {
 		It("updates server properties", func() {
 			mockIaaSClient.EXPECT().
 				UpdateServer(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Server{Id: new(serverID), Name: new("updated-name")}, nil)
+				Return(&iaas.Server{Id: new(serverID), Name: "updated-name"}, nil)
 
 			updatePayload := iaas.UpdateServerPayload{Name: new("updated-name")}
 			server, err := mockIaaSClient.UpdateServer(context.Background(), serverID, updatePayload)

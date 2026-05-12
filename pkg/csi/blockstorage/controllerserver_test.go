@@ -650,7 +650,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			}
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{}, nil)
 			iaasClient.EXPECT().GetServer(gomock.Any(), "fake").Return(&iaas.Server{}, nil)
-			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId).Return(req.VolumeId, nil)
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(req.VolumeId, nil)
 			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
@@ -730,8 +730,6 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			})
 			It("should create backup successfully", func() {
 				// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-				// properties := map[string]string{blockStorageCSIClusterIDKey: "cluster"}
-				properties := map[string]string{}
 				expectedSnap := &iaas.Snapshot{
 					Id:        new("fake-snapshot"),
 					Name:      new("fake-snapshot"),
@@ -753,14 +751,14 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 				// Backups are created from snapshots
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
-				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), "fake-snapshot", req.SourceVolumeId, properties).Return(expectedSnap, nil)
+				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 
 				// Actually create the backup from the snapshot
 				iaasClient.EXPECT().CreateBackup(gomock.Any(), "fake-snapshot", req.GetSourceVolumeId(), "fake-snapshot", gomock.Any()).Return(expectedBackup, nil)
 				iaasClient.EXPECT().WaitBackupReady(gomock.Any(), "fake-backup", *expectedSnap.Size, stackitclient.BackupMaxDurationSecondsPerGBDefault).
 					Return(new("AVAILABLE"), nil)
-				iaasClient.EXPECT().GetBackupByID(gomock.Any(), "fake-backup").Return(expectedBackup, nil)
+				iaasClient.EXPECT().GetBackup(gomock.Any(), "fake-backup").Return(expectedBackup, nil)
 
 				// Remove the snapshot after the backup is created
 				iaasClient.EXPECT().DeleteSnapshot(gomock.Any(), "fake-snapshot").Return(nil)
@@ -825,8 +823,6 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				Expect(err).To(Not(HaveOccurred()))
 
 				// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-				// properties := map[string]string{blockStorageCSIClusterIDKey: "cluster"}
-				properties := map[string]string{}
 				expectedSnap := &iaas.Snapshot{
 					Id:        new("fake-snapshot"),
 					Name:      new("fake-snapshot"),
@@ -848,7 +844,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 				// Backups are created from snapshots
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
-				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), "fake-snapshot", req.SourceVolumeId, properties).Return(expectedSnap, nil)
+				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 
 				// Actually create the backup from the snapshot
@@ -880,13 +876,9 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Size:      new(int64(10)),
 					CreatedAt: new(time.Now()),
 				}
-				// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-				// properties := map[string]string{blockStorageCSIClusterIDKey: "cluster"}
-				properties := map[string]string{}
-
 				// TODO: Again filters are not implemented yet by the API
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
-				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), "fake-snapshot", req.SourceVolumeId, properties).Return(expectedSnap, nil)
+				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).ToNot(HaveOccurred())
