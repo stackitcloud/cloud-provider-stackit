@@ -32,7 +32,7 @@ var _ = Describe("LoadBalancer", func() {
 
 	Context("LoadBalancer Management", func() {
 		It("CreateLoadBalancer successfully calls the API", func() {
-			payload := loadbalancer.CreateLoadBalancerPayload{Name: new(lbName)}
+			payload := &loadbalancer.CreateLoadBalancerPayload{Name: new(lbName)}
 			mockLBClient.EXPECT().
 				CreateLoadBalancer(gomock.Any(), payload).
 				Return(&loadbalancer.LoadBalancer{Name: new(lbName)}, nil)
@@ -72,7 +72,7 @@ var _ = Describe("LoadBalancer", func() {
 				UpdateLoadBalancer(gomock.Any(), lbName, gomock.Any()).
 				Return(nil)
 
-			err := mockLBClient.UpdateLoadBalancer(context.Background(), lbName, loadbalancer.UpdateLoadBalancerPayload{})
+			err := mockLBClient.UpdateLoadBalancer(context.Background(), lbName, &loadbalancer.UpdateLoadBalancerPayload{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 

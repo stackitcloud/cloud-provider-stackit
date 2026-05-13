@@ -262,8 +262,11 @@ func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backu
 func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
 	duration := time.Duration(int64(backupMaxDurationSecondsPerGB)*snapshotSize + backupBaseDurationSeconds)
 	err := i.waitBackupReadyWithContext(backupID, duration)
-	if errors.Is(err, context.DeadlineExceeded) {
-		err = fmt.Errorf("timeout, Backup %s is still not Ready: %v", backupID, err)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("timeout, Backup %s is still not Ready: %w", backupID, err)
+		}
+		return nil, err
 	}
 
 	backup, err := i.GetBackup(ctx, backupID)
@@ -272,10 +275,10 @@ func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapsh
 	}
 
 	if backup != nil {
-		return backup.Status, err
+		return backup.Status, nil
 	}
 
-	return new("Failed to get backup status"), err
+	return new("Failed to get backup status"), nil
 }
 
 func (i iaasClient) waitBackupReadyWithContext(backupID string, duration time.Duration) error {

@@ -59,7 +59,7 @@ var _ = Describe("Server", func() {
 				CreateServer(gomock.Any(), gomock.Any()).
 				Return(iaas.Server{
 					Id: new(serverID), Name: "new-server"}, nil)
-			payload := iaas.CreateServerPayload{Name: "new-server"}
+			payload := &iaas.CreateServerPayload{Name: "new-server"}
 
 			server, err := mockIaaSClient.CreateServer(context.Background(), payload)
 			Expect(err).ToNot(HaveOccurred())
@@ -136,7 +136,7 @@ var _ = Describe("Snapshot", func() {
 				CreateSnapshot(gomock.Any(), gomock.Any()).
 				Return(&iaas.Snapshot{Id: new(snapshotID)}, nil)
 
-			payload := iaas.CreateSnapshotPayload{Name: new("new-snapshot")}
+			payload := &iaas.CreateSnapshotPayload{Name: new("new-snapshot")}
 			snapshot, err := mockIaaSClient.CreateSnapshot(context.Background(), payload)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*snapshot.Id).To(Equal(snapshotID))
@@ -380,7 +380,7 @@ var _ = Describe("Volume", func() {
 				CreateVolume(gomock.Any(), gomock.Any()).
 				Return(&iaas.Volume{Id: new(volumeID)}, nil)
 
-			vol, err := mockIaaSClient.CreateVolume(context.Background(), iaas.CreateVolumePayload{})
+			vol, err := mockIaaSClient.CreateVolume(context.Background(), &iaas.CreateVolumePayload{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*vol.Id).To(Equal(volumeID))
 		})
