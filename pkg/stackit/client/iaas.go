@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
@@ -19,11 +18,11 @@ import (
 type IaaSClient interface {
 	GetServer(ctx context.Context, serverID string) (*iaas.Server, error)
 	DeleteServer(ctx context.Context, serverID string) error
-	CreateServer(ctx context.Context, create iaas.CreateServerPayload) (*iaas.Server, error)
+	CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error)
 	UpdateServer(ctx context.Context, serverID string, update iaas.UpdateServerPayload) (*iaas.Server, error)
 	ListServers(ctx context.Context) (*[]iaas.Server, error)
 
-	CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
+	CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
 	ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, error)
 	DeleteSnapshot(ctx context.Context, snapshotID string) error
 	GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error)
@@ -35,7 +34,7 @@ type IaaSClient interface {
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
 	WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error)
 
-	CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error)
+	CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error)
 	DeleteVolume(ctx context.Context, volumeID string) error
 	AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error)
 	DetachVolume(ctx context.Context, serverID, volumeID string) error
@@ -92,7 +91,6 @@ var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
 type iaasClient struct {
 	Client    iaas.DefaultAPI
-	bsOpts    stackitconfig.BlockStorageOpts
 	projectID string
 	region    string
 }
@@ -122,8 +120,8 @@ func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
 	return i.Client.DeleteServer(ctx, i.projectID, i.region, serverID).Execute()
 }
 
-func (i iaasClient) CreateServer(ctx context.Context, create iaas.CreateServerPayload) (*iaas.Server, error) {
-	server, err := i.Client.CreateServer(ctx, i.projectID, i.region).CreateServerPayload(create).Execute()
+func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
+	server, err := i.Client.CreateServer(ctx, i.projectID, i.region).CreateServerPayload(*create).Execute()
 	if isOpenAPINotFound(err) {
 		return nil, ErrorNotFound
 	}
@@ -142,8 +140,8 @@ func (i iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	return &resp.Items, nil
 }
 
-func (i iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
-	snapshot, err := i.Client.CreateSnapshot(ctx, i.projectID, i.region).CreateSnapshotPayload(payload).Execute()
+func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+	snapshot, err := i.Client.CreateSnapshot(ctx, i.projectID, i.region).CreateSnapshotPayload(*payload).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -262,10 +260,8 @@ func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backu
 }
 
 func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
-	var err error
-
 	duration := time.Duration(int64(backupMaxDurationSecondsPerGB)*snapshotSize + backupBaseDurationSeconds)
-	err = i.waitBackupReadyWithContext(backupID, duration)
+	err := i.waitBackupReadyWithContext(backupID, duration)
 	if errors.Is(err, context.DeadlineExceeded) {
 		err = fmt.Errorf("timeout, Backup %s is still not Ready: %v", backupID, err)
 	}
@@ -322,9 +318,9 @@ func (i iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, e
 	return *backup.Status == backupReadyStatus, nil
 }
 
-func (i iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+func (i iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
-	volume, err := i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(payload).Execute()
+	volume, err := i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(*payload).Execute()
 	if err != nil {
 		return nil, err
 	}

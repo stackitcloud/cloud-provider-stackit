@@ -202,7 +202,7 @@ func instanceIDFromProviderID(providerID string) (instanceID, region string, err
 	}
 }
 
-func getServerByName(ctx context.Context, client stackitclient.IaaSClient, name, projectID, region string) (*iaas.Server, error) {
+func getServerByName(ctx context.Context, client stackitclient.IaaSClient, name string) (*iaas.Server, error) {
 	servers, err := client.ListServers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
@@ -226,7 +226,7 @@ func getServerByName(ctx context.Context, client stackitclient.IaaSClient, name,
 
 func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.Server, error) {
 	if node.Spec.ProviderID == "" {
-		return getServerByName(ctx, i.iaasClient, node.Name, i.projectID, i.region)
+		return getServerByName(ctx, i.iaasClient, node.Name)
 	}
 
 	instanceID, instanceRegion, err := instanceIDFromProviderID(node.Spec.ProviderID)

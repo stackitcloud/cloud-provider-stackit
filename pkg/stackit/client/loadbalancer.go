@@ -8,11 +8,11 @@ import (
 )
 
 type LoadBalancingClient interface {
-	CreateLoadBalancer(ctx context.Context, payload loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
+	CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, lbName string) error
 	GetLoadBalancer(ctx context.Context, id string) (*loadbalancer.LoadBalancer, error)
-	UpdateLoadBalancer(ctx context.Context, lbName string, updates loadbalancer.UpdateLoadBalancerPayload) error
+	UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) error
 	UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 
 	CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error)
@@ -40,8 +40,8 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 	}, nil
 }
 
-func (l loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	lb, err := l.Client.CreateLoadBalancer(ctx, l.projectID, l.region).CreateLoadBalancerPayload(payload).Execute()
+func (l loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	lb, err := l.Client.CreateLoadBalancer(ctx, l.projectID, l.region).CreateLoadBalancerPayload(*payload).Execute()
 	if isOpenAPINotFound(err) {
 		return lb, ErrorNotFound
 	}
@@ -65,8 +65,8 @@ func (l loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string)
 	return l.Client.GetLoadBalancer(ctx, l.projectID, l.region, lbName).Execute()
 }
 
-func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates loadbalancer.UpdateLoadBalancerPayload) error {
-	if _, err := l.Client.UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).UpdateLoadBalancerPayload(updates).Execute(); err != nil {
+func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) error {
+	if _, err := l.Client.UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).UpdateLoadBalancerPayload(*updates).Execute(); err != nil {
 		return err
 	}
 

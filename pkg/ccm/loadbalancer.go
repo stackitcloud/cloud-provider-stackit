@@ -146,7 +146,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		// However, we need to copy over the version because it is required on every update.
 		spec.Version = lb.Version
 		spec.Name = &name
-		updatePayload := loadbalancer.UpdateLoadBalancerPayload{
+		updatePayload := &loadbalancer.UpdateLoadBalancerPayload{
 			Errors:          spec.Errors,
 			ExternalAddress: spec.ExternalAddress,
 			Listeners:       spec.Listeners,
@@ -214,7 +214,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 	}
 	spec.Name = &name
 
-	lb, createErr := l.client.CreateLoadBalancer(ctx, *spec)
+	lb, createErr := l.client.CreateLoadBalancer(ctx, spec)
 	if createErr != nil {
 		return nil, createErr
 	}
@@ -306,7 +306,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 			PlanId:      lb.PlanId,
 			Labels:      lb.Labels,
 		}
-		err = l.client.UpdateLoadBalancer(ctx, name, *payload)
+		err = l.client.UpdateLoadBalancer(ctx, name, payload)
 		if err != nil {
 			return fmt.Errorf("failed to update load balancer: %w", err)
 		}

@@ -57,7 +57,7 @@ func (mr *MockLoadBalancingClientMockRecorder) CreateCredentials(ctx, payload an
 }
 
 // CreateLoadBalancer mocks base method.
-func (m *MockLoadBalancingClient) CreateLoadBalancer(ctx context.Context, payload v2api.CreateLoadBalancerPayload) (*v2api.LoadBalancer, error) {
+func (m *MockLoadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *v2api.CreateLoadBalancerPayload) (*v2api.LoadBalancer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateLoadBalancer", ctx, payload)
 	ret0, _ := ret[0].(*v2api.LoadBalancer)
@@ -174,7 +174,7 @@ func (mr *MockLoadBalancingClientMockRecorder) UpdateCredentials(ctx, credential
 }
 
 // UpdateLoadBalancer mocks base method.
-func (m *MockLoadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates v2api.UpdateLoadBalancerPayload) error {
+func (m *MockLoadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *v2api.UpdateLoadBalancerPayload) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateLoadBalancer", ctx, lbName, updates)
 	ret0, _ := ret[0].(error)

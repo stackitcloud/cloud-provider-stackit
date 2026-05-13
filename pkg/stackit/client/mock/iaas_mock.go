@@ -73,7 +73,7 @@ func (mr *MockIaaSClientMockRecorder) CreateBackup(ctx, name, volID, snapshotID,
 }
 
 // CreateServer mocks base method.
-func (m *MockIaaSClient) CreateServer(ctx context.Context, create v2api.CreateServerPayload) (*v2api.Server, error) {
+func (m *MockIaaSClient) CreateServer(ctx context.Context, create *v2api.CreateServerPayload) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateServer", ctx, create)
 	ret0, _ := ret[0].(*v2api.Server)
@@ -88,7 +88,7 @@ func (mr *MockIaaSClientMockRecorder) CreateServer(ctx, create any) *gomock.Call
 }
 
 // CreateSnapshot mocks base method.
-func (m *MockIaaSClient) CreateSnapshot(ctx context.Context, payload v2api.CreateSnapshotPayload) (*v2api.Snapshot, error) {
+func (m *MockIaaSClient) CreateSnapshot(ctx context.Context, payload *v2api.CreateSnapshotPayload) (*v2api.Snapshot, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSnapshot", ctx, payload)
 	ret0, _ := ret[0].(*v2api.Snapshot)
@@ -103,7 +103,7 @@ func (mr *MockIaaSClientMockRecorder) CreateSnapshot(ctx, payload any) *gomock.C
 }
 
 // CreateVolume mocks base method.
-func (m *MockIaaSClient) CreateVolume(ctx context.Context, payload v2api.CreateVolumePayload) (*v2api.Volume, error) {
+func (m *MockIaaSClient) CreateVolume(ctx context.Context, payload *v2api.CreateVolumePayload) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateVolume", ctx, payload)
 	ret0, _ := ret[0].(*v2api.Volume)
