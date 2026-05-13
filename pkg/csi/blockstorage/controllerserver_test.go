@@ -635,7 +635,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Size:     new(int64(10)),
 					ServerId: new("serverID"),
 				},
-			}, "", nil)
+			}, nil)
 			resp, err := fakeCs.ListVolumes(context.Background(), req)
 			Expect(err).Should(Not(HaveOccurred()))
 			Expect(resp.GetEntries()).Should(Equal(expectedVolumeResponseList))
@@ -696,7 +696,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				Size:   new(int64(10)),
 				Status: new(stackitclient.VolumeAvailableStatus),
 			}, nil)
-			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, stackitclient.VolumeAvailableStatus, volSizeGB).Return(nil)
+			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, stackitclient.VolumeAvailableStatus, iaas.ResizeVolumePayload{Size: volSizeGB}).Return(nil)
 			iaasClient.EXPECT().WaitVolumeTargetStatus(gomock.Any(), req.VolumeId, expandTargetStatus).Return(nil)
 			_, err := fakeCs.ControllerExpandVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
@@ -706,12 +706,16 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:      "fake",
 				CapacityRange: stdCapRange,
 			}
+
 			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
 			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
 				Size:   new(int64(10)),
 				Status: new("ERROR"),
 			}, nil)
-			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, "ERROR", volSizeGB).Return(fmt.Errorf("volume cannot be resized, when status is ERROR"))
+			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, "ERROR", iaas.ResizeVolumePayload{
+				Size: volSizeGB,
+			}).Return(fmt.Errorf("volume cannot be resized, when status is ERROR"))
+
 			_, err := fakeCs.ControllerExpandVolume(context.Background(), req)
 			Expect(err).To(HaveOccurred())
 			Expect(status.Convert(err).Code()).To(Equal(codes.Internal))
@@ -750,7 +754,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).Return([]iaas.Backup{}, nil)
 
 				// Backups are created from snapshots
-				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
+				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 
@@ -843,7 +847,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).Return([]iaas.Backup{}, nil)
 
 				// Backups are created from snapshots
-				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
+				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 
@@ -877,7 +881,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					CreatedAt: new(time.Now()),
 				}
 				// TODO: Again filters are not implemented yet by the API
-				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
+				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
@@ -894,7 +898,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}
 
 				// TODO: Again filters are not implemented yet by the API
-				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{*expectedSnap}, "", nil)
+				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{*expectedSnap}, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(new("AVAILABLE"), nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).ToNot(HaveOccurred())
@@ -908,7 +912,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					{
 						Id: new("fake-snapshot2"),
 					},
-				}, "", nil)
+				}, nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).To(HaveOccurred())
 				Expect(status.Convert(err).Code()).To(Equal(codes.Internal))
@@ -921,7 +925,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 						Id:       new("fake-snapshot"),
 						VolumeId: "something-different",
 					},
-				}, "", nil)
+				}, nil)
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).To(HaveOccurred())
 				Expect(status.Convert(err).Code()).To(Equal(codes.AlreadyExists))
@@ -979,7 +983,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				VolumeId:  "something-different",
 				Size:      new(int64(10)),
 				CreatedAt: new(snapShotCreationTime),
-			}}, "", nil)
+			}}, nil)
 			resp, err := fakeCs.ListSnapshots(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
 			Expect(resp.GetEntries()).Should(Equal(expectedSnapshotListResponse))
