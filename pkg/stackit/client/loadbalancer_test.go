@@ -1,4 +1,4 @@
-package client_test
+package client
 
 import (
 	"context"
@@ -8,13 +8,14 @@ import (
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"go.uber.org/mock/gomock"
 
-	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
+	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/loadbalancer"
 )
 
 var _ = Describe("LoadBalancer", func() {
 	var (
 		mockCtrl     *gomock.Controller
-		mockLBClient *mock.MockLoadBalancingClient
+		mockLBClient *mock.MockDefaultAPI
+		client       *loadBalancingClient
 	)
 
 	const (
@@ -23,7 +24,11 @@ var _ = Describe("LoadBalancer", func() {
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
-		mockLBClient = mock.NewMockLoadBalancingClient(mockCtrl)
+		mockLBClient = mock.NewMockDefaultAPI(mockCtrl)
+
+		client = &loadBalancingClient{
+			Client: mockLBClient,
+		}
 	})
 
 	AfterEach(func() {
@@ -34,10 +39,10 @@ var _ = Describe("LoadBalancer", func() {
 		It("CreateLoadBalancer successfully calls the API", func() {
 			payload := &loadbalancer.CreateLoadBalancerPayload{Name: new(lbName)}
 			mockLBClient.EXPECT().
-				CreateLoadBalancer(gomock.Any(), payload).
+				CreateLoadBalancer(gomock.Any(), payload, gomock.Any()).
 				Return(&loadbalancer.LoadBalancer{Name: new(lbName)}, nil)
 
-			lb, err := mockLBClient.CreateLoadBalancer(context.Background(), payload)
+			lb, err := client.CreateLoadBalancer(context.Background(), payload)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*lb.Name).To(Equal(lbName))
 		})
@@ -48,10 +53,10 @@ var _ = Describe("LoadBalancer", func() {
 				{Name: new("lb-2")},
 			}
 			mockLBClient.EXPECT().
-				ListLoadBalancers(gomock.Any()).
+				ListLoadBalancers(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(mockItems, nil)
 
-			lbs, err := mockLBClient.ListLoadBalancers(context.Background())
+			lbs, err := client.ListLoadBalancers(context.Background())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(lbs).To(HaveLen(2))
 			Expect(*lbs[0].Name).To(Equal("lb-1"))
@@ -59,29 +64,29 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("GetLoadBalancer returns a specific LB", func() {
 			mockLBClient.EXPECT().
-				GetLoadBalancer(gomock.Any(), lbName).
+				GetLoadBalancer(gomock.Any(), lbName, gomock.Any(), gomock.Any()).
 				Return(&loadbalancer.LoadBalancer{Name: new(lbName)}, nil)
 
-			lb, err := mockLBClient.GetLoadBalancer(context.Background(), lbName)
+			lb, err := client.GetLoadBalancer(context.Background(), lbName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*lb.Name).To(Equal(lbName))
 		})
 
 		It("UpdateLoadBalancer calls API successfully", func() {
 			mockLBClient.EXPECT().
-				UpdateLoadBalancer(gomock.Any(), lbName, gomock.Any()).
+				UpdateLoadBalancer(gomock.Any(), lbName, gomock.Any(), gomock.Any()).
 				Return(nil)
 
-			err := mockLBClient.UpdateLoadBalancer(context.Background(), lbName, &loadbalancer.UpdateLoadBalancerPayload{})
+			err := client.UpdateLoadBalancer(context.Background(), lbName, &loadbalancer.UpdateLoadBalancerPayload{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("DeleteLoadBalancer calls API successfully", func() {
 			mockLBClient.EXPECT().
-				DeleteLoadBalancer(gomock.Any(), lbName).
+				DeleteLoadBalancer(gomock.Any(), lbName, gomock.Any(), gomock.Any()).
 				Return(nil)
 
-			err := mockLBClient.DeleteLoadBalancer(context.Background(), lbName)
+			err := client.DeleteLoadBalancer(context.Background(), lbName)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -90,10 +95,10 @@ var _ = Describe("LoadBalancer", func() {
 		It("UpdateTargetPool calls API successfully", func() {
 			payload := loadbalancer.UpdateTargetPoolPayload{}
 			mockLBClient.EXPECT().
-				UpdateTargetPool(gomock.Any(), lbName, "pool-1", payload).
+				UpdateTargetPool(gomock.Any(), lbName, "pool-1", payload, gomock.Any()).
 				Return(nil)
 
-			err := mockLBClient.UpdateTargetPool(context.Background(), lbName, "pool-1", payload)
+			err := client.UpdateTargetPool(context.Background(), lbName, "pool-1", payload)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -101,32 +106,32 @@ var _ = Describe("LoadBalancer", func() {
 	Context("Credentials", func() {
 		It("CreateCredentials returns response on success", func() {
 			mockLBClient.EXPECT().
-				CreateCredentials(gomock.Any(), gomock.Any()).
+				CreateCredentials(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&loadbalancer.CreateCredentialsResponse{Credential: &loadbalancer.CredentialsResponse{
 					DisplayName: new("cred-1"),
 				}}, nil)
 
-			resp, err := mockLBClient.CreateCredentials(context.Background(), loadbalancer.CreateCredentialsPayload{})
+			resp, err := client.CreateCredentials(context.Background(), loadbalancer.CreateCredentialsPayload{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*resp.Credential.DisplayName).To(Equal("cred-1"))
 		})
 
 		It("ListCredentials returns all credentials", func() {
 			mockLBClient.EXPECT().
-				ListCredentials(gomock.Any()).
+				ListCredentials(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&loadbalancer.ListCredentialsResponse{Credentials: []loadbalancer.CredentialsResponse{{DisplayName: new("cred-1")}}}, nil)
 
-			resp, err := mockLBClient.ListCredentials(context.Background())
+			resp, err := client.ListCredentials(context.Background())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.Credentials).To(HaveLen(1))
 		})
 
 		It("DeleteCredentials calls API successfully", func() {
 			mockLBClient.EXPECT().
-				DeleteCredentials(gomock.Any(), "cred-ref").
+				DeleteCredentials(gomock.Any(), "cred-ref", gomock.Any(), gomock.Any()).
 				Return(nil)
 
-			err := mockLBClient.DeleteCredentials(context.Background(), "cred-ref")
+			err := client.DeleteCredentials(context.Background(), "cred-ref")
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

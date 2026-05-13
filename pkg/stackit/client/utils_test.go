@@ -1,9 +1,8 @@
-package client_test
+package client
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
@@ -24,13 +23,13 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all backups when filters is nil", func() {
-			result := client.FilterBackups(backups, nil)
+			result := FilterBackups(backups, nil)
 			Expect(result).To(Equal(backups))
 		})
 
 		It("should filter by Status", func() {
 			filters["Status"] = "available"
-			result := client.FilterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 			Expect(*result[1].Name).To(Equal("backup-3"))
@@ -38,14 +37,14 @@ var _ = Describe("Filter", func() {
 
 		It("should filter by VolumeID", func() {
 			filters["VolumeID"] = "vol-2"
-			result := client.FilterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("backup-2"))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "backup-1"
-			result := client.FilterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 		})
@@ -53,7 +52,7 @@ var _ = Describe("Filter", func() {
 		It("should filter by multiple criteria", func() {
 			filters["Status"] = "available"
 			filters["VolumeID"] = "vol-1"
-			result := client.FilterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 			Expect(*result[1].Name).To(Equal("backup-3"))
@@ -76,13 +75,13 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all volumes when filters is nil", func() {
-			result := client.FilterVolumes(volumes, nil)
+			result := FilterVolumes(volumes, nil)
 			Expect(result).To(Equal(volumes))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "volume-1"
-			result := client.FilterVolumes(volumes, filters)
+			result := FilterVolumes(volumes, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("volume-1"))
 			Expect(*result[1].Name).To(Equal("volume-1"))
@@ -105,13 +104,13 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all snapshots when filters is nil", func() {
-			result := client.FilterSnapshots(snapshots, nil)
+			result := FilterSnapshots(snapshots, nil)
 			Expect(result).To(Equal(snapshots))
 		})
 
 		It("should filter by Status", func() {
 			filters["Status"] = "available"
-			result := client.FilterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 			Expect(*result[1].Name).To(Equal("snapshot-3"))
@@ -119,14 +118,14 @@ var _ = Describe("Filter", func() {
 
 		It("should filter by VolumeID", func() {
 			filters["VolumeID"] = "vol-2"
-			result := client.FilterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("snapshot-2"))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "snapshot-1"
-			result := client.FilterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 		})
@@ -134,7 +133,7 @@ var _ = Describe("Filter", func() {
 		It("should filter by multiple criteria", func() {
 			filters["Status"] = "available"
 			filters["VolumeID"] = "vol-1"
-			result := client.FilterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 			Expect(*result[1].Name).To(Equal("snapshot-3"))

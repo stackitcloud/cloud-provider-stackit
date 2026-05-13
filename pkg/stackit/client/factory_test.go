@@ -1,4 +1,4 @@
-package client_test
+package client
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
@@ -16,7 +15,7 @@ import (
 var _ = Describe("Client", func() {
 	Describe("GetConfig", func() {
 		It("should parse valid yaml configuration", func() {
-			cfg, err := client.GetConfig(strings.NewReader(`
+			cfg, err := GetConfig(strings.NewReader(`
 global:
   projectId: "test-project"
   iaasApi: "https://api.example.com"
@@ -42,7 +41,7 @@ blockStorage:
 		})
 
 		It("should handle missing optional fields", func() {
-			cfg, err := client.GetConfig(strings.NewReader(`
+			cfg, err := GetConfig(strings.NewReader(`
 global:
   projectId: "test-project"
   region: "eu01"`))
@@ -54,7 +53,7 @@ global:
 		})
 
 		It("should return error for invalid yaml", func() {
-			_, err := client.GetConfig(strings.NewReader(`
+			_, err := GetConfig(strings.NewReader(`
 global:
   projectId: "test-project"
   region: "eu01"
@@ -63,7 +62,7 @@ global:
 		})
 
 		It("should handle empty yaml gracefully", func() {
-			cfg, err := client.GetConfig(strings.NewReader(``))
+			cfg, err := GetConfig(strings.NewReader(``))
 			Expect(err).NotTo(HaveOccurred())
 			// Empty YAML should result in zero values
 			Expect(cfg).To(Equal(stackitconfig.CSIConfig{}))
@@ -102,13 +101,13 @@ blockStorage:
 			Expect(err).NotTo(HaveOccurred())
 			tempFile.Close()
 
-			cfg, err := client.GetConfigFromFile(tempFilePath)
+			cfg, err := GetConfigFromFile(tempFilePath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.Global.ProjectID).To(Equal("test-project"))
 		})
 
 		It("should return error for non-existent file", func() {
-			_, err := client.GetConfigFromFile("non-existent-file.yaml")
+			_, err := GetConfigFromFile("non-existent-file.yaml")
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -123,7 +122,7 @@ global:
 metadata:
   requestTimeout: "%s"`, durationStr)
 
-				cfg, err := client.GetConfig(strings.NewReader(yaml))
+				cfg, err := GetConfig(strings.NewReader(yaml))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cfg.Metadata.RequestTimeout.Duration).To(Equal(expected))
 			},
@@ -142,7 +141,7 @@ global:
 metadata:
   requestTimeout: "invalid-duration"`
 
-			_, err := client.GetConfig(strings.NewReader(yaml))
+			_, err := GetConfig(strings.NewReader(yaml))
 			Expect(err).To(HaveOccurred())
 		})
 	})
