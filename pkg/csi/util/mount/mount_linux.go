@@ -2,7 +2,16 @@
 
 package mount
 
-import "golang.org/x/sys/unix"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"golang.org/x/sys/unix"
+	"k8s.io/klog/v2"
+)
 
 var (
 	pciAddressRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
