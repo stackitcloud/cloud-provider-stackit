@@ -204,7 +204,7 @@ var _ = Describe("LoadBalancer", func() {
 			}, nil)
 			// TODO: match payload
 			mockClient.EXPECT().CreateCredentials(gomock.Any(), gomock.Any()).MinTimes(1).
-				DoAndReturn(func(_ context.Context, _ string, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+				DoAndReturn(func(_ context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
 					return &loadbalancer.CreateCredentialsResponse{
 						Credential: &loadbalancer.CredentialsResponse{
 							CredentialsRef: new("my-credential-ref"),
@@ -275,7 +275,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				versionMatcher("current-version"),
-			).MinTimes(1).Return(myLb, nil)
+			).MinTimes(1).Return(nil)
 
 			svc = svc.DeepCopy()
 			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
@@ -332,7 +332,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				versionMatcher("current-version"),
-			).MinTimes(1).Return(myLb, nil)
+			).MinTimes(1).Return(nil)
 
 			_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
 			Expect(err).NotTo(HaveOccurred())
@@ -373,7 +373,7 @@ var _ = Describe("LoadBalancer", func() {
 						versionMatcher("current-version"),
 						hasNoObservabilityConfigured(),
 					),
-				).MinTimes(1).Return(myLb, nil),
+				).MinTimes(1).Return(nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), gomock.Any()).MinTimes(1).Return(nil),
 			)
 
@@ -460,7 +460,7 @@ var _ = Describe("LoadBalancer", func() {
 			gomock.InOrder(
 				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), name, gomock.All(
 					hasNoObservabilityConfigured(), externalAddressSet("8.8.4.4"),
-				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
+				)).MinTimes(1).Return(nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().ListCredentials(gomock.Any()).Return(&loadbalancer.ListCredentialsResponse{
 					Credentials: []loadbalancer.CredentialsResponse{},
@@ -494,7 +494,7 @@ var _ = Describe("LoadBalancer", func() {
 			gomock.InOrder(
 				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), name, gomock.All(
 					hasNoObservabilityConfigured(), externalAddressNotSet(), ephemeralAddress(),
-				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
+				)).MinTimes(1).Return(nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().ListCredentials(gomock.Any()).Return(&loadbalancer.ListCredentialsResponse{
 					Credentials: []loadbalancer.CredentialsResponse{},

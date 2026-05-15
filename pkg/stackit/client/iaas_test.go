@@ -3,9 +3,11 @@ package client
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 
@@ -40,7 +42,8 @@ var _ = Describe("Server", func() {
 		It("returns a server on success", func() {
 			mockIaaSClient.EXPECT().
 				GetServer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Server{Id: new(serverID), Name: "my-server"}, nil)
+				Return(iaas.ApiGetServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetServerExecute(gomock.Any()).Return(&iaas.Server{Id: new(serverID), Name: "my-server"}, nil)
 
 			server, err := client.GetServer(context.Background(), "my-server")
 			Expect(err).ToNot(HaveOccurred())
@@ -50,7 +53,10 @@ var _ = Describe("Server", func() {
 		It("returns ErrorNotFound when API returns 404", func() {
 			mockIaaSClient.EXPECT().
 				GetServer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, ErrorNotFound)
+				Return(iaas.ApiGetServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetServerExecute(gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
 
 			_, err := client.GetServer(context.Background(), "my-server")
 			Expect(err).To(HaveOccurred())
@@ -61,8 +67,10 @@ var _ = Describe("Server", func() {
 		It("successfully creates a server", func() {
 			mockIaaSClient.EXPECT().
 				CreateServer(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(iaas.Server{
-					Id: new(serverID), Name: "new-server"}, nil)
+				Return(iaas.ApiCreateServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().CreateServerExecute(gomock.Any()).Return(&iaas.Server{
+				Id: new(serverID), Name: "new-server"}, nil)
+
 			payload := &iaas.CreateServerPayload{Name: "new-server"}
 
 			server, err := client.CreateServer(context.Background(), payload)
@@ -75,7 +83,8 @@ var _ = Describe("Server", func() {
 		It("deletes the server successfully", func() {
 			mockIaaSClient.EXPECT().
 				DeleteServer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil)
+				Return(iaas.ApiDeleteServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().DeleteServerExecute(gomock.Any()).Return(nil)
 
 			err := client.DeleteServer(context.Background(), serverID)
 			Expect(err).ToNot(HaveOccurred())
@@ -90,11 +99,11 @@ var _ = Describe("Server", func() {
 
 			mockIaaSClient.EXPECT().
 				ListServers(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.ServerListResponse{Items: mockItems}, nil)
+				Return(iaas.ApiListServersRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().ListServersExecute(gomock.Any()).Return(&iaas.ServerListResponse{Items: mockItems}, nil)
 
 			resp, err := client.ListServers(context.Background())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(resp).To(HaveLen(1))
 			items := *resp
 			Expect(items).To(HaveLen(1))
 			Expect(*items[0].Id).To(Equal("id-1"))
@@ -105,7 +114,8 @@ var _ = Describe("Server", func() {
 		It("updates server properties", func() {
 			mockIaaSClient.EXPECT().
 				UpdateServer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Server{Id: new(serverID), Name: "updated-name"}, nil)
+				Return(iaas.ApiUpdateServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().UpdateServerExecute(gomock.Any()).Return(&iaas.Server{Id: new(serverID), Name: "updated-name"}, nil)
 
 			updatePayload := iaas.UpdateServerPayload{Name: new("updated-name")}
 			server, err := client.UpdateServer(context.Background(), serverID, updatePayload)
@@ -143,7 +153,8 @@ var _ = Describe("Snapshot", func() {
 		It("successfully creates a snapshot", func() {
 			mockIaaSClient.EXPECT().
 				CreateSnapshot(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Snapshot{Id: new(snapshotID)}, nil)
+				Return(iaas.ApiCreateSnapshotRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().CreateSnapshotExecute(gomock.Any()).Return(&iaas.Snapshot{Id: new(snapshotID)}, nil)
 
 			payload := &iaas.CreateSnapshotPayload{Name: new("new-snapshot")}
 			snapshot, err := client.CreateSnapshot(context.Background(), payload)
@@ -154,14 +165,17 @@ var _ = Describe("Snapshot", func() {
 
 	Context("ListSnapshots", func() {
 		It("returns a filtered list of snapshots", func() {
-			mockItems := []iaas.Snapshot{
-				{Id: new("id-1"), Name: new("snap-1")},
-				{Id: new("id-2"), Name: new("snap-2")},
+			mockItems := &iaas.SnapshotListResponse{
+				Items: []iaas.Snapshot{
+					{Id: new("id-1"), Name: new("snap-1")},
+					{Id: new("id-2"), Name: new("snap-2")},
+				},
 			}
 
 			mockIaaSClient.EXPECT().
 				ListSnapshotsInProject(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.SnapshotListResponse{Items: mockItems}, nil)
+				Return(iaas.ApiListSnapshotsInProjectRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().ListSnapshotsInProjectExecute(gomock.Any()).Return(mockItems, nil)
 
 			resp, err := client.ListSnapshots(context.Background(), nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -173,7 +187,8 @@ var _ = Describe("Snapshot", func() {
 		It("returns a specific snapshot on success", func() {
 			mockIaaSClient.EXPECT().
 				GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("AVAILABLE")}, nil)
+				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("AVAILABLE")}, nil)
 
 			snapshot, err := client.GetSnapshot(context.Background(), snapshotID)
 			Expect(err).ToNot(HaveOccurred())
@@ -185,7 +200,8 @@ var _ = Describe("Snapshot", func() {
 		It("deletes the snapshot successfully", func() {
 			mockIaaSClient.EXPECT().
 				DeleteSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil)
+				Return(iaas.ApiDeleteSnapshotRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().DeleteSnapshotExecute(gomock.Any()).Return(nil)
 
 			err := client.DeleteSnapshot(context.Background(), snapshotID)
 			Expect(err).ToNot(HaveOccurred())
@@ -196,7 +212,8 @@ var _ = Describe("Snapshot", func() {
 		It("returns the current status of the snapshot", func() {
 			mockIaaSClient.EXPECT().
 				GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("READY")}, nil)
+				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("READY")}, nil)
 
 			status, err := client.WaitSnapshotReady(context.Background(), snapshotID)
 			Expect(err).ToNot(HaveOccurred())
@@ -206,7 +223,8 @@ var _ = Describe("Snapshot", func() {
 		It("returns an error if the snapshot retrieval fails", func() {
 			mockIaaSClient.EXPECT().
 				GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, fmt.Errorf("api error"))
+				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(nil, fmt.Errorf("api error"))
 
 			status, err := client.WaitSnapshotReady(context.Background(), snapshotID)
 			Expect(err).To(HaveOccurred())
@@ -259,7 +277,8 @@ var _ = Describe("Backup", func() {
 		It("returns backup on successful API call", func() {
 			mockIaaSClient.EXPECT().
 				CreateBackup(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Backup{Id: new("expected-backup-id")}, nil)
+				Return(iaas.ApiCreateBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().CreateBackupExecute(gomock.Any()).Return(&iaas.Backup{Id: new("expected-backup-id")}, nil)
 
 			backup, err := client.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
 
@@ -270,7 +289,8 @@ var _ = Describe("Backup", func() {
 		It("returns error when API fails", func() {
 			mockIaaSClient.EXPECT().
 				CreateBackup(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, fmt.Errorf("API error"))
+				Return(iaas.ApiCreateBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().CreateBackupExecute(gomock.Any()).Return(nil, fmt.Errorf("API error"))
 
 			_, err := client.CreateBackup(context.Background(), "expected-name", "volume-id", "", nil)
 			Expect(err).To(HaveOccurred())
@@ -289,7 +309,8 @@ var _ = Describe("Backup", func() {
 
 			mockIaaSClient.EXPECT().
 				ListBackups(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(mockBackups.Items, nil)
+				Return(iaas.ApiListBackupsRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().ListBackupsExecute(gomock.Any()).Return(mockBackups, nil)
 
 			backups, err := client.ListBackups(context.Background(), nil)
 
@@ -301,7 +322,8 @@ var _ = Describe("Backup", func() {
 		It("returns error when list API fails", func() {
 			mockIaaSClient.EXPECT().
 				ListBackups(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, fmt.Errorf("list error"))
+				Return(iaas.ApiListBackupsRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().ListBackupsExecute(gomock.Any()).Return(nil, fmt.Errorf("execute error"))
 
 			_, err := client.ListBackups(context.Background(), nil)
 			Expect(err).To(HaveOccurred())
@@ -312,7 +334,8 @@ var _ = Describe("Backup", func() {
 		It("returns a specific backup", func() {
 			mockIaaSClient.EXPECT().
 				GetBackup(gomock.Any(), gomock.Any(), gomock.Any(), "backup-id").
-				Return(&iaas.Backup{Id: new("backup-id")}, nil)
+				Return(iaas.ApiGetBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetBackupExecute(gomock.Any()).Return(&iaas.Backup{Id: new("backup-id")}, nil)
 
 			backup, err := client.GetBackup(context.Background(), "backup-id")
 			Expect(err).ToNot(HaveOccurred())
@@ -324,7 +347,8 @@ var _ = Describe("Backup", func() {
 		It("calls delete successfully", func() {
 			mockIaaSClient.EXPECT().
 				DeleteBackup(gomock.Any(), gomock.Any(), gomock.Any(), "backup-id").
-				Return(nil)
+				Return(iaas.ApiDeleteBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().DeleteBackupExecute(gomock.Any()).Return(nil)
 
 			err := client.DeleteBackup(context.Background(), "backup-id")
 			Expect(err).ToNot(HaveOccurred())
@@ -333,7 +357,8 @@ var _ = Describe("Backup", func() {
 		It("returns error if delete fails", func() {
 			mockIaaSClient.EXPECT().
 				DeleteBackup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(fmt.Errorf("delete failed"))
+				Return(iaas.ApiDeleteBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().DeleteBackupExecute(gomock.Any()).Return(fmt.Errorf("delete failed"))
 
 			err := client.DeleteBackup(context.Background(), "any-id")
 			Expect(err).To(HaveOccurred())
@@ -343,19 +368,20 @@ var _ = Describe("Backup", func() {
 	Context("WaitBackupReady", func() {
 		It("returns the backup status when it becomes ready", func() {
 			mockIaaSClient.EXPECT().
-				GetBackup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Backup{Id: new("backup-id"), Status: new("Ready")}, nil)
+				GetBackup(gomock.Any(), gomock.Any(), gomock.Any(), "backup-id").
+				Return(iaas.ApiGetBackupRequest{ApiService: mockIaaSClient}).AnyTimes()
+			mockIaaSClient.EXPECT().GetBackupExecute(gomock.Any()).Return(&iaas.Backup{Id: new("backup-id"), Status: new(backupReadyStatus)}, nil).AnyTimes()
 
-			status, err := client.WaitBackupReady(context.Background(), "backup-id", 10, 60)
-
+			status, err := client.WaitBackupReady(context.Background(), "backup-id", 1, 1)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(*status).To(Equal("Ready"))
+			Expect(*status).To(Equal(backupReadyStatus))
 		})
 
 		It("returns error on timeout or wait failure", func() {
 			mockIaaSClient.EXPECT().
 				GetBackup(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, fmt.Errorf("timeout waiting for backup"))
+				Return(iaas.ApiGetBackupRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetBackupExecute(gomock.Any()).Return(nil, fmt.Errorf("timeout waiting for backup"))
 
 			status, err := client.WaitBackupReady(context.Background(), "id", 1, 1)
 			Expect(err).To(HaveOccurred())
@@ -393,9 +419,9 @@ var _ = Describe("Volume", func() {
 
 	Context("Volume Lifecycle", func() {
 		It("CreateVolume successfully calls the API", func() {
-			mockIaaSClient.EXPECT().
-				CreateVolume(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Volume{Id: new(volumeID)}, nil)
+			mockIaaSClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiCreateVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().CreateVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID)}, nil)
 
 			vol, err := client.CreateVolume(context.Background(), &iaas.CreateVolumePayload{})
 			Expect(err).ToNot(HaveOccurred())
@@ -403,9 +429,9 @@ var _ = Describe("Volume", func() {
 		})
 
 		It("GetVolume returns a specific volume", func() {
-			mockIaaSClient.EXPECT().
-				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Volume{Id: new(volumeID), Name: new("test-vol")}, nil)
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), Name: new("test-vol")}, nil)
 
 			vol, err := client.GetVolume(context.Background(), volumeID)
 			Expect(err).ToNot(HaveOccurred())
@@ -413,9 +439,9 @@ var _ = Describe("Volume", func() {
 		})
 
 		It("DeleteVolume fails if volume is still attached (diskIsUsed logic)", func() {
-			mockIaaSClient.EXPECT().
-				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Volume{Id: new(volumeID), ServerId: new(serverID)}, nil)
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), ServerId: new(serverID)}, nil)
 
 			err := client.DeleteVolume(context.Background(), volumeID)
 			Expect(err).To(HaveOccurred())
@@ -425,8 +451,14 @@ var _ = Describe("Volume", func() {
 
 	Context("Attach/Detach Volume", func() {
 		It("AttachVolume calls API when not already attached", func() {
-			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Volume{Id: new(volumeID), ServerId: nil}, nil)
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), volumeID).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), ServerId: nil}, nil)
+
+			mockIaaSClient.EXPECT().AddVolumeToServer(gomock.Any(), gomock.Any(), gomock.Any(), serverID, volumeID).
+				Return(iaas.ApiAddVolumeToServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().AddVolumeToServerExecute(gomock.Any()).Return(
+				&iaas.VolumeAttachment{VolumeId: new(volumeID), ServerId: new(serverID)}, nil)
 
 			id, err := client.AttachVolume(context.Background(), serverID, volumeID, iaas.AddVolumeToServerPayload{})
 			Expect(err).ToNot(HaveOccurred())
@@ -435,7 +467,8 @@ var _ = Describe("Volume", func() {
 
 		It("DetachVolume fails if status is not Available", func() {
 			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(&iaas.Volume{Id: new(volumeID), Status: new("CREATING")}, nil)
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Name: new("volume-1"), Id: new(volumeID), Status: new("CREATING")}, nil)
 
 			err := client.DetachVolume(context.Background(), serverID, volumeID)
 			Expect(err).To(HaveOccurred())
@@ -447,17 +480,14 @@ var _ = Describe("Volume", func() {
 		It("successfully resizes an Available volume", func() {
 			mockIaaSClient.EXPECT().
 				ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil)
+				Return(iaas.ApiResizeVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().ResizeVolumeExecute(gomock.Any()).Return(nil)
 
-			err := client.ExpandVolume(context.Background(), volumeID, "available", iaas.ResizeVolumePayload{})
+			err := client.ExpandVolume(context.Background(), volumeID, VolumeAvailableStatus, iaas.ResizeVolumePayload{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("errors when volume is in a bad state for resize", func() {
-			mockIaaSClient.EXPECT().
-				ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(fmt.Errorf("volume cannot be resized, when status is %s", "ERROR"))
-
 			err := client.ExpandVolume(context.Background(), volumeID, "ERROR", iaas.ResizeVolumePayload{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("cannot be resized"))
@@ -466,10 +496,10 @@ var _ = Describe("Volume", func() {
 
 	Context("Waiting Logic", func() {
 		It("WaitVolumeTargetStatus returns nil when target status is reached", func() {
-			// Mocking the behavior of WaitVolumeTargetStatus
 			mockIaaSClient.EXPECT().
-				GetVolume(gomock.Any(), volumeID, []string{"available"}, gomock.Any()).
-				Return(nil)
+				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), Status: new("available")}, nil)
 
 			err := client.WaitVolumeTargetStatus(context.Background(), volumeID, []string{"available"})
 			Expect(err).ToNot(HaveOccurred())
@@ -477,8 +507,11 @@ var _ = Describe("Volume", func() {
 
 		It("WaitDiskAttached returns error on timeout", func() {
 			mockIaaSClient.EXPECT().
-				GetVolume(gomock.Any(), serverID, volumeID, gomock.Any()).
-				Return(fmt.Errorf("timeout"))
+				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{
+					ApiService: mockIaaSClient,
+				})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(nil, fmt.Errorf("timeout"))
 
 			err := client.WaitDiskAttached(context.Background(), serverID, volumeID)
 			Expect(err).To(HaveOccurred())
