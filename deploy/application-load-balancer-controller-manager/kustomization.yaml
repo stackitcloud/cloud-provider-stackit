@@ -5,3 +5,5 @@ resources:
 - deployment.yaml
 - rbac.yaml
 - service.yaml
+- validating-webhook.yaml
+- validating-webhook-issuer.yaml

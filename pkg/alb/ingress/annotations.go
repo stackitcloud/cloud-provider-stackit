@@ -20,6 +20,10 @@ const (
 	// AnnotationPlanID sets the plan for the ALB.
 	// Can be set on IngressClass.
 	AnnotationPlanID = "alb.stackit.cloud/plan-id"
+	// AnnotationNetworkMode specifies the network routing mode.
+    // It currently validates the presence of "NodePort" to ensure backward compatibility for future direct-to-pod routing.
+    // Can be set on IngressClass.
+    AnnotationNetworkMode = "alb.stackit.cloud/network-mode"
 
 	// AnnotationTargetPoolTLSEnabled If true, the application load balancer enables TLS bridging.
 	// It uses the trusted CAs from the operating system for validation.

@@ -43,6 +43,9 @@ spec:
           hostPort: 8081
           name: probe
           protocol: TCP
+        - containerPort: 9443
+          name: validating-webhook
+          protocol: TCP
         resources:
           limits:
             cpu: "0.5"
@@ -53,7 +56,14 @@ spec:
         volumeMounts:
         - mountPath: /etc/serviceaccount
           name: cloud-secret
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: validating-webhook-cert
+          readOnly: true
       volumes:
       - name: cloud-secret
         secret:
           secretName: stackit-cloud-secret
+      - name: validating-webhook-cert
+        secret:
+          secretName: stackit-application-load-balancer-controller-manager-webhook-cert
+          

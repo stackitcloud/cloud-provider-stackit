@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: stackit-application-load-balancer-controller-manager
+  namespace: kube-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: stackit-application-load-balancer-controller-manager-webhook-cert
+  namespace: kube-system
+spec:
+  dnsNames:
+    - stackit-application-load-balancer-controller-manager.kube-system.svc
+    - stackit-application-load-balancer-controller-manager.kube-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: stackit-application-load-balancer-controller-manager
+  secretName: stackit-application-load-balancer-controller-manager-webhook-cert # cert-manager will create this secret
