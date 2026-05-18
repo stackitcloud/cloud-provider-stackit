@@ -124,12 +124,12 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			iaasClient.EXPECT().ListVolumes(
 				gomock.Any(), gomock.Any(), gomock.Eq(""),
-			).DoAndReturn(func(_ context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
+			).DoAndReturn(func(_ context.Context, _ int, _ string) ([]iaas.Volume, error) {
 				var volList []iaas.Volume
 				for _, vol := range createdVolumes {
 					volList = append(volList, *vol) // Append the value
 				}
-				return volList, "", nil
+				return volList, nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().DeleteVolume(
@@ -162,7 +162,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().CreateSnapshot(
 				gomock.Any(), // context
 				gomock.Any(), // payload
-			).DoAndReturn(func(_ context.Context, name string, volID string, _ map[string]string) (*iaas.Snapshot, error) {
+			).DoAndReturn(func(_ context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
 					Id:        new(uuid.New().String()),
 					Name:      new(name),
