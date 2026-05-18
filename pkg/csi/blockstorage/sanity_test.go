@@ -165,17 +165,17 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			).DoAndReturn(func(_ context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
 					Id:        new(uuid.New().String()),
-					Name:      new(name),
+					Name:      payload.Name,
 					Status:    new(stackitclient.SnapshotReadyStatus),
 					CreatedAt: new(time.Now()),
 					Size:      new(int64(10)), // 10 GiB
-					VolumeId:  volID,
+					VolumeId:  payload.VolumeId,
 				}
 				createdSnapshots[*newSnap.Id] = newSnap
 				return newSnap, nil
 			}).AnyTimes()
 
-			iaasClient.EXPECT().GetServer(
+			iaasClient.EXPECT().GetSnapshot(
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
 			).DoAndReturn(func(_ context.Context, snapshotID string) (*iaas.Snapshot, error) {
@@ -189,7 +189,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().ListSnapshots(
 				gomock.Any(), // context
 				gomock.Any(), // filters
-			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, error) {
 				var snapshots []iaas.Snapshot
 
 				markerFilter := filters["Marker"]
@@ -223,16 +223,14 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					}
 				}
 
-				retToken := ""
 				if limitFilter != "" {
 					limit, _ := strconv.Atoi(limitFilter)
 
 					if limit > 0 && limit <= len(snapshots) {
 						snapshots = snapshots[:limit]
 					}
-					retToken = limitFilter
 				}
-				return snapshots, retToken, nil
+				return snapshots, nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().DeleteSnapshot(
@@ -323,7 +321,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // instanceID
 				gomock.Any(), // volumeID
 				gomock.Any(), // payload
-			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string) (string, error) {
+			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string, _ iaas.AddVolumeToServerPayload) (string, error) {
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
 					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
