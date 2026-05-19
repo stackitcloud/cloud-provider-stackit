@@ -138,13 +138,13 @@ func main() {
 	decoder := admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/validate-ingress", &webhook.Admission{
 		Handler: &ingress.IngressValidator{
-			Client:  mgr.GetClient(),
+			Client:  mgr.GetAPIReader(),
 			Decoder: decoder,
 		},
 	})
 	mgr.GetWebhookServer().Register("/validate-ingressclass", &webhook.Admission{
 		Handler: &ingress.IngressClassValidator{
-			Client:  mgr.GetClient(),
+			Client:  mgr.GetAPIReader(),
 			Decoder: decoder,
 		},
 	})

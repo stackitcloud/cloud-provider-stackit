@@ -14,7 +14,7 @@ import (
 )
 
 type IngressValidator struct {
-    Client  client.Client
+    Client  client.Reader
     Decoder admission.Decoder
 }
 
