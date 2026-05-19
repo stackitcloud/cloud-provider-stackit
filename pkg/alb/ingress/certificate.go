@@ -24,8 +24,7 @@ func (r *IngressClassReconciler) deleteAllCertsForClass(ctx context.Context, cla
 
 	for _, cert := range certificatesList.Items {
 		if cert.Labels == nil {
-			// This part will go away when Labels are supported by Cert API
-			// do I need to check if nil
+			continue
 		}
 
 		if val, ok := (*cert.Labels)[LabelIngressClassUID]; ok && val == targetUID {
