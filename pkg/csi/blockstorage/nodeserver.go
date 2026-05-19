@@ -320,6 +320,9 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	klog.V(4).Infof("Determined %d PCIe ports occupied by non virtio block devices", emptyPCIeRootPorts)
 	klog.V(4).Infof("Determined node to support %d volumes", maxVolumesPerNode)
 
+	// always subtract one for every SKE node, because they always have a root partition
+	maxVolumesPerNode -= 1
+
 	nodeInfo := &csi.NodeGetInfoResponse{
 		NodeId:            nodeID,
 		MaxVolumesPerNode: maxVolumesPerNode,
