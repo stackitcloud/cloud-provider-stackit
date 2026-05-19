@@ -177,7 +177,7 @@ var _ = Describe("Snapshot", func() {
 				Return(iaas.ApiListSnapshotsInProjectRequest{ApiService: mockIaaSClient})
 			mockIaaSClient.EXPECT().ListSnapshotsInProjectExecute(gomock.Any()).Return(mockItems, nil)
 
-			resp, err := client.ListSnapshots(context.Background(), nil)
+			resp, _, err := client.ListSnapshots(context.Background(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).To(HaveLen(2))
 		})

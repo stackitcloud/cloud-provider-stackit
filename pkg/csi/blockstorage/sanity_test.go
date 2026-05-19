@@ -189,7 +189,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().ListSnapshots(
 				gomock.Any(), // context
 				gomock.Any(), // filters
-			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, error) {
+			).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
 				var snapshots []iaas.Snapshot
 
 				markerFilter := filters["Marker"]
@@ -223,14 +223,16 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					}
 				}
 
+				retToken := ""
 				if limitFilter != "" {
 					limit, _ := strconv.Atoi(limitFilter)
 
 					if limit > 0 && limit <= len(snapshots) {
 						snapshots = snapshots[:limit]
 					}
+					retToken = limitFilter
 				}
-				return snapshots, nil
+				return snapshots, retToken, nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().DeleteSnapshot(

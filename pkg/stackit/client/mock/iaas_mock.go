@@ -778,12 +778,13 @@ func (c *MockIaaSClientListServersCall) DoAndReturn(f func(context.Context) (*[]
 }
 
 // ListSnapshots mocks base method.
-func (m *MockIaaSClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]v2api.Snapshot, error) {
+func (m *MockIaaSClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]v2api.Snapshot, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListSnapshots", ctx, filters)
 	ret0, _ := ret[0].([]v2api.Snapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // ListSnapshots indicates an expected call of ListSnapshots.
@@ -799,19 +800,19 @@ type MockIaaSClientListSnapshotsCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockIaaSClientListSnapshotsCall) Return(arg0 []v2api.Snapshot, arg1 error) *MockIaaSClientListSnapshotsCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockIaaSClientListSnapshotsCall) Return(arg0 []v2api.Snapshot, arg1 string, arg2 error) *MockIaaSClientListSnapshotsCall {
+	c.Call = c.Call.Return(arg0, arg1, arg2)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientListSnapshotsCall) Do(f func(context.Context, map[string]string) ([]v2api.Snapshot, error)) *MockIaaSClientListSnapshotsCall {
+func (c *MockIaaSClientListSnapshotsCall) Do(f func(context.Context, map[string]string) ([]v2api.Snapshot, string, error)) *MockIaaSClientListSnapshotsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientListSnapshotsCall) DoAndReturn(f func(context.Context, map[string]string) ([]v2api.Snapshot, error)) *MockIaaSClientListSnapshotsCall {
+func (c *MockIaaSClientListSnapshotsCall) DoAndReturn(f func(context.Context, map[string]string) ([]v2api.Snapshot, string, error)) *MockIaaSClientListSnapshotsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

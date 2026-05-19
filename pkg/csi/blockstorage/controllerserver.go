@@ -629,7 +629,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 	filters["Name"] = name
 
 	// List existing snapshots with the same name
-	snapshots, err := cs.Instance.ListSnapshots(ctx, filters)
+	snapshots, _, err := cs.Instance.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to query for existing Snapshot during CreateSnapshot: %v", err)
 		return nil, status.Error(codes.Internal, "Failed to get snapshots")
@@ -792,7 +792,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 	// Only retrieve snapshots that are available
 	filters["Status"] = stackitclient.SnapshotReadyStatus
-	slist, err = cloud.ListSnapshots(ctx, filters)
+	slist, nextPageToken, err = cloud.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to ListSnapshots: %v", err)
 		return nil, status.Errorf(codes.Internal, "ListSnapshots failed with error %v", err)
