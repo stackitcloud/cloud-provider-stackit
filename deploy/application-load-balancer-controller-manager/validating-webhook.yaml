@@ -20,3 +20,18 @@ webhooks:
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 5
+  - name: validate-ingressclass.stackit.cloud
+    rules:
+      - apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["ingressclasses"]
+        scope: "Cluster"
+    clientConfig:
+      service:
+        namespace: kube-system
+        name: stackit-application-load-balancer-controller-manager
+        path: "/validate-ingressclass"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5

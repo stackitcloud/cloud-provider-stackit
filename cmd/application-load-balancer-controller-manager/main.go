@@ -135,12 +135,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	decoder := admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/validate-ingress", &webhook.Admission{
-        Handler: &ingress.IngressValidator{
-            Client:  mgr.GetClient(),
-            Decoder: admission.NewDecoder(mgr.GetScheme()),
-        },
-    })
+		Handler: &ingress.IngressValidator{
+			Client:  mgr.GetClient(),
+			Decoder: decoder,
+		},
+	})
+	mgr.GetWebhookServer().Register("/validate-ingressclass", &webhook.Admission{
+		Handler: &ingress.IngressClassValidator{
+			Client:  mgr.GetClient(),
+			Decoder: decoder,
+		},
+	})
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

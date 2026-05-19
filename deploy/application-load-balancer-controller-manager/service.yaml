@@ -17,7 +17,7 @@ spec:
     port: 8080
     targetPort: metrics
     protocol: TCP
-  - name: validating-webhook
+  - name: webhook
     port: 443
     targetPort: 9443
     protocol: TCP

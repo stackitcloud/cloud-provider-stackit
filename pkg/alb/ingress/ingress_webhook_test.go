@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	admissionv1 "k8s.io/api/admission/v1"
 )
 
 func TestIngressValidator_Handle(t *testing.T) {
@@ -38,89 +38,76 @@ func TestIngressValidator_Handle(t *testing.T) {
 	decoder := admission.NewDecoder(s)
 
 	validator := &IngressValidator{
-		Client: fakeClient,
+		Client:  fakeClient,
+		Decoder: decoder,
 	}
-	_ = validator.InjectDecoder(decoder)
 
 	tests := []struct {
-		name           string
-		className      *string
-		annotations    map[string]string
-		expectAllowed  bool
+		name          string
+		operation     admissionv1.Operation
+		className     *string
+		annotations   map[string]string
+		expectAllowed bool
 	}{
 		{
-			name:      "Valid Ingress",
+			name:      "Valid Ingress (Create)",
+			operation: admissionv1.Create,
 			className: &managedIngressClassName,
 			annotations: map[string]string{
-				AnnotationNetworkMode: "NodePort",
+				AnnotationHTTPSOnly: "true",
+				AnnotationPriority:  "100",
+			},
+			expectAllowed: true,
+		},
+		{
+			name:      "Valid Ingress (Update)",
+			operation: admissionv1.Update,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationHTTPSOnly:                   "false",
+				AnnotationCookiePersistenceTTLSeconds: "3600",
 			},
 			expectAllowed: true,
 		},
 		{
 			name:          "No IngressClass - Should Ignore and Allow",
+			operation:     admissionv1.Create,
 			className:     nil,
 			annotations:   map[string]string{},
 			expectAllowed: true,
 		},
 		{
 			name:      "Unmanaged IngressClass - Should Ignore and Allow",
+			operation: admissionv1.Create,
 			className: &unmanagedIngressClassName,
 			annotations: map[string]string{
-				// These are completely invalid for STACKIT ALB,
-				// but the webhook shouldn't check them because it's unmanaged.
-				AnnotationNetworkMode: "LoadBalancer",
-				AnnotationHTTPPort:    "potato",
+				AnnotationHTTPSOnly: "not-a-bool",
 			},
 			expectAllowed: true,
 		},
 		{
-			name:      "Missing Network Mode",
+			name:      "Denied - Invalid Boolean",
+			operation: admissionv1.Create,
 			className: &managedIngressClassName,
 			annotations: map[string]string{
-				AnnotationHTTPPort: "80",
+				AnnotationHTTPSOnly: "not-a-bool",
 			},
 			expectAllowed: false,
 		},
 		{
-			name:      "Invalid Network Mode Value - Must be NodePort",
+			name:      "Denied - Invalid Integer",
+			operation: admissionv1.Create,
 			className: &managedIngressClassName,
 			annotations: map[string]string{
-				AnnotationNetworkMode: "LoadBalancer",
+				AnnotationPriority: "high",
 			},
 			expectAllowed: false,
 		},
 		{
-			name:      "Invalid Boolean",
+			name:      "Denied - Negative TTL",
+			operation: admissionv1.Create,
 			className: &managedIngressClassName,
 			annotations: map[string]string{
-				AnnotationNetworkMode: "NodePort",
-				AnnotationInternal:    "not-a-bool",
-			},
-			expectAllowed: false,
-		},
-		{
-			name:      "Invalid Port Number - Out of Range",
-			className: &managedIngressClassName,
-			annotations: map[string]string{
-				AnnotationNetworkMode: "NodePort",
-				AnnotationHTTPPort:    "99999",
-			},
-			expectAllowed: false,
-		},
-		{
-			name:      "Invalid IP Address",
-			className: &managedIngressClassName,
-			annotations: map[string]string{
-				AnnotationNetworkMode: "NodePort",
-				AnnotationExternalIP:  "300.0.0.1",
-			},
-			expectAllowed: false,
-		},
-		{
-			name:      "Negative TTL",
-			className: &managedIngressClassName,
-			annotations: map[string]string{
-				AnnotationNetworkMode:                 "NodePort",
 				AnnotationCookiePersistenceTTLSeconds: "-50",
 			},
 			expectAllowed: false,
@@ -130,6 +117,10 @@ func TestIngressValidator_Handle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ingress := &networkingv1.Ingress{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "networking.k8s.io/v1",
+					Kind:       "Ingress",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-ingress",
 					Namespace:   "default",
@@ -139,8 +130,7 @@ func TestIngressValidator_Handle(t *testing.T) {
 					IngressClassName: tt.className,
 				},
 			}
-
-			// Marshal it into JSON to simulate the API server payload
+			
 			rawIngress, err := json.Marshal(ingress)
 			if err != nil {
 				t.Fatalf("Failed to marshal ingress: %v", err)
@@ -148,15 +138,19 @@ func TestIngressValidator_Handle(t *testing.T) {
 
 			req := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
-					Object: runtime.RawExtension{Raw: rawIngress},
+					Operation: tt.operation,
+					Object:    runtime.RawExtension{Raw: rawIngress},
 				},
 			}
 
-			// Execute the webhook
+			if tt.operation == admissionv1.Update {
+				req.AdmissionRequest.OldObject = runtime.RawExtension{Raw: rawIngress}
+			}
+
 			res := validator.Handle(context.TODO(), req)
 
 			if res.Allowed != tt.expectAllowed {
-				t.Errorf("Expected Allowed=%v, got Allowed=%v. Result Message: %s", 
+				t.Errorf("Expected Allowed=%v, got Allowed=%v. Result Message: %s",
 					tt.expectAllowed, res.Allowed, res.Result.Message)
 			}
 		})
