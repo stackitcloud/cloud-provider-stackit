@@ -112,6 +112,69 @@ func TestIngressValidator_Handle(t *testing.T) {
 			},
 			expectAllowed: false,
 		},
+		{
+			name:      "Valid WAF Name (Allowed)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "my-valid-waf-123",
+			},
+			expectAllowed: true,
+		},
+		{
+			name:      "Valid WAF Name Single Char (Allowed)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "a",
+			},
+			expectAllowed: true,
+		},
+		{
+			name:      "Denied - Invalid WAF Name (Uppercase)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "My-Waf-Name",
+			},
+			expectAllowed: false,
+		},
+		{
+			name:      "Denied - Invalid WAF Name (Starts with hyphen)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "-my-waf",
+			},
+			expectAllowed: false,
+		},
+		{
+			name:      "Denied - Invalid WAF Name (Ends with hyphen)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "my-waf-",
+			},
+			expectAllowed: false,
+		},
+		{
+			name:      "Denied - Invalid WAF Name (Invalid Character)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "my_waf_name",
+			},
+			expectAllowed: false,
+		},
+		{
+			name:      "Denied - Invalid WAF Name (Too Long - 64 chars)",
+			operation: admissionv1.Create,
+			className: &managedIngressClassName,
+			annotations: map[string]string{
+				AnnotationWAFName: "a123456789012345678901234567890123456789012345678901234567890123",
+			},
+			expectAllowed: false,
+		},
 	}
 
 	for _, tt := range tests {

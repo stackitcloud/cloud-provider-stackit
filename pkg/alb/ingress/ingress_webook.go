@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"regexp"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,6 +81,15 @@ func (v *IngressValidator) handleUpdate(ctx context.Context, req admission.Reque
 
 // validateBaseAnnotations checks simple formatting, allowed values, and basic constraints for all relevant annotations.
 func (v *IngressValidator) validateBaseAnnotations(ctx context.Context, ingress *networkingv1.Ingress) admission.Response {
+	// Validate WAF Name using the provided regex constraint
+	if val, ok := ingress.Annotations[AnnotationWAFName]; ok {
+		wafRegex := `^[0-9a-z](?:(?:[0-9a-z]|-){0,61}[0-9a-z])?$`
+		matched, _ := regexp.MatchString(wafRegex, val)
+		if !matched {
+			return admission.Denied(fmt.Sprintf("Annotation '%s' has an invalid value '%s'. It must match the pattern: %s", AnnotationWAFName, val, wafRegex))
+		}
+	}
+
 	// Validate Booleans
 	boolAnnotations := []string{
 		AnnotationTargetPoolTLSEnabled,
