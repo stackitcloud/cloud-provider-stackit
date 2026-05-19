@@ -77,6 +77,13 @@ func (v *IngressClassValidator) handleUpdate(ctx context.Context, req admission.
 		return resp
 	}
 
+	// Check immutability for AnnotationInternal
+	oldInternal := oldClass.Annotations[AnnotationInternal]
+	newInternal := newClass.Annotations[AnnotationInternal]
+	if oldInternal != newInternal {
+		return admission.Denied(fmt.Sprintf("The annotation '%s' is immutable and cannot be changed after creation.", AnnotationInternal))
+	}
+
 	if resp := v.validateIPUpdate(ctx, oldClass, newClass); !resp.Allowed {
 		return resp
 	}
@@ -89,6 +96,13 @@ func (v *IngressClassValidator) validateBaseAnnotations(ingressClass *networking
 	if val, ok := ingressClass.Annotations[AnnotationExternalIP]; ok {
 		if net.ParseIP(val) == nil {
 			return admission.Denied(fmt.Sprintf("Annotation '%s' must be a valid IP address.", AnnotationExternalIP))
+		}
+	}
+
+	// Check if AnnotationInternal is a boolean.
+	if val, ok := ingressClass.Annotations[AnnotationInternal]; ok {
+		if _, err := strconv.ParseBool(val); err != nil {
+			return admission.Denied(fmt.Sprintf("Annotation '%s' must be a valid boolean (true or false).", AnnotationInternal))
 		}
 	}
 
