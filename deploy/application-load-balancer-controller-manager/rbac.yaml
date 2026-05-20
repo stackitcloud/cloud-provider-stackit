@@ -27,19 +27,19 @@ rules:
 - apiGroups:
   - "networking.k8s.io"
   resources:
-  - ingress
+  - ingresses
   verbs:
   - get
 - apiGroups:
   - "networking.k8s.io"
   resources:
-  - ingress/status
+  - ingresses/status
   verbs:
   - patch
 - apiGroups:
   - "networking.k8s.io"
   resources:
-  - ingressclass
+  - ingressclasses
   verbs:
   - list
   - patch
