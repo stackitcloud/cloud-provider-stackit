@@ -18,12 +18,11 @@ import (
 )
 
 const (
-	// prefixCustomerLabel is the api prefix for all custom labels
-	prefixCustomerLabel = "lb.customer.label/"
+	prefixALBIngressController = "alb-ingress-controller-"
 
 	// LabelIngressClassUID is the unique key that identifies resources
 	// owned by a specific IngressClass.
-	LabelIngressClassUID = prefixCustomerLabel + "ingress-class-uid"
+	LabelIngressClassUID = prefixALBIngressController + "ingress-class-uid"
 )
 
 func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
@@ -101,6 +100,8 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 		}
 	}
 
+	fmt.Printf("\n\n >>> DEBUG: show existing labels %v \n\n , \n\n", mergedLabels)
+
 	// Merge with existing global config labels
 	if r.ALBConfig.ApplicationLoadBalancer.ExtraLabels != nil {
 		for k, v := range r.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
@@ -113,6 +114,9 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	// Add ownership label
 	mergedLabels[LabelIngressClassUID] = string(class.UID)
 	alb.Labels = &mergedLabels
+
+	fmt.Printf("\n\n >>> DEBUG: show if ownership label is added %v \n\n , \n\n", mergedLabels)
+	fmt.Printf("\n\n >>> DEBUG: show me alb labels %v \n\n , \n\n", alb.Labels)
 
 	for port, listener := range listeners {
 		albsdkListener := albsdk.Listener{
