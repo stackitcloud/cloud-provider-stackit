@@ -20,6 +20,7 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, alb *albsdk.Creat
 			}
 			return nil
 		}
+		return fmt.Errorf("failed to get load balancer: %w", err)
 	}
 
 	if !updateNeeded(responseAlb, alb) {
