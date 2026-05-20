@@ -2,31 +2,31 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: kube-system
-  name: stackit-application-load-balancer-contoller-manager
+  name: stackit-application-load-balancer-controller-manager
   labels:
-    app: stackit-application-load-balancer-contoller-manager
+    app: stackit-application-load-balancer-controller-manager
 spec:
   replicas: 2
   strategy:
     type: RollingUpdate
   selector:
     matchLabels:
-      app: stackit-application-load-balancer-contoller-manager
+      app: stackit-application-load-balancer-controller-manager
   template:
     metadata:
       labels:
-        app: stackit-application-load-balancer-contoller-manager
+        app: stackit-application-load-balancer-controller-manager
     spec:
-      serviceAccountName: stackit-application-load-balancer-contoller-manager
+      serviceAccountName: stackit-application-load-balancer-controller-manager
       terminationGracePeriodSeconds: 30
       containers:
-      - name: stackit-application-load-balancer-contoller-manager
+      - name: stackit-application-load-balancer-controller-manager
         # TODO(jamand): Adapt image tag
-        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-application-load-balancer-contoller-manager:XXX
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-application-load-balancer-controller-manager:XXX
         args:
         - "--authorization-always-allow-paths=/metrics"
         - "--leader-elect=true"
-        - "--leader-elect-resource-name=stackit-application-load-balancer-contoller-manager"
+        - "--leader-elect-resource-name=stackit-application-load-balancer-controller-manager"
         - "--enable-http2"
         - "--metrics-bind-address=8080"
         - "--secureMetrics=false"
