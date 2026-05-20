@@ -4,4 +4,4 @@ kind: Kustomization
 resources:
 - deployment.yaml
 - rbac.yaml
-
+- service.yaml
