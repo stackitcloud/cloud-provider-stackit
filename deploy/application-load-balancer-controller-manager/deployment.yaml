@@ -12,6 +12,9 @@ spec:
   selector:
     matchLabels:
       app: stackit-application-load-balancer-controller-manager
+      networking.gardener.cloud/from-seed: allowed # Allow traffic from seed to shoot for webhook calls
+      networking.gardener.cloud/to-dns: allowed # Allow traffic to CoreDNS for webhook calls
+      networking.gardener.cloud/to-apiserver: allowed # Allow traffic to API server for webhook calls
   template:
     metadata:
       labels:
