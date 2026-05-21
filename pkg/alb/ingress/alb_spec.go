@@ -100,8 +100,6 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 		}
 	}
 
-	fmt.Printf("\n\n >>> DEBUG: show existing labels %v \n\n , \n\n", mergedLabels)
-
 	// Merge with existing global config labels
 	if r.ALBConfig.ApplicationLoadBalancer.ExtraLabels != nil {
 		for k, v := range r.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
@@ -114,9 +112,6 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	// Add ownership label
 	mergedLabels[LabelIngressClassUID] = string(class.UID)
 	alb.Labels = &mergedLabels
-
-	fmt.Printf("\n\n >>> DEBUG: show if ownership label is added %v \n\n , \n\n", mergedLabels)
-	fmt.Printf("\n\n >>> DEBUG: show me alb labels %v \n\n , \n\n", alb.Labels)
 
 	for port, listener := range listeners {
 		albsdkListener := albsdk.Listener{

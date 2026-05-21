@@ -26,6 +26,7 @@ const (
 	networkID      = "my-network"
 	controllerName = "stackit.cloud/alb-ingress"
 	finalizerName  = "stackit.cloud/alb-ingress"
+	targetCertID   = "real-certificate-uuid-abc-123"
 )
 
 var _ = Describe("IngressClassReconciler", func() {
@@ -238,7 +239,7 @@ var _ = Describe("IngressClassReconciler", func() {
 						UID:          "envtest-ic-uid",
 						Labels: map[string]string{
 							"app": "stackit-alb-ingress",
-							//LabelIngressClassUID: "target-cloud-alb-id",
+							"alb-ingress-controller-ingress-class-uid": "target-cloud-alb-id",
 						},
 					},
 					Spec: networkingv1.IngressClassSpec{Controller: controllerName},
@@ -258,10 +259,19 @@ var _ = Describe("IngressClassReconciler", func() {
 						DeleteLoadBalancer(gomock.Any(), projectID, region, gomock.Any()).
 						Return(nil).
 						Times(1) // Asserts that the controller MUST call this exactly 1 time!
+
 				}
+
 			})
 
-			It("should read the UID label, invoke the cloud delete call, and drop the resource from K8s", func() {
+			It("should read the UID label, delete associated ALB and certificate ", func() {
+
+				// should delete the associated ALB and Certificate
+				certClient.EXPECT().
+					DeleteCertificate(gomock.Any(), projectID, region, targetCertID).
+					Return(nil).
+					AnyTimes()
+
 				// Publish the labeled IngressClass to the test cluster
 				Expect(k8sClient.Create(ctx, managedIngressClass)).To(Succeed())
 
