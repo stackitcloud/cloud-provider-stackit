@@ -148,19 +148,90 @@ var _ = Describe("Node Controller", func() {
 			Expect(*spec).To(BeEquivalentTo(albSpec))
 		})
 
-		It("should work with labels", func() {
+		Context("when handling labels", func() {
+			It("should work with valid labels", func() {
 
-			reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels = map[string]string{"managed-by": "alb-ingressClass"}
-			// adding extra labels to albSpec.Labels map
-			for k, v := range reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
-				(*albSpec.Labels)[k] = v
-			}
-			spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
-			Expect(err).To(Succeed())
-			Expect(errorEventList).To(BeEmpty())
+				reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels = map[string]string{"managed-by": "alb-ingressClass"}
+				// adding extra labels to albSpec.Labels map
+				for k, v := range reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
+					(*albSpec.Labels)[k] = v
+				}
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+				Expect(err).To(Succeed())
+				Expect(errorEventList).To(BeEmpty())
 
-			Expect(spec).ToNot(BeNil())
-			Expect(*spec).To(BeEquivalentTo(albSpec))
+				Expect(spec).ToNot(BeNil())
+				Expect(*spec).To(BeEquivalentTo(albSpec))
+			})
+
+			It("should successfully validate and merge labels", func() {
+
+				ingressClass.Labels = map[string]string{
+					"app":                  "frontend",               // Valid
+					"stackit-internal-key": "malicious",              // Invalid: Reserved prefix
+					"invalid/key/chars/#$": "value",                  // Invalid: Bad characters
+					"valid-key":            "invalid_value_chars_#$", // Invalid: Bad value characters
+				}
+
+				// adding extra labels to albSpec.Labels map
+				reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels = map[string]string{
+					"managed-by": "alb-ingressClass", // Valid
+				}
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+
+				Expect(err).To(Succeed())
+				Expect(spec).ToNot(BeNil())
+
+				// verifying that exactly 3 validation errors were recorded
+				Expect(errorEventList).To(HaveLen(3))
+
+				// verifying that the error messages correctly point to the IngressClass
+				Expect(errorEventList[0].ingressRef.Kind).To(Equal("IngressClass"))
+				Expect(errorEventList[0].ingressRef.Name).To(Equal(ingressClass.Name))
+
+				// verifying that only the valid labels (plus the mandatory ownership label) made it through
+				expectedLabels := map[string]string{
+					"app":                "frontend",
+					"managed-by":         "alb-ingressClass",
+					LabelIngressClassUID: string(ingressClass.UID), // Ownership label must be present
+				}
+
+				Expect(*spec.Labels).To(BeEquivalentTo(expectedLabels))
+			})
+
+			It("should strictly enforce the 64-label limit and protect the ownership label", func() {
+
+				overflowLabels := make(map[string]string)
+				for i := 1; i <= 70; i++ {
+					key := fmt.Sprintf("user-label-key-%d", i)
+					overflowLabels[key] = "valid-value"
+				}
+				ingressClass.Labels = overflowLabels
+
+				// adding extra labels to albSpec.Labels map
+				reconciler.ALBConfig.ApplicationLoadBalancer.ExtraLabels = map[string]string{
+					"global-config-1": "value-1",
+					"global-config-2": "value-2",
+				}
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+
+				Expect(err).To(Succeed())
+				Expect(spec).ToNot(BeNil())
+				Expect(spec.Labels).ToNot(BeNil())
+
+				// verifying that the map must never exceed the limit of 64 labels
+				Expect(*spec.Labels).To(HaveLen(64))
+
+				// verifying the system ownership label must exist in the final map
+				Expect(*spec.Labels).To(HaveKey(LabelIngressClassUID))
+				Expect((*spec.Labels)[LabelIngressClassUID]).To(Equal(string(ingressClass.UID)))
+
+				// Verify that no false-positive validation errors were thrown
+				// Because exceeding the limit shouldn't create validation syntax errors
+				Expect(errorEventList).To(BeEmpty())
+			})
 		})
 
 		It("should work with certificates", func() {
@@ -207,9 +278,12 @@ var _ = Describe("Node Controller", func() {
 				Times(1)
 
 			httpsIngress := testHttpsIngress(&ingressClass, &service)
+			if httpsIngress.Annotations == nil {
+				httpsIngress.Annotations = make(map[string]string)
+			}
 			httpsIngress.Annotations = map[string]string{"alb.stackit.cloud/https-only": "true"}
 
-			Expect(k8sClient.Create(context.Background(), new(httpsIngress))).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), &httpsIngress)).To(Succeed())
 
 			// expected albSpec should include new https listener
 			httpListener := testHttpListener(service.Spec.Ports[0].NodePort)

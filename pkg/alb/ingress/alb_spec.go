@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,10 +21,12 @@ import (
 
 const (
 	prefixALBIngressController = "alb-ingress-controller-"
-
+	// prefixStackitInternalLabel is reserved for STACKIT internal labeling of resources that customer are not allowed to use
+	prefixStackitInternalLabel = "stackit-"
 	// LabelIngressClassUID is the unique key that identifies resources
 	// owned by a specific IngressClass.
 	LabelIngressClassUID = prefixALBIngressController + "ingress-class-uid"
+	maximumLabelCount    = 64
 )
 
 func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
@@ -93,19 +97,25 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 
 	mergedLabels := make(map[string]string)
 
-	// Add user labels, mind the limit
-	for k, v := range class.Labels {
-		if len(mergedLabels) < 64 {
-			mergedLabels[k] = v
-		}
+	ingressClassRef := corev1.ObjectReference{
+		Kind:       "IngressClass",
+		APIVersion: "networking.k8s.io/v1",
+		Name:       class.Name,
 	}
+
+	// Add user labels by validating and merging them
+	errorList = validateAndMergeLabels(class.Labels, mergedLabels, ingressClassRef, errorList)
 
 	// Merge with existing global config labels
 	if r.ALBConfig.ApplicationLoadBalancer.ExtraLabels != nil {
-		for k, v := range r.ALBConfig.ApplicationLoadBalancer.ExtraLabels {
-			if len(mergedLabels) < 64 {
-				mergedLabels[k] = v
-			}
+		errorList = validateAndMergeLabels(r.ALBConfig.ApplicationLoadBalancer.ExtraLabels, mergedLabels, ingressClassRef, errorList)
+	}
+
+	// evict one item to make room for the ownership label
+	if len(mergedLabels) >= 64 {
+		for k := range mergedLabels {
+			delete(mergedLabels, k)
+			break
 		}
 	}
 
@@ -467,4 +477,65 @@ func getIngressRefForIngress(scheme *runtime.Scheme, ingress *networkingv1.Ingre
 		return corev1.ObjectReference{}
 	}
 	return *ref
+}
+
+// validateAndMergeLabels checks for the reserved prefix and copies valid labels up to the 64 limit.
+// It returns the updated errorList slice.
+func validateAndMergeLabels(
+	inputLabels map[string]string,
+	mergedLabels map[string]string,
+	ingressClassRef corev1.ObjectReference,
+	errorList []errorEvents,
+) []errorEvents {
+	for k, v := range inputLabels {
+		if len(mergedLabels) >= 64 {
+			break
+		}
+
+		isValid := true
+
+		if strings.HasPrefix(k, prefixStackitInternalLabel) {
+			isValid = false
+			errorList = append(errorList, errorEvents{
+				ingressRef: ingressClassRef,
+				description: fmt.Sprintf(
+					"Invalid label key '%s': the 'stackit-' prefix is reserved and cannot be used. %q",
+					k,
+					ingressClassRef.Name,
+				),
+				typ: "error",
+			})
+		}
+
+		if !labels.IsValidLabelKey(k) {
+			isValid = false
+			errorList = append(errorList, errorEvents{
+				ingressRef: ingressClassRef,
+				description: fmt.Sprintf(
+					"Invalid label key '%s': must be 1-63 characters, start/end with alphanumeric, may contain - _ .  IngressClass:  %q",
+					k,
+					ingressClassRef.Name,
+				),
+				typ: "error",
+			})
+		}
+
+		if !labels.IsValidLabelValue(v) {
+			isValid = false
+			errorList = append(errorList, errorEvents{
+				ingressRef: ingressClassRef,
+				description: fmt.Sprintf(
+					"Invalid label value '%s': must be 0-63 characters, start/end with alphanumeric, may contain - _ .  IngressClass: %q",
+					v,
+					ingressClassRef.Name,
+				),
+				typ: "error",
+			})
+		}
+		if isValid {
+			mergedLabels[k] = v
+		}
+
+	}
+	return errorList
 }
