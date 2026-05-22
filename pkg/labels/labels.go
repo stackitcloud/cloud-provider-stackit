@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+const (
+
+	// prefixALBIngressController is the prefix for all labels associated with ingress controllers
+	prefixALBIngressController = "alb-ingress-controller-"
+	// LabelIngressClassUID is the unique key that identifies resources
+	// owned by a specific IngressClass.
+	LabelIngressClassUID = prefixALBIngressController + "ingress-class-uid"
+)
+
 // Replace non-alphanumeric characters (except '-', '_', '.') with '-'
 var reg = regexp.MustCompile(`[^-a-zA-Z0-9_.]+`)
 

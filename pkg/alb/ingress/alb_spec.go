@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,7 +46,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(ctx context.Context, cla
 		errorList = append(errorList, listenerMergeError...)
 	}
 
-	certNameToId, certificateErrorEvents := r.applyCertificates(ctx, certificates)
+	certNameToId, certificateErrorEvents := r.applyCertificates(ctx, class, certificates)
 	errorList = append(errorList, certificateErrorEvents...)
 
 	alb, albSpecErrorList, err := r.getAlbSpecForResources(ctx, class, listeners, targetPools, certNameToId)
@@ -82,6 +83,12 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	if plan := getAnnotation(AnnotationPlanID, "", class); plan != "" {
 		alb.PlanId = &plan
 	}
+
+	// add ownership labels
+	ownershipLabels := map[string]string{
+		labels.LabelIngressClassUID: string(class.UID),
+	}
+	alb.Labels = &ownershipLabels
 
 	for port, listener := range listeners {
 		albsdkListener := albsdk.Listener{
@@ -379,7 +386,7 @@ func (r *IngressClassReconciler) getCertificateForSecretName(ctx context.Context
 	}, nil
 }
 
-func (r *IngressClassReconciler) applyCertificates(ctx context.Context, certificates albCertificates) (map[string]string, []errorEvents) {
+func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *networkingv1.IngressClass, certificates albCertificates) (map[string]string, []errorEvents) {
 	errorList := []errorEvents{}
 	nameToID := map[string]string{}
 	for name, certificate := range certificates {
@@ -388,6 +395,9 @@ func (r *IngressClassReconciler) applyCertificates(ctx context.Context, certific
 			ProjectId:  &r.ALBConfig.Global.ProjectID,
 			PrivateKey: new(string(certificate.privateKey)),
 			PublicKey:  new(string(certificate.publicKey)),
+			Labels: &map[string]string{
+				labels.LabelIngressClassUID: string(class.UID),
+			},
 		}
 		response, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {
