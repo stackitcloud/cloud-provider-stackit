@@ -20,6 +20,8 @@ var (
 	reg = regexp.MustCompile(`[^-a-zA-Z0-9_.]+`)
 )
 
+const MaximumLabelCount = 64
+
 func IsValidLabelKey(key string) bool {
 	return labelKeyRegex.MatchString(key)
 }

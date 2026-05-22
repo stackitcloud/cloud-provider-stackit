@@ -26,7 +26,6 @@ const (
 	// LabelIngressClassUID is the unique key that identifies resources
 	// owned by a specific IngressClass.
 	LabelIngressClassUID = prefixALBIngressController + "ingress-class-uid"
-	maximumLabelCount    = 64
 )
 
 func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvents, error) {
@@ -112,7 +111,7 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	}
 
 	// evict one item to make room for the ownership label
-	if len(mergedLabels) >= 64 {
+	if len(mergedLabels) >= labels.MaximumLabelCount {
 		for k := range mergedLabels {
 			delete(mergedLabels, k)
 			break
@@ -488,7 +487,7 @@ func validateAndMergeLabels(
 	errorList []errorEvents,
 ) []errorEvents {
 	for k, v := range inputLabels {
-		if len(mergedLabels) >= 64 {
+		if len(mergedLabels) >= labels.MaximumLabelCount {
 			break
 		}
 
