@@ -24,13 +24,13 @@ const (
 	// AnnotationTargetPoolTLSEnabled If true, the application load balancer enables TLS bridging.
 	// It uses the trusted CAs from the operating system for validation.
 	// Can be set on IngressClass, Ingress and Service.
-	AnnotationTargetPoolTLSEnabled = "alb.stackit.cloud/traget-pool-tls-enabled"
+	AnnotationTargetPoolTLSEnabled = "alb.stackit.cloud/target-pool-tls-enabled"
 	// AnnotationTargetPoolTLSCustomCa If set, the application load balancer enables TLS bridging with a custom CA provided as value.
 	// Can be set on IngressClass, Ingress and Service
-	AnnotationTargetPoolTLSCustomCa = "alb.stackit.cloud/traget-pool-tls-custom-ca"
+	AnnotationTargetPoolTLSCustomCa = "alb.stackit.cloud/target-pool-tls-custom-ca"
 	// AnnotationTargetPoolTLSSkipCertificateValidation If true, the application load balancer enables TLS bridging but skips validation.
 	// Can be set on IngressClass, Ingress and Service.
-	AnnotationTargetPoolTLSSkipCertificateValidation = "alb.stackit.cloud/traget-pool-tls-skip-certificate-validation"
+	AnnotationTargetPoolTLSSkipCertificateValidation = "alb.stackit.cloud/target-pool-tls-skip-certificate-validation"
 
 	// AnnotationHTTPPort Specifies the HTTP port.
 	// Can be set on IngressClass and Ingress.
