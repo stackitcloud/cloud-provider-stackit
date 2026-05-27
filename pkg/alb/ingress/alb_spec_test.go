@@ -168,7 +168,7 @@ var _ = Describe("Node Controller", func() {
 					Name: new(expectedGeneratedCertName),
 				}
 
-				// 4. Setup mock client expectation
+				// Setup mock client expectation
 				certClient.EXPECT().
 					CreateCertificate(gomock.Any(), "test-project", "test-region", gomock.Any()).
 					Return(mockResponse, nil).
@@ -176,7 +176,7 @@ var _ = Describe("Node Controller", func() {
 
 				albSpec = getInitialAlbSpec(&ingressClass, &service, &node, reconciler.ALBConfig.ApplicationLoadBalancer.NetworkID)
 
-				// 5. Reset expected listeners on albSpec template
+				// Reset expected listeners on albSpec template
 				httpsListener := testHttpsListener(service.Spec.Ports[0].NodePort, targetCertID)
 				albSpec.Listeners = []albsdk.Listener{
 					httpsListener,
@@ -215,7 +215,6 @@ var _ = Describe("Node Controller", func() {
 
 				Expect(k8sClient.Create(context.Background(), &httpsIngress)).To(Succeed())
 
-				// Corrected Pointer initialization logic to prevent nil dereferences
 				albSpec.TargetPools[0].TlsConfig = &albsdk.TlsConfig{
 					Enabled: new(bool),
 				}
