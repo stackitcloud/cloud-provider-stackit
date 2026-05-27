@@ -111,6 +111,9 @@ func updateNeeded(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalance
 							return true
 						}
 					}
+					if ptr.Deref(albRule.WebSocket, false) != ptr.Deref(payloadRule.WebSocket, false) {
+						return true
+					}
 					if ptr.Deref(albRule.TargetPool, "") != ptr.Deref(payloadRule.TargetPool, "") {
 						return true
 					}
