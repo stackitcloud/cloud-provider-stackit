@@ -202,7 +202,6 @@ allowVolumeExpansion: true
 - **Scope:** Tests a broad spectrum of the CSI driver's core features (e.g., volume provisioning, mounting, unmounting, deletion), except `VolumeSnapshot`.
 
 
-
 ### Sequential E2E Test Suite (Snapshots & Backups)
 
 Specific tests related to `VolumeSnapshot` must be run sequentially to ensure proper state management and ordering of operations.
