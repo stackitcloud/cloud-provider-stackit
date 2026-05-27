@@ -78,21 +78,21 @@ func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []error) {
 		if dstTargetPool.skipCertificateValidation != srcTargetPool.skipCertificateValidation {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
-				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSSkipCertificateValidation, dstTargetPool.ingressRef),
+				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSSkipCertificateValidation, dstTargetPool.ingressRef),
 				typ:         "Warning",
 			})
 		}
 		if dstTargetPool.tlsEnabled != srcTargetPool.tlsEnabled {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
-				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSEnabled, dstTargetPool.ingressRef),
+				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSEnabled, dstTargetPool.ingressRef),
 				typ:         "Warning",
 			})
 		}
 		if dstTargetPool.customCA != srcTargetPool.customCA {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
-				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSCustomCa, dstTargetPool.ingressRef),
+				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSCustomCa, dstTargetPool.ingressRef),
 				typ:         "Warning",
 			})
 		}

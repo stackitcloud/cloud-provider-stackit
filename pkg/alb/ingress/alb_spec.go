@@ -192,6 +192,26 @@ func (r *IngressClassReconciler) getAlbSpecForResources(
 			Targets:           targets,
 			ActiveHealthCheck: nil, // TODO
 		}
+
+		if targetPool.tlsEnabled {
+			albsdkTargetPool.TlsConfig = &albsdk.TlsConfig{
+				Enabled:                   new(bool),
+				SkipCertificateValidation: nil,
+				CustomCa:                  nil,
+			}
+			*albsdkTargetPool.TlsConfig.Enabled = true
+
+			if targetPool.skipCertificateValidation {
+				albsdkTargetPool.TlsConfig.SkipCertificateValidation = new(bool)
+				*albsdkTargetPool.TlsConfig.SkipCertificateValidation = true
+			}
+
+			if targetPool.customCA != "" {
+				albsdkTargetPool.TlsConfig.CustomCa = new(string)
+				*albsdkTargetPool.TlsConfig.CustomCa = targetPool.customCA
+			}
+		}
+
 		alb.TargetPools = append(alb.TargetPools, albsdkTargetPool)
 	}
 

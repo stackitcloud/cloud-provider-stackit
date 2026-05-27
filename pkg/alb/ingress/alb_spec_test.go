@@ -32,8 +32,7 @@ var _ = Describe("Node Controller", func() {
 		node         corev1.Node
 
 		reconciler IngressClassReconciler
-
-		albSpec albsdk.CreateLoadBalancerPayload
+		albSpec    albsdk.CreateLoadBalancerPayload
 	)
 
 	BeforeEach(func() {
@@ -86,57 +85,7 @@ var _ = Describe("Node Controller", func() {
 				ApplicationLoadBalancer: stackitconfig.ApplicationLoadBalancerOpts{NetworkID: networkID}},
 		}
 
-		albSpec = albsdk.CreateLoadBalancerPayload{
-			DisableTargetSecurityGroupAssignment: new(true),
-			Labels:                               new(map[string]string{labels.LabelIngressClassUID: "test-ingress-class-uid"}),
-			Listeners: []albsdk.Listener{
-				{
-					Http: new(albsdk.ProtocolOptionsHTTP{
-						Hosts: []albsdk.HostConfig{
-							{
-								Host: new("example.com"),
-								Rules: []albsdk.Rule{
-									{
-										Path: new(albsdk.Path{
-											Prefix: new("/"),
-										}),
-										TargetPool: new(fmt.Sprintf("port-%d", service.Spec.Ports[0].NodePort)),
-										WebSocket:  new(false),
-									},
-								},
-							},
-						},
-					}),
-					Name:     new("80-http"),
-					Port:     new(int32(80)),
-					Protocol: new("PROTOCOL_HTTP"),
-				},
-			},
-			Name: new(string(ingressClass.UID)), //todo
-			Networks: []albsdk.Network{
-				{
-					NetworkId: new(reconciler.ALBConfig.ApplicationLoadBalancer.NetworkID),
-					Role:      new("ROLE_LISTENERS_AND_TARGETS"),
-				},
-			},
-			Options: new(albsdk.LoadBalancerOptions{
-				EphemeralAddress: new(true),
-			}),
-			// Region:         new(reconciler.ALBConfig.Global.Region), why is there a region in spec? TODO
-			TargetPools: []albsdk.TargetPool{
-				{
-					Name:       new(fmt.Sprintf("port-%d", service.Spec.Ports[0].NodePort)),
-					TargetPort: new(service.Spec.Ports[0].NodePort),
-					Targets: []albsdk.Target{
-						{
-							DisplayName: new(node.Name),
-							Ip:          new(node.Status.Addresses[0].Address),
-						},
-					},
-				},
-			},
-		}
-
+		albSpec = getInitialAlbSpec(&ingressClass, &service, &node, reconciler.ALBConfig.ApplicationLoadBalancer.NetworkID)
 	})
 
 	Describe("Generate ALB spec", func() {
@@ -151,91 +100,133 @@ var _ = Describe("Node Controller", func() {
 
 		Context("when handling labels", func() {
 			It("should work with ownership labels", func() {
-
 				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
 				Expect(err).To(Succeed())
 				Expect(errorEventList).To(BeEmpty())
 
 				Expect(spec).ToNot(BeNil())
 				expectedLabels := map[string]string{
-					labels.LabelIngressClassUID: string(ingressClass.UID), // Ownership label must be present
+					labels.LabelIngressClassUID: string(ingressClass.UID),
 				}
 
 				Expect(*spec).To(BeEquivalentTo(albSpec))
 				Expect(*spec.Labels).To(BeEquivalentTo(expectedLabels))
 			})
-
 		})
 
-		It("should work with certificates", func() {
+		Context("when certificates are configured", func() {
+			var (
+				targetCertID string
+			)
 
-			mockCtrl = gomock.NewController(GinkgoT())
-			certClient = stackitmocks.NewMockCertificatesClient(mockCtrl)
+			BeforeEach(func() {
+				// 1. Properly initialize the mock controller
+				mockCtrl = gomock.NewController(GinkgoT())
+				certClient = stackitmocks.NewMockCertificatesClient(mockCtrl)
+				reconciler.CertificateClient = certClient
 
-			// Bind this mock instance to live reconciler reference context
-			reconciler.CertificateClient = certClient
+				// 2. Clear state pollution by providing a fresh in-memory cluster API server instance
+				k8sClient = fake.NewClientBuilder().
+					WithScheme(scheme.Scheme).
+					Build()
+				reconciler.Client = k8sClient
 
-			certSecret := corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-secret-cert",
-					UID:  "dummy-secret-uid-value-1234567",
-				},
-				Type: corev1.SecretTypeTLS,
-				Data: map[string][]byte{
-					"tls.crt": []byte("mock-public-key"),
-					"tls.key": []byte("mock-private-key"),
-				},
-			}
-			Expect(k8sClient.Create(context.Background(), &certSecret)).To(Succeed())
+				// reset necessary shared basic entities into the fresh cluster space
+				ingressClass.ResourceVersion = ""
+				service.ResourceVersion = ""
+				node.ResourceVersion = ""
+				ingressClass.UID = "test-ingress-class-uid" // Preserve initial constant UID value
 
-			actualStoredSecret := &corev1.Secret{}
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: "my-secret-cert"}, actualStoredSecret)
-			Expect(err).NotTo(HaveOccurred())
+				// Re-seed necessary shared basic entities into the fresh cluster space
+				Expect(k8sClient.Create(context.Background(), &ingressClass)).To(Succeed())
+				Expect(k8sClient.Create(context.Background(), &service)).To(Succeed())
+				Expect(k8sClient.Create(context.Background(), &node)).To(Succeed())
 
-			expectedGeneratedCertName := getCertName(&ingressClass, actualStoredSecret)
-			targetCertID := "real-certificate-uuid-abc-123"
+				// 3. Seed the k8s secret
+				certSecret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-secret-cert",
+						UID:  "dummy-secret-uid-value-1234567",
+					},
+					Type: corev1.SecretTypeTLS,
+					Data: map[string][]byte{
+						"tls.crt": []byte("mock-public-key"),
+						"tls.key": []byte("mock-private-key"),
+					},
+				}
+				Expect(k8sClient.Create(context.Background(), &certSecret)).To(Succeed())
 
-			mockResponse := &certsdk.GetCertificateResponse{
-				Id:   new(targetCertID),
-				Name: new(expectedGeneratedCertName),
-			}
+				actualStoredSecret := &corev1.Secret{}
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: "my-secret-cert"}, actualStoredSecret)
+				Expect(err).NotTo(HaveOccurred())
 
-			certClient.EXPECT().
-				CreateCertificate(
-					gomock.Any(),
-					"test-project",
-					"test-region",
-					gomock.Any(), // Intercepts any incoming *certsdk.CreateCertificatePayload matching
-				).
-				Return(mockResponse, nil).
-				Times(1)
+				expectedGeneratedCertName := getCertName(&ingressClass, actualStoredSecret)
+				targetCertID = "real-certificate-uuid-abc-123"
 
-			httpsIngress := testHttpsIngress(&ingressClass, &service)
-			if httpsIngress.Annotations == nil {
-				httpsIngress.Annotations = make(map[string]string)
-			}
-			httpsIngress.Annotations = map[string]string{"alb.stackit.cloud/https-only": "true"}
+				mockResponse := &certsdk.GetCertificateResponse{
+					Id:   new(targetCertID),
+					Name: new(expectedGeneratedCertName),
+				}
 
-			Expect(k8sClient.Create(context.Background(), &httpsIngress)).To(Succeed())
+				// 4. Setup mock client expectation
+				certClient.EXPECT().
+					CreateCertificate(gomock.Any(), "test-project", "test-region", gomock.Any()).
+					Return(mockResponse, nil).
+					AnyTimes()
 
-			// expected albSpec should include new https listener
-			httpListener := testHttpListener(service.Spec.Ports[0].NodePort)
-			httpsListener := testHttpsListener(service.Spec.Ports[0].NodePort, targetCertID)
-			albSpec.Listeners = []albsdk.Listener{
-				httpsListener,
-				httpListener,
-			}
+				albSpec = getInitialAlbSpec(&ingressClass, &service, &node, reconciler.ALBConfig.ApplicationLoadBalancer.NetworkID)
 
-			// get the specs and compare
-			spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
-			Expect(err).To(Succeed())
-			Expect(errorEventList).To(BeEmpty())
+				// 5. Reset expected listeners on albSpec template
+				httpsListener := testHttpsListener(service.Spec.Ports[0].NodePort, targetCertID)
+				albSpec.Listeners = []albsdk.Listener{
+					httpsListener,
+				}
+			})
 
-			Expect(spec).ToNot(BeNil())
+			AfterEach(func() {
+				mockCtrl.Finish()
+			})
 
-			// compare
-			Expect(*spec).To(BeEquivalentTo(albSpec))
+			It("should work with certificates", func() {
+				httpsIngress := testHttpsIngress(&ingressClass, &service)
+				if httpsIngress.Annotations == nil {
+					httpsIngress.Annotations = make(map[string]string)
+				}
+				httpsIngress.Annotations = map[string]string{"alb.stackit.cloud/https-only": "true"}
 
+				Expect(k8sClient.Create(context.Background(), &httpsIngress)).To(Succeed())
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+				Expect(err).To(Succeed())
+				Expect(errorEventList).To(BeEmpty())
+				Expect(spec).ToNot(BeNil())
+				Expect(*spec).To(BeEquivalentTo(albSpec))
+			})
+
+			It("should work with tls bridging", func() {
+				httpsIngress := testHttpsIngress(&ingressClass, &service)
+				if httpsIngress.Annotations == nil {
+					httpsIngress.Annotations = make(map[string]string)
+				}
+				httpsIngress.Annotations = map[string]string{
+					"alb.stackit.cloud/https-only":              "true",
+					"alb.stackit.cloud/target-pool-tls-enabled": "true",
+				}
+
+				Expect(k8sClient.Create(context.Background(), &httpsIngress)).To(Succeed())
+
+				// Corrected Pointer initialization logic to prevent nil dereferences
+				albSpec.TargetPools[0].TlsConfig = &albsdk.TlsConfig{
+					Enabled: new(bool),
+				}
+				*albSpec.TargetPools[0].TlsConfig.Enabled = true
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+				Expect(err).To(Succeed())
+				Expect(errorEventList).To(BeEmpty())
+				Expect(spec).ToNot(BeNil())
+				Expect(*spec).To(BeEquivalentTo(albSpec))
+			})
 		})
 
 		It("should work with 2 ingresses different path", func() {
@@ -379,6 +370,59 @@ func testHttpsListener(nodePort int32, certID string) albsdk.Listener {
 							TargetPool: new(fmt.Sprintf("port-%d", nodePort)),
 							WebSocket:  new(false),
 						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Add this to the bottom of your test file alongside your other helpers
+func getInitialAlbSpec(ingressClass *networkingv1.IngressClass, service *corev1.Service, node *corev1.Node, networkID string) albsdk.CreateLoadBalancerPayload {
+	return albsdk.CreateLoadBalancerPayload{
+		DisableTargetSecurityGroupAssignment: new(true),
+		Labels:                               new(map[string]string{labels.LabelIngressClassUID: "test-ingress-class-uid"}),
+		Listeners: []albsdk.Listener{
+			{
+				Http: new(albsdk.ProtocolOptionsHTTP{
+					Hosts: []albsdk.HostConfig{
+						{
+							Host: new("example.com"),
+							Rules: []albsdk.Rule{
+								{
+									Path: new(albsdk.Path{
+										Prefix: new("/"),
+									}),
+									TargetPool: new(fmt.Sprintf("port-%d", service.Spec.Ports[0].NodePort)),
+									WebSocket:  new(false),
+								},
+							},
+						},
+					},
+				}),
+				Name:     new("80-http"),
+				Port:     new(int32(80)),
+				Protocol: new("PROTOCOL_HTTP"),
+			},
+		},
+		Name: new(string(ingressClass.UID)),
+		Networks: []albsdk.Network{
+			{
+				NetworkId: new(networkID),
+				Role:      new("ROLE_LISTENERS_AND_TARGETS"),
+			},
+		},
+		Options: new(albsdk.LoadBalancerOptions{
+			EphemeralAddress: new(true),
+		}),
+		TargetPools: []albsdk.TargetPool{
+			{
+				Name:       new(fmt.Sprintf("port-%d", service.Spec.Ports[0].NodePort)),
+				TargetPort: new(service.Spec.Ports[0].NodePort),
+				Targets: []albsdk.Target{
+					{
+						DisplayName: new(node.Name),
+						Ip:          new(node.Status.Addresses[0].Address),
 					},
 				},
 			},
