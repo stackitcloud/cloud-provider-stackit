@@ -181,6 +181,23 @@ The CSI E2E test suite validates the full functionality of the CSI driver. Tests
 
 To execute the main CSI E2E test suite, which covers most driver features, use the following command. This suite runs tests in parallel to maximize efficiency.
 
+#### Prerequisite: StorageClass
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  labels:
+    shoot.gardener.cloud/no-cleanup: "true"
+  name: premium-perf4-stackit
+parameters:
+  type: storage_premium_perf4
+provisioner: block-storage.csi.stackit.cloud
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+```
+
 - **Command:** `make verify-e2e-csi-parallel`
 - **Scope:** Tests a broad spectrum of the CSI driver's core features (e.g., volume provisioning, mounting, unmounting, deletion), except `VolumeSnapshot`.
 
