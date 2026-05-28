@@ -9,8 +9,6 @@ import (
 	"time"
 
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
-	lbLegacy "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	corev1 "k8s.io/api/core/v1"
 
@@ -248,7 +246,7 @@ func getPlanID(service *corev1.Service) (planID *string, msgs []string, err erro
 // The property name will be empty and must be set by the caller to produce a valid payload for the API.
 // An error is returned if the service has invalid options.
 //
-//nolint:gocyclo,funlen,staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
+//nolint:gocyclo,funlen // main function to create a lb from a service, this includes many options and is therefore complex.
 func lbSpecFromService(
 	service *corev1.Service,
 	nodes []*corev1.Node,
@@ -259,7 +257,7 @@ func lbSpecFromService(
 		Options: &loadbalancer.LoadBalancerOptions{},
 		Networks: []loadbalancer.Network{
 			{
-				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS_AND_TARGETS)),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &opts.NetworkID,
 			},
 		},
@@ -268,17 +266,17 @@ func lbSpecFromService(
 	if listenerNetwork := service.Annotations[listenerNetworkAnnotation]; listenerNetwork != "" {
 		lb.Networks = []loadbalancer.Network{
 			{
-				Role:      new(string(lbLegacy.NETWORKROLE_TARGETS)),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
 				NetworkId: &opts.NetworkID,
 			}, {
-				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS)),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS),
 				NetworkId: &listenerNetwork,
 			},
 		}
 	} else {
 		lb.Networks = []loadbalancer.Network{
 			{
-				Role:      new(string(lbLegacy.NETWORKROLE_LISTENERS_AND_TARGETS)),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
 				NetworkId: &opts.NetworkID,
 			},
 		}
@@ -503,22 +501,22 @@ func lbSpecFromService(
 			name = fmt.Sprintf("port-%s-%d", strings.ToLower(string(port.Protocol)), port.Port)
 		}
 
-		var protocol lbLegacy.ListenerProtocol
+		var protocol loadbalancer.ListenerProtocol
 		var tcpOptions *loadbalancer.OptionsTCP
 		var udpOptions *loadbalancer.OptionsUDP
 
 		switch port.Protocol {
 		case corev1.ProtocolTCP:
 			if proxyProtocolEnableForPort(tcpProxyProtocolEnabled, tcpProxyProtocolPortFilter, port.Port) {
-				protocol = lbLegacy.LISTENERPROTOCOL_TCP_PROXY
+				protocol = loadbalancer.LISTENERPROTOCOL_PROTOCOL_TCP_PROXY
 			} else {
-				protocol = lbLegacy.LISTENERPROTOCOL_TCP
+				protocol = loadbalancer.LISTENERPROTOCOL_PROTOCOL_TCP
 			}
 			tcpOptions = &loadbalancer.OptionsTCP{
 				IdleTimeout: new(fmt.Sprintf("%.0fs", tcpIdleTimeout.Seconds())),
 			}
 		case corev1.ProtocolUDP:
-			protocol = lbLegacy.LISTENERPROTOCOL_UDP
+			protocol = loadbalancer.LISTENERPROTOCOL_PROTOCOL_UDP
 			udpOptions = &loadbalancer.OptionsUDP{
 				IdleTimeout: new(fmt.Sprintf("%.0fs", udpIdleTimeout.Seconds())),
 			}
@@ -530,7 +528,7 @@ func lbSpecFromService(
 			DisplayName: &name,
 			Port:        new(port.Port),
 			TargetPool:  &name,
-			Protocol:    new(string(protocol)),
+			Protocol:    new(protocol),
 			Tcp:         tcpOptions,
 			Udp:         udpOptions,
 		})
@@ -597,8 +595,7 @@ type resultImmutableChanged struct {
 // compareLBwithSpec checks whether the load balancer fulfills the specification.
 // If immutableChanged is not nil then spec differs from lb such that an update will fail.
 // Otherwise, fulfills will indicate whether an update is necessary.
-//
-//nolint:staticcheck // Temporary workaround: v2api OpenAPI generator currently misses enum constants.
+
 func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
 	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
 	fulfills = true
@@ -666,13 +663,13 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 			if !cmp.PtrValEqual(x.TargetPool, y.TargetPool) {
 				fulfills = false
 			}
-			if (cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_TCP) || cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_TCP_PROXY)) &&
+			if (cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_PROTOCOL_TCP || cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_PROTOCOL_TCP_PROXY) &&
 				!cmp.PtrValEqualFn(x.Tcp, y.Tcp, func(a, b loadbalancer.OptionsTCP) bool {
 					return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 				}) {
 				fulfills = false
 			}
-			if cmp.UnpackPtr(x.Protocol) == string(lbLegacy.LISTENERPROTOCOL_UDP) && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
+			if cmp.UnpackPtr(x.Protocol) == loadbalancer.LISTENERPROTOCOL_PROTOCOL_UDP && !cmp.PtrValEqualFn(x.Udp, y.Udp, func(a, b loadbalancer.OptionsUDP) bool {
 				return cmp.PtrValEqual(a.IdleTimeout, b.IdleTimeout)
 			}) {
 				fulfills = false
