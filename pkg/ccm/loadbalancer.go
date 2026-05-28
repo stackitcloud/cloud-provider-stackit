@@ -9,7 +9,6 @@ import (
 
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
-	lbwait "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api/wait"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
@@ -159,7 +158,7 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			PrivateAddress:  spec.PrivateAddress,
 			Region:          spec.Region,
 			Labels:          spec.Labels,
-			Status:          spec.Status,
+			Status:          new(loadbalancer.UpdateLoadBalancerPayloadStatus(spec.GetStatus())),
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
@@ -179,10 +178,10 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		}
 	}
 
-	if lb.Status != nil && *lb.Status == lbwait.LOADBALANCERSTATUS_ERROR {
+	if lb.Status != nil && *lb.Status == loadbalancer.LOADBALANCERSTATUS_STATUS_ERROR {
 		return nil, fmt.Errorf("the load balancer is in an error state")
 	}
-	if lb.Status == nil || *lb.Status != lbwait.LOADBALANCERSTATUS_READY {
+	if lb.Status == nil || *lb.Status != loadbalancer.LOADBALANCERSTATUS_STATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -222,7 +221,7 @@ func (l *LoadBalancer) createLoadBalancer(ctx context.Context, clusterName strin
 		return nil, createErr
 	}
 
-	if lb.Status == nil || *lb.Status != lbwait.LOADBALANCERSTATUS_READY {
+	if lb.Status == nil || *lb.Status != loadbalancer.LOADBALANCERSTATUS_STATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
 	}
 
@@ -275,7 +274,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 		return nil
 	case err != nil:
 		return err
-	case lb.Status != nil && *lb.Status == lbwait.LOADBALANCERSTATUS_TERMINATING:
+	case lb.Status != nil && *lb.Status == loadbalancer.LOADBALANCERSTATUS_STATUS_TERMINATING:
 		return nil
 	}
 

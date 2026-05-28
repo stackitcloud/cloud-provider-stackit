@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
-	lbwait "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api/wait"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,7 +116,7 @@ var _ = Describe("LoadBalancer", func() {
 				Name:            spec.Name,
 				Networks:        spec.Networks,
 				Options:         spec.Options,
-				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -239,7 +238,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 				PlanId:          new(p10),
@@ -265,7 +264,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -323,7 +322,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -359,7 +358,7 @@ var _ = Describe("LoadBalancer", func() {
 				Networks:        spec.Networks,
 				Options:         spec.Options,
 				PrivateAddress:  spec.PrivateAddress,
-				Status:          new(lbwait.LOADBALANCERSTATUS_READY),
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
 				TargetPools:     spec.TargetPools,
 				Version:         new("current-version"),
 			}
@@ -411,7 +410,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		It("should finalize deletion if load balancer is state terminating", func() {
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
-				Status: new(lbwait.LOADBALANCERSTATUS_TERMINATING),
+				Status: new(loadbalancer.LOADBALANCERSTATUS_STATUS_TERMINATING),
 			}, nil)
 
 			err := loadBalancer.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
