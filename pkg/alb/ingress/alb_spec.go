@@ -22,7 +22,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngressClass(
 	ctx context.Context,
 	class *networkingv1.IngressClass,
 ) (payload *albsdk.CreateLoadBalancerPayload, activeCertIDs map[string]string, validationErrors []error, err error) {
-	ingresses, err := r.getIngressesForIngressClass(ctx, class)
+	ingresses, err := r.getSortedIngressesForIngressClass(ctx, class)
 	if err != nil {
 		return nil, nil, nil, err
 	}
