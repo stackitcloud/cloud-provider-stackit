@@ -133,7 +133,12 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		lbOpts = append(lbOpts, sdkconfig.WithToken(lbEmergencyAPIToken))
 	}
 
-	loadbalancingClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).LoadBalancing(lbOpts)
+	region := os.Getenv("STACKIT_REGION")
+	if region == "" {
+		return nil, fmt.Errorf("STACKIT_REGION environment variable must be set")
+	}
+
+	loadbalancingClient, err := stackitclient.New(region, cfg.Global.ProjectID).LoadBalancing(lbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Load Balancing stackitclient: %v", err)
 	}
@@ -146,7 +151,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 	}
 
-	iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
+	iaasClient, err := stackitclient.New(region, cfg.Global.ProjectID).IaaS(iaasOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IaaS stackitclient: %v", err)
 	}
