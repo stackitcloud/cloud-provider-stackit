@@ -302,26 +302,24 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve instance id of node %v", err)
 	}
 
-	flavor, err := ns.Metadata.GetFlavor(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve flavor of node %v", err)
-	}
-
-	maxVolumesPerNode := DetermineMaxVolumesByFlavor(flavor)
+	//flavor, err := ns.Metadata.GetFlavor(ctx)
+	//if err != nil {
+	//	return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve flavor of node %v", err)
+	//}
 
 	// Subtract already mounted Volumes
-	emptyPCIeRootPorts, err := mount.CountNonVirtioBlockDevices()
+	emptyPCIeRootPorts, err := mount.CountFreePCIeSlots()
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports %v", err)
 		emptyPCIeRootPorts = 0
 	}
 
-	maxVolumesPerNode -= emptyPCIeRootPorts
-	klog.V(4).Infof("Determined %d PCIe ports occupied by non virtio block devices", emptyPCIeRootPorts)
-	klog.V(4).Infof("Determined node to support %d volumes", maxVolumesPerNode)
+	vols, err := mount.CountLocalCSIVolumes(driverName)
+	if err != nil {
+		klog.Errorf("[NodeGetInfo] unable to retrieve volume count %v", err)
+	}
 
-	// always subtract one for every SKE node, because they always have a root partition
-	maxVolumesPerNode -= 1
+	maxVolumesPerNode := emptyPCIeRootPorts + vols
 
 	nodeInfo := &csi.NodeGetInfoResponse{
 		NodeId:            nodeID,
