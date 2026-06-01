@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"time"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
+	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -76,7 +79,11 @@ const (
 
 const (
 	SnapshotReadyStatus = "AVAILABLE"
-	SnapshotType        = "type"
+	snapReadyDuration   = 1 * time.Second
+	snapReadyFactor     = 1.2
+	snapReadySteps      = 10
+
+	SnapshotType = "type"
 )
 
 type VolumeSourceTypes string
@@ -108,34 +115,110 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 }
 
 func (i iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	server, err := i.Client.GetServer(ctx, i.projectID, i.region, serverID).Execute()
-	return server, err
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
+	return server, nil
 }
 
 func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
-	return i.Client.DeleteServer(ctx, i.projectID, i.region, serverID).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	err := i.Client.DeleteServer(ctx, i.projectID, i.region, serverID).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
-	server, err := i.Client.CreateServer(ctx, i.projectID, i.region).CreateServerPayload(*create).Execute()
-	return server, err
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	server, err := i.Client.
+		CreateServer(ctx, i.projectID, i.region).
+		CreateServerPayload(*create).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
+	return server, nil
 }
 
 func (i iaasClient) UpdateServer(ctx context.Context, serverID string, update iaas.UpdateServerPayload) (*iaas.Server, error) {
-	return i.Client.UpdateServer(ctx, i.projectID, i.region, serverID).UpdateServerPayload(update).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	server, err := i.Client.
+		UpdateServer(ctx, i.projectID, i.region, serverID).
+		UpdateServerPayload(update).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
+	return server, nil
 }
 
 func (i iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	resp, err := i.Client.ListServers(ctx, i.projectID, i.region).Details(true).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
+
 	return &resp.Items, nil
 }
 
 func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
-	snapshot, err := i.Client.CreateSnapshot(ctx, i.projectID, i.region).CreateSnapshotPayload(*payload).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	snapshot, err := i.Client.
+		CreateSnapshot(ctx, i.projectID, i.region).
+		CreateSnapshotPayload(*payload).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -143,8 +226,16 @@ func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnap
 }
 
 func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	snaps, err := i.Client.ListSnapshotsInProject(ctx, i.projectID, i.region).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, "", stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, "", err
 	}
 
@@ -154,12 +245,33 @@ func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string
 }
 
 func (i iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
-	return i.Client.DeleteSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	err := i.Client.DeleteSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (i iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	snapshot, err := i.Client.GetSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -167,16 +279,49 @@ func (i iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.S
 }
 
 func (i iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error) {
-	snap, err := i.GetSnapshot(ctx, snapshotID)
-	if err != nil {
-		return nil, err
+	backoff := wait.Backoff{
+		Duration: snapReadyDuration,
+		Factor:   snapReadyFactor,
+		Steps:    snapReadySteps,
 	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		ready, err := i.snapshotIsReady(ctx, snapshotID)
+		if err != nil {
+			return false, err
+		}
+
+		return ready, nil
+	})
+
+	if wait.Interrupted(err) {
+		err = fmt.Errorf("timeout, Snapshot %s is still not Ready %v", snapshotID, err)
+	}
+
+	snap, _ := i.GetSnapshot(ctx, snapshotID)
 
 	if snap != nil {
-		return snap.Status, nil
+		return snap.Status, err
 	}
 
-	return new("Failed to get Snapshot status"), nil
+	return new("Failed to get Snapshot status"), err
+}
+
+func (i iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (bool, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	snapshot, err := i.Client.GetSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return false, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return false, err
+	}
+
+	return *snapshot.Status == SnapshotReadyStatus, nil
 }
 
 func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
@@ -185,8 +330,19 @@ func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID st
 		return nil, err
 	}
 
-	backup, err := i.Client.CreateBackup(ctx, i.projectID, i.region).CreateBackupPayload(payload).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	backup, err := i.Client.
+		CreateBackup(ctx, i.projectID, i.region).
+		CreateBackupPayload(payload).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -229,8 +385,16 @@ func BuildCreateBackupPayload(name, volID, snapshotID string, tags map[string]st
 }
 
 func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	backups, err := i.Client.ListBackups(ctx, i.projectID, i.region).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -240,12 +404,33 @@ func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) 
 }
 
 func (i iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
-	return i.Client.DeleteBackup(ctx, i.projectID, i.region, backupID).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	err := i.Client.DeleteBackup(ctx, i.projectID, i.region, backupID).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	backup, err := i.Client.GetBackup(ctx, i.projectID, i.region, backupID).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -316,8 +501,17 @@ func (i iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, e
 
 func (i iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
+
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	volume, err := i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(*payload).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -333,7 +527,20 @@ func (i iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 		return fmt.Errorf("cannot delete the volume %q, it's still attached to a node", volumeID)
 	}
 
-	return i.Client.DeleteVolume(ctx, i.projectID, i.region, volumeID).Execute()
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	err = i.Client.DeleteVolume(ctx, i.projectID, i.region, volumeID).Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error) {
@@ -341,24 +548,44 @@ func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string,
 	if err != nil {
 		return "", err
 	}
+
 	if volume.ServerId != nil && serverID == *volume.ServerId {
 		klog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, serverID)
 		return *volume.Id, nil
 	}
+
 	payload.DeleteOnTermination = new(false)
 
-	if _, err = i.Client.AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	if _, err = i.Client.
+		AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
 		AddVolumeToServerPayload(payload).
 		Execute(); err != nil {
-		return "", nil
+
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return "", stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return "", err
 	}
 
 	return volume.GetId(), nil
 }
 
 func (i iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	volume, err := i.Client.GetVolume(ctx, i.projectID, i.region, volumeID).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -366,8 +593,16 @@ func (i iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volum
 }
 
 func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	volumes, err := i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
@@ -377,7 +612,6 @@ func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaa
 	return filteredVolumes, nil
 }
 
-// GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error)
 func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error) {
 	vols, err := i.GetVolumesByName(ctx, name)
 	if err != nil {
@@ -396,19 +630,43 @@ func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Vol
 }
 
 func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 	volumes, err := i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
 	return volumes.Items, nil
 }
 
-// ExpandVolume(ctx context.Context, volumeID, volumeStatus string, newSize int64) error
 func (i iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {
 	switch volumeStatus {
 	case VolumeAttachedStatus, VolumeAvailableStatus:
-		return i.Client.ResizeVolume(ctx, i.projectID, i.region, volumeID).ResizeVolumePayload(payload).Execute()
+		var httpResp *http.Response
+		ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+		err := i.Client.
+			ResizeVolume(ctx, i.projectID, i.region, volumeID).
+			ResizeVolumePayload(payload).
+			Execute()
+		if err != nil {
+			if httpResp != nil {
+				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+				return stackiterrors.WrapErrorWithResponseID(err, reqID)
+			}
+
+			return err
+		}
+
+		return nil
+
 	default:
 		return fmt.Errorf("volume cannot be resized, when status is %s", volumeStatus)
 	}
@@ -506,9 +764,21 @@ func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string)
 	}
 
 	if volume.ServerId != nil && *volume.ServerId == serverID {
+		var httpResp *http.Response
+		ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
 		if err := i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute(); err != nil {
-			return fmt.Errorf("failed to detach volume %s from compute %s : %w", *volume.Name, serverID, err)
+			if httpResp != nil {
+				reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+				return stackiterrors.WrapErrorWithResponseID(
+					fmt.Errorf("failed to detach volume %s from compute %s : %w", *volume.Name, serverID, err),
+					reqID,
+				)
+			}
+
+			return err
 		}
+
 		klog.V(2).Infof("Successfully detached volume: %s from compute: %s", *volume.Id, serverID)
 	}
 

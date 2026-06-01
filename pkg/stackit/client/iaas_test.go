@@ -212,23 +212,24 @@ var _ = Describe("Snapshot", func() {
 		It("returns the current status of the snapshot", func() {
 			mockIaaSClient.EXPECT().
 				GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient})
-			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("READY")}, nil)
+				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient}).AnyTimes()
+			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(&iaas.Snapshot{Id: new(snapshotID), Status: new("AVAILABLE")}, nil).AnyTimes()
 
 			status, err := client.WaitSnapshotReady(context.Background(), snapshotID)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(*status).To(Equal("READY"))
+			Expect(*status).To(Equal("AVAILABLE"))
 		})
 
 		It("returns an error if the snapshot retrieval fails", func() {
 			mockIaaSClient.EXPECT().
 				GetSnapshot(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient})
-			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(nil, fmt.Errorf("api error"))
+				Return(iaas.ApiGetSnapshotRequest{ApiService: mockIaaSClient}).AnyTimes()
+			mockIaaSClient.EXPECT().GetSnapshotExecute(gomock.Any()).Return(nil, fmt.Errorf("api error")).AnyTimes()
 
 			status, err := client.WaitSnapshotReady(context.Background(), snapshotID)
 			Expect(err).To(HaveOccurred())
-			Expect(status).To(BeNil())
+			Expect(status).ToNot(BeNil())
+			Expect(*status).To(Equal("Failed to get Snapshot status"))
 		})
 	})
 })
