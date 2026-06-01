@@ -18,7 +18,11 @@ func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
 	}
 }
 
-func CountNonVirtioBlockDevices() (int64, error) {
+func CountLocalCSIVolumes(_ string) (int64, error) {
 	// not implemented
+	return 0, nil
+}
+
+func CountFreePCIeSlots() (int64, error) {
 	return 0, nil
 }

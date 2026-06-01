@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -36,10 +37,9 @@ func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
 	}
 }
 
-// CountNonVirtioBlockDevices returns the number of PCIe Root ports who
-// are currently occupied by anything else than an VIRTIO 1.0 Block Device
-// returns zero when something went wrong
-func CountNonVirtioBlockDevices() (int64, error) {
+// CountFreePCIeSlots returns the number of PCIe Root ports who
+// are currently not occupied by anything.
+func CountFreePCIeSlots() (int64, error) {
 	const pciPath = "/sys/bus/pci/devices"
 
 	// Get all PCI devices
@@ -48,7 +48,7 @@ func CountNonVirtioBlockDevices() (int64, error) {
 		return 0, fmt.Errorf("failed to read PCI bus: %w", err)
 	}
 
-	pcieSlotsOccupiedByNonBlockDevice := 0
+	freePCIeSlots := 0
 
 	for _, dev := range devices {
 		devPath := filepath.Join(pciPath, dev.Name())
@@ -71,23 +71,48 @@ func CountNonVirtioBlockDevices() (int64, error) {
 			if err2 != nil {
 				klog.Errorf("failed to read dir %s : %v", devPath, err2)
 			}
-			for _, file := range files {
-				// Ignore PCI bus directories such as pci001 pci002 and pci010
-				// Devices must follow <domain:bus:device.function> format
-				if pciAddressRegex.MatchString(file.Name()) {
-					isNonBlockDevice := IsNonBlockDevice(devPath, file)
-					if isNonBlockDevice {
-						pcieSlotsOccupiedByNonBlockDevice++
-					}
-					break
-				}
+			hasDownStreamFolder := slices.ContainsFunc(files, func(s os.DirEntry) bool {
+				return pciAddressRegex.MatchString(s.Name())
+			})
+			if !hasDownStreamFolder {
+				freePCIeSlots += 1
 			}
 		} else {
 			klog.V(4).Infof("skipping class %s: path: %s", class, devPath)
 		}
 	}
 
-	return int64(pcieSlotsOccupiedByNonBlockDevice), nil
+	return int64(freePCIeSlots), nil
+}
+
+// CountLocalCSIVolumes tries to count how many volumes are mounted for a given driverName.
+func CountLocalCSIVolumes(driverName string) (int64, error) {
+	const kubeletDir = "/var/lib/kubelet"
+	volumeCount := 0
+	// The path where Kubelet mounts global tracking directories for a specific CSI driver
+	targetDir := filepath.Join(kubeletDir, "plugins", "kubernetes.io", "csi", driverName)
+
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+		return 0, nil
+	} else if err != nil {
+		return 0, fmt.Errorf("failed to check directory: %w", err)
+	}
+
+	volumes, err := os.ReadDir(targetDir)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read dir %s: %w", targetDir, err)
+	}
+	for _, vol := range volumes {
+		// Check if volume has a "globalmount" dir to determine if it's mounted correctly
+		globalMountPath := filepath.Join(vol.Name(), "globalmount")
+		if _, err := os.Stat(globalMountPath); os.IsNotExist(err) {
+			continue
+		}
+
+		volumeCount++
+	}
+
+	return int64(volumeCount), nil
 }
 
 func IsNonBlockDevice(devPath string, file os.DirEntry) bool {
