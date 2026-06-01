@@ -19,8 +19,8 @@ var (
 )
 
 const (
-	RedhatVendor      = "0x1af4"
-	VirtioBlockDevice = "0x1042"
+	// PCIClassBridgePCI Linux constant: https://github.com/torvalds/linux/blob/e43ffb69e0438cddd72aaa30898b4dc446f664f8/include/linux/pci_ids.h#L62
+	PCIClassBridgePCI = "0x0604"
 )
 
 func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
@@ -63,7 +63,7 @@ func CountFreePCIeSlots() (int64, error) {
 		class := strings.TrimSpace(string(classBuf))
 
 		// Class 0x060400 is a PCI-to-PCI bridge (standard for Root Ports)
-		if strings.HasPrefix(class, "0x0604") {
+		if strings.HasPrefix(class, PCIClassBridgePCI) {
 			// 2. Check if the port has downstream devices
 			// If the bridge has children, they appear as subdirectories
 			// matching the PCI address format (e.g., 0000:01:00.0)
@@ -113,21 +113,4 @@ func CountLocalCSIVolumes(driverName string) (int64, error) {
 	}
 
 	return int64(volumeCount), nil
-}
-
-func IsNonBlockDevice(devPath string, file os.DirEntry) bool {
-	var isNonBlockDevice bool
-	pciDevicePath := filepath.Join(devPath, file.Name())
-	vendorBuf, err := os.ReadFile(filepath.Join(pciDevicePath, "vendor"))
-	if err != nil {
-		klog.Errorf("failed to read PCI device vendor %s : %v", pciDevicePath, err)
-	}
-	deviceBuf, err := os.ReadFile(filepath.Join(pciDevicePath, "device"))
-	if err != nil {
-		klog.Errorf("failed to read PCI device file %s : %v", pciDevicePath, err)
-	}
-	if strings.TrimSpace(string(vendorBuf)) == RedhatVendor && strings.TrimSpace(string(deviceBuf)) != VirtioBlockDevice {
-		isNonBlockDevice = true
-	}
-	return isNonBlockDevice
 }
