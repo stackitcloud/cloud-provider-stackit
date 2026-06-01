@@ -3,13 +3,14 @@ package ccm
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
+	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +100,7 @@ var _ = Describe("LoadBalancer", func() {
 
 	Describe("GetLoadBalancer", func() {
 		It("should report LB does not exist", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			svc := minimalLoadBalancerService()
 
@@ -189,7 +190,7 @@ var _ = Describe("LoadBalancer", func() {
 
 	Describe("EnsureLoadBalancer", func() {
 		It("ensure load balancer should trigger load balancer creation if LB doesn't exist", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
 
 			_, err := loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
@@ -198,7 +199,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should create a load balancer with observability configured", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 			mockClient.EXPECT().ListCredentials(gomock.Any()).Return(&loadbalancer.ListCredentialsResponse{
 				Credentials: []loadbalancer.CredentialsResponse{},
 			}, nil)
@@ -398,7 +399,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should finalize deletion if LB API returns not found", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			err := loadBalancer.EnsureLoadBalancerDeleted(context.Background(), clusterName, minimalLoadBalancerService())
 			Expect(err).NotTo(HaveOccurred())
@@ -418,7 +419,7 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should report no error if LB not found", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			svc := minimalLoadBalancerService()
 

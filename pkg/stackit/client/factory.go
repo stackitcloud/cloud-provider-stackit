@@ -1,7 +1,6 @@
 package client
 
 import (
-	"errors"
 	"io"
 	"os"
 
@@ -23,7 +22,6 @@ const (
 // userAgentData is used to add extra information to the STACKIT SDK user-agent
 var (
 	userAgentData []string
-	ErrorNotFound = errors.New("not found")
 )
 
 // Factory produces clients for various STACKIT services.

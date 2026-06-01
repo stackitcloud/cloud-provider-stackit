@@ -1,20 +1,8 @@
 package client
 
 import (
-	"errors"
-	"net/http"
-
-	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
-
-func isOpenAPINotFound(err error) bool {
-	apiErr := &oapiError.GenericOpenAPIError{}
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	return apiErr.StatusCode == http.StatusNotFound
-}
 
 func FilterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
 	filteredVolumes := make([]iaas.Volume, 0)
@@ -80,8 +68,4 @@ func FilterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Back
 	}
 
 	return filteredBackups
-}
-
-func IsNotFound(err error) bool {
-	return errors.Is(err, ErrorNotFound)
 }

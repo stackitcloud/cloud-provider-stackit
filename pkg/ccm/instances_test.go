@@ -19,11 +19,12 @@ package ccm
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 
-	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
@@ -158,7 +159,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("does not error when get server instance not found", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(nil, stackitclient.ErrorNotFound)
+			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -210,7 +211,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("fails if server not found", func() {
-			nodeMockClient.EXPECT().ListServers(gomock.Any()).Return(nil, stackitclient.ErrorNotFound)
+			nodeMockClient.EXPECT().ListServers(gomock.Any()).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},

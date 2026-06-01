@@ -42,9 +42,6 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 
 func (l loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
 	lb, err := l.Client.CreateLoadBalancer(ctx, l.projectID, l.region).CreateLoadBalancerPayload(*payload).Execute()
-	if isOpenAPINotFound(err) {
-		return lb, ErrorNotFound
-	}
 	return lb, err
 }
 

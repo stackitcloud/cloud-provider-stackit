@@ -109,11 +109,7 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 
 func (i iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
 	server, err := i.Client.GetServer(ctx, i.projectID, i.region, serverID).Execute()
-	if isOpenAPINotFound(err) {
-		return nil, ErrorNotFound
-	}
-
-	return server, nil
+	return server, err
 }
 
 func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
@@ -122,9 +118,6 @@ func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
 
 func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
 	server, err := i.Client.CreateServer(ctx, i.projectID, i.region).CreateServerPayload(*create).Execute()
-	if isOpenAPINotFound(err) {
-		return nil, ErrorNotFound
-	}
 	return server, err
 }
 
