@@ -29,7 +29,7 @@ func IsTooManyDevicesError(err error) bool {
 
 	// TODO: Improve this if possible
 	return oAPIError.StatusCode == http.StatusForbidden &&
-		strings.Contains(oAPIError.ErrorMessage, "maximum allowed number of disk devices")
+		strings.Contains(string(oAPIError.Body), "maximum allowed number of disk devices")
 }
 
 func IgnoreNotFound(err error) error {
