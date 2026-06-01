@@ -302,12 +302,6 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve instance id of node %v", err)
 	}
 
-	//flavor, err := ns.Metadata.GetFlavor(ctx)
-	//if err != nil {
-	//	return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve flavor of node %v", err)
-	//}
-
-	// Subtract already mounted Volumes
 	emptyPCIeRootPorts, err := mount.CountFreePCIeSlots()
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports %v", err)
@@ -319,6 +313,7 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		klog.Errorf("[NodeGetInfo] unable to retrieve volume count %v", err)
 	}
 
+	// maxVolumesPerNode is the result of all free/empty PCIClassBridgePCI ports plus all already mounted volumes.
 	maxVolumesPerNode := emptyPCIeRootPorts + vols
 
 	nodeInfo := &csi.NodeGetInfoResponse{

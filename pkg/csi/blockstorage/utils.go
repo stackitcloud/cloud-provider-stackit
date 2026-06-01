@@ -84,23 +84,6 @@ func ParseEndpoint(ep string) (proto, addr string, err error) {
 	return "", "", fmt.Errorf("invalid endpoint: %v", ep)
 }
 
-func DetermineMaxVolumesByFlavor(flavor string) int64 {
-	flavorParts := strings.Split(flavor, ".")
-
-	// The following numbers were specified by the IaaS team. They are based on actual tests.
-	switch {
-	case strings.HasPrefix(flavor, "n"):
-		// Flavors starting with 'n' are nvidia GPU flavors
-		return 13
-	case strings.HasSuffix(flavorParts[0], "2a"):
-		// AMD 2nd Gen
-		return 159
-	default:
-		// All other flavors can mount 28 volumes
-		return 28
-	}
-}
-
 func logGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	callID := serverGRPCEndpointCallCounter.Add(1)
 
