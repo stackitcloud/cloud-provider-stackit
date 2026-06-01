@@ -3,6 +3,7 @@ package ingress
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -229,34 +230,92 @@ var _ = Describe("Node Controller", func() {
 			})
 		})
 
-		It("should work with 2 ingresses different path", func() {
-			ingress2 := testIngress(&ingressClass, &service)
-			ingress2.Name = "ingress2"
-			ingress2.Spec.Rules[0].HTTP.Paths[0].Path = "/foobar"
+		Context("when sorting multiple ingresses", func() {
+			var (
+				ingress2 networkingv1.Ingress
+			)
 
-			Expect(k8sClient.Create(context.Background(), &ingress2)).To(Succeed())
+			It("should prioritize priority annotations if defined", func() {
 
-			secTargetPool := *albSpec.Listeners[0].Http.Hosts[0].Rules[0].TargetPool
-			albSpec.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
-				{
-					Path:       &albsdk.Path{Prefix: new("/foobar")},
-					TargetPool: new(secTargetPool),
-					WebSocket:  new(false),
-				},
-				{
-					Path:       &albsdk.Path{Prefix: new("/")},
-					TargetPool: new(secTargetPool),
-					WebSocket:  new(false),
-				},
-			}
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ingress.Namespace, Name: ingress.Name}, &ingress)
+				Expect(err).NotTo(HaveOccurred())
 
-			spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
-			Expect(err).To(Succeed())
-			Expect(errorEventList).To(BeEmpty())
+				ingress.Annotations = nil // ensuring no priority annotations are lingering
+				Expect(k8sClient.Update(context.Background(), &ingress)).To(Succeed())
 
-			Expect(spec).ToNot(BeNil())
-			Expect(*spec).To(BeEquivalentTo(albSpec))
+				ingress2 = testIngress(&ingressClass, &service)
+				ingress2.Name = "ingress2"
+				ingress2.Spec.Rules[0].HTTP.Paths[0].Path = "/foobar"
+				if ingress2.Annotations == nil {
+					ingress2.Annotations = make(map[string]string)
+				}
+				ingress2.Annotations = map[string]string{"alb.stackit.cloud/priority": "100"}
+
+				Expect(k8sClient.Create(context.Background(), &ingress2)).To(Succeed())
+
+				secTargetPool := *albSpec.Listeners[0].Http.Hosts[0].Rules[0].TargetPool
+				albSpec.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
+					{
+						Path:       &albsdk.Path{Prefix: new("/foobar")},
+						TargetPool: new(secTargetPool),
+						WebSocket:  new(false),
+					},
+					{
+						Path:       &albsdk.Path{Prefix: new("/")},
+						TargetPool: new(secTargetPool),
+						WebSocket:  new(false),
+					},
+				}
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+				Expect(err).To(Succeed())
+				Expect(errorEventList).To(BeEmpty())
+
+				Expect(spec).ToNot(BeNil())
+				Expect(*spec).To(BeEquivalentTo(albSpec))
+			})
+
+			It("should sort by creationTimeStamp when priority annotations are missing ", func() {
+
+				// manipulate the base ingress' (created in the top-level BeforeEach) creation timestamp  to be the oldest
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ingress.Namespace, Name: ingress.Name}, &ingress)
+				Expect(err).NotTo(HaveOccurred())
+				ingress.Annotations = nil // ensuring no priority annotations are lingering
+				Expect(k8sClient.Update(context.Background(), &ingress)).To(Succeed())
+
+				time.Sleep(1 * time.Second)
+
+				ingress2 = testIngress(&ingressClass, &service)
+				ingress2.Name = "ingress2"
+				ingress2.Spec.Rules[0].HTTP.Paths[0].Path = "/foobar"
+				ingress2.Annotations = nil // ensuring no priority annotations
+
+				Expect(k8sClient.Create(context.Background(), &ingress2)).To(Succeed())
+
+				secTargetPool := *albSpec.Listeners[0].Http.Hosts[0].Rules[0].TargetPool
+				albSpec.Listeners[0].Http.Hosts[0].Rules = []albsdk.Rule{
+					{
+						Path:       &albsdk.Path{Prefix: new("/")},
+						TargetPool: new(secTargetPool),
+						WebSocket:  new(false),
+					},
+					{
+						Path:       &albsdk.Path{Prefix: new("/foobar")},
+						TargetPool: new(secTargetPool),
+						WebSocket:  new(false),
+					},
+				}
+
+				spec, errorEventList, err := reconciler.getAlbSpecForIngressClass(context.Background(), &ingressClass)
+				Expect(err).To(Succeed())
+				Expect(errorEventList).To(BeEmpty())
+
+				Expect(spec).ToNot(BeNil())
+				Expect(*spec).To(BeEquivalentTo(albSpec))
+			})
+
 		})
+
 	})
 })
 
