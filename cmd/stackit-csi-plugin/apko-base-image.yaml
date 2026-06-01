@@ -13,12 +13,12 @@ contents:
   - lsblk=~2.41.2
   - mount=~2.41.2
   - umount=~2.41.2
-  - btrfs-progs=~6.17
+  - btrfs-progs=~7.0
   - udev=~258.1
   - util-linux-misc=~2.41.2 # contains fsck
-  - xfsprogs=~6.17.0
-  - xfsprogs-core=~6.17.0
-  - xfsprogs-extra=~6.17.0 # contains xfs_io
+  - xfsprogs=~7.0.1
+  - xfsprogs-core=~7.0.1
+  - xfsprogs-extra=~7.0.1 # contains xfs_io
   - findmnt=~2.41.2
 
 accounts:
