@@ -503,11 +503,23 @@ func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string)
 		return err
 	}
 
-	if *volume.Status != VolumeAvailableStatus {
+	if *volume.Status == VolumeAvailableStatus {
+		klog.V(2).Infof("Volume: %s has been detached from compute: %s ", *volume.Id, serverID)
+		return nil
+	}
+
+	if *volume.Status != VolumeAttachedStatus {
 		return fmt.Errorf("can not detach volume %s, its status is %s", *volume.Name, *volume.Status)
 	}
 
-	return i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
+	if volume.ServerId != nil && *volume.ServerId == serverID {
+		if err := i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute(); err != nil {
+			return fmt.Errorf("failed to detach volume %s from compute %s : %w", *volume.Name, serverID, err)
+		}
+		klog.V(2).Infof("Successfully detached volume: %s from compute: %s", *volume.Id, serverID)
+	}
+
+	return nil
 }
 
 func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
