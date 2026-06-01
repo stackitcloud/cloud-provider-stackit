@@ -90,8 +90,8 @@ func DetermineMaxVolumesByFlavor(flavor string) int64 {
 	// The following numbers were specified by the IaaS team. They are based on actual tests.
 	switch {
 	case strings.HasPrefix(flavor, "n"):
-		// Flavors starting with 'n' are nvidia GPU flavors, all GPU VM's can only mount 10 volumes
-		return 10
+		// Flavors starting with 'n' are nvidia GPU flavors
+		return 13
 	case strings.HasSuffix(flavorParts[0], "2a"):
 		// AMD 2nd Gen
 		return 159
