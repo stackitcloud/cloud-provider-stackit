@@ -58,14 +58,14 @@ func ingressEventHandler(c client.Client) handler.EventHandler {
 		}
 
 		if ingressClass.Spec.Controller == controllerName {
-			return []ctrl.Request{
-				{
-					NamespacedName: client.ObjectKeyFromObject(ingressClass),
-				},
-			}
+			return nil
 		}
-
-		return nil
+		
+		return []ctrl.Request{
+			{
+				NamespacedName: client.ObjectKeyFromObject(ingressClass),
+			},
+		}
 	})
 }
 
