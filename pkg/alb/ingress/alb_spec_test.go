@@ -280,15 +280,16 @@ var _ = Describe("Node Controller", func() {
 				// manipulate the base ingress' (created in the top-level BeforeEach) creation timestamp  to be the oldest
 				err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ingress.Namespace, Name: ingress.Name}, &ingress)
 				Expect(err).NotTo(HaveOccurred())
+
 				ingress.Annotations = nil // ensuring no priority annotations are lingering
 				Expect(k8sClient.Update(context.Background(), &ingress)).To(Succeed())
-
-				time.Sleep(1 * time.Second)
+				Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: ingress.Namespace, Name: ingress.Name}, &ingress)).To(Succeed())
 
 				ingress2 = testIngress(&ingressClass, &service)
 				ingress2.Name = "ingress2"
-				ingress2.Spec.Rules[0].HTTP.Paths[0].Path = "/foobar"
+				ingress2.Spec.Rules[0].HTTP.Paths[0].Path = "/menekse"
 				ingress2.Annotations = nil // ensuring no priority annotations
+				ingress2.ObjectMeta.CreationTimestamp = metav1.NewTime(ingress.CreationTimestamp.Add(1 * time.Hour))
 
 				Expect(k8sClient.Create(context.Background(), &ingress2)).To(Succeed())
 
@@ -300,7 +301,7 @@ var _ = Describe("Node Controller", func() {
 						WebSocket:  new(false),
 					},
 					{
-						Path:       &albsdk.Path{Prefix: new("/foobar")},
+						Path:       &albsdk.Path{Prefix: new("/menekse")},
 						TargetPool: new(secTargetPool),
 						WebSocket:  new(false),
 					},
