@@ -35,6 +35,13 @@ If you need to explicitly prioritize certain rules over others, you can override
 
 Note that this sorting only applies across different Ingress resources. The top-to-bottom sequence of rules and paths defined within a single Ingress YAML is not preserved and is processed non-deterministically. If you need to preserve the exact top-to-bottom order specified in your YAML, you must separate them into distinct Ingress resources and use the priority annotation.
 
+### Network Routing Mode
+The network routing mode determines how the ALB forwards external traffic to your applications within the cluster. Specifying this mode is mandatory. If omitted, your resource will be rejected by the validation webhook.
+
+You must set the `alb.stackit.cloud/network-mode` annotation on your IngressClass.
+
+Currently `NodePort` is the only supported mode. The ALB routes traffic to the cluster nodes, which then forward it to your pods. Future releases will introduce direct-to-pod routing as an additional mode. Setting `NodePort` now ensures your current configurations remain backwards compatible when new modes are added.
+
 ### WebSockets Support
 You can enable WebSocket support for your applications by adding a specific annotation to your Ingress resource. Note that in this initial release, enabling this annotation applies globally to all routing rules defined within that specific Ingress.
 
@@ -69,6 +76,7 @@ metadata:
 
 | Annotation | Allowed On | Requirement | Description |
 | :--- | :--- | :--- | :--- |
+| `alb.stackit.cloud/network-mode` | IngressClass | Mandatory | Routing mode (currently only `NodePort` supported). |
 | `alb.stackit.cloud/external-address` | IngressClass | Optional | Uses a specific STACKIT floating IP instead of an ephemeral one. |
 | `alb.stackit.cloud/internal` | IngressClass | Optional | If `true`, the ALB is not exposed via a public IP. |
 | `alb.stackit.cloud/plan-id` | IngressClass | Optional | Sets the service plan for the ALB. |
