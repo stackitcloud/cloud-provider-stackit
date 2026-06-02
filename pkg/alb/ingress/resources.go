@@ -30,6 +30,7 @@ type albListenerRule struct {
 	pathTyp                     networkingv1.PathType
 	targetPoolName              string
 	websocket                   bool
+	sequenceIndex               int
 }
 
 type albTargetPools map[string]albTargetPool

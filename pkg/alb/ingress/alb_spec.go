@@ -41,9 +41,9 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(
 	certificates := albCertificates{}
 	targetPools := albTargetPools{}
 
-	for _, ingress := range ingresses {
+		for i, ingress := range ingresses {
 		var listenerMergeError, targetPoolMergeError []error
-		ingressListeners, ingressCertificates, ingressTargetPools, ingressErrorList := r.getALBResourcesForIngress(ctx, class, &ingress)
+		ingressListeners, ingressCertificates, ingressTargetPools, ingressErrorList := r.getALBResourcesForIngress(ctx, class, &ingress, i)
 		errorList = append(errorList, ingressErrorList...)
 
 		certificates = mergeCertificates(certificates, ingressCertificates)
@@ -147,6 +147,33 @@ func (r *IngressClassReconciler) getAlbSpecForResources(
 
 				albsdkHost.Rules = append(albsdkHost.Rules, albsdkRule)
 			}
+
+			/// menekse
+
+			sort.SliceStable(albsdkHost.Rules, func(i, j int) bool {
+				pathI := ""
+				if albsdkHost.Rules[i].Path.Prefix != nil {
+					pathI = *albsdkHost.Rules[i].Path.Prefix
+				} else if albsdkHost.Rules[i].Path.ExactMatch != nil {
+					pathI = *albsdkHost.Rules[i].Path.ExactMatch
+				}
+
+				pathJ := ""
+				if albsdkHost.Rules[j].Path.Prefix != nil {
+					pathJ = *albsdkHost.Rules[j].Path.Prefix
+				} else if albsdkHost.Rules[j].Path.ExactMatch != nil {
+					pathJ = *albsdkHost.Rules[j].Path.ExactMatch
+				}
+
+				ruleI := hostPaths.path[pathI]
+				ruleJ := hostPaths.path[pathJ]
+
+				// Smaller sequence index means it was processed earlier (higher priority)
+				return ruleI.sequenceIndex < ruleJ.sequenceIndex
+			})
+
+			////
+
 			albsdkHosts = append(albsdkHosts, albsdkHost)
 
 			albsdkListener.Http = new(albsdk.ProtocolOptionsHTTP{
@@ -218,7 +245,7 @@ func (r *IngressClassReconciler) getAlbSpecForResources(
 	return alb, errorList, nil
 }
 
-func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress) (albListeners, albCertificates, albTargetPools, []error) {
+func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress, sequenceIndex int) (albListeners, albCertificates, albTargetPools, []error) {
 	ref := getIngressRefForIngress(r.Scheme, ingress)
 
 	certificates := albCertificates{}
@@ -283,6 +310,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 				cookiePersistenceTtlSeconds: getAnnotation(AnnotationCookiePersistenceTTLSeconds, 0, class, ingress),
 				targetPoolName:              poolName,
 				websocket:                   getAnnotation(AnnotationWebSocket, false, class, ingress),
+				sequenceIndex:               sequenceIndex,
 			}
 		}
 	}
