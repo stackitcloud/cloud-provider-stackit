@@ -18,92 +18,12 @@ The controller uses the default Kubernetes client. Ensure your KUBECONFIG enviro
 export KUBECONFIG=~/.kube/config
 ```
 
-### Create your deployment and expose it via Ingress
-
-1. Create your k8s deployment, here’s an example of a simple http web server:
-
-```
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: httpbin-deployment
-  name: httpbin-deployment
-  namespace: default
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: httpbin-deployment
-  template:
-    metadata:
-      labels:
-        app: httpbin-deployment
-    spec:
-      containers:
-      - image: kennethreitz/httpbin
-        name: httpbin
-        ports:
-        - containerPort: 80
-```
-
-2. Now, create a k8s service so that the traffic can be routed to the pods:
-
-```
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: httpbin-deployment
-  name: httpbin
-  namespace: default
-spec:
-  ports:
-  - port: 80
-    protocol: TCP
-    targetPort: 80
-    nodePort: 30000
-  selector:
-    app: httpbin-deployment
-  type: NodePort
-```
-
-> NOTE: The service has to be of type NodePort to enable access to the nodes from the outside of the cluster.
-
-3. Create an IngressClass that specifies the ALB Ingress controller:
-
-```
-apiVersion: networking.k8s.io/v1
-kind: IngressClass
-metadata:
-  namespace: default
-  name: alb-01
-spec:
-  controller: stackit.cloud/alb-ingress
-```
-
-4. Lastly, create an ingress resource that references the previously created IngressClass:
-
-```
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: alb-ingress
-  namespace: default
-spec:
-  ingressClassName: alb-01
-  rules:
-  - host: example.gg
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: httpbin
-            port:
-              number: 80
-```
+### Expose your deployment via Ingress
+Check out our sample manifests to quickly deploy and expose your applications:
+1. **[Deployment](../samples/ingress/deployment.yaml)**: A sample web server.
+2. **[Service](../samples/ingress/service.yaml)**: Exposes the pods (must be of type `NodePort`).
+3. **[IngressClass](../samples/ingress/ingress-class.yaml)**: Specifies the `stackit.cloud/alb-ingress` controller.
+4. **[Ingress](../samples/ingress/ingress.yaml)**: Routes external traffic to your service.
 
 ### WebSockets Support
 You can enable WebSocket support for your applications by adding a specific annotation to your Ingress resource. Note that in this initial release, enabling this annotation applies globally to all routing rules defined within that specific Ingress.
