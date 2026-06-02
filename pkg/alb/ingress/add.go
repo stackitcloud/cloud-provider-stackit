@@ -17,7 +17,6 @@ import (
 // SetupWithManager sets up the controller with the Manager.
 func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&networkingv1.IngressClass{}, builder.WithPredicates(ingressClassPredicate())).
 		Watches(&corev1.Node{}, nodeEventHandler(r.Client), builder.WithPredicates(nodePredicate())).
 		Watches(&networkingv1.Ingress{}, ingressEventHandler(r.Client)).
