@@ -134,3 +134,22 @@ metadata:
   annotations:
     alb.stackit.cloud/web-application-firewall-name: "my-waf-config"
 ```
+
+### Supported Annotations
+
+| Annotation | Allowed On | Description |
+| :--- | :--- | :--- |
+| `alb.stackit.cloud/external-address` | IngressClass | Uses a specific STACKIT floating IP instead of an ephemeral one. |
+| `alb.stackit.cloud/internal` | IngressClass | If `true`, the ALB is not exposed via a public IP. |
+| `alb.stackit.cloud/plan-id` | IngressClass | Sets the service plan for the ALB. |
+| `alb.stackit.cloud/http-port` | IngressClass, Ingress | Specifies the custom HTTP port. |
+| `alb.stackit.cloud/https-port` | IngressClass, Ingress | Specifies the custom HTTPS port. |
+| `alb.stackit.cloud/https-only` | IngressClass, Ingress | If `true`, the Ingress will not be reachable via HTTP. |
+| `alb.stackit.cloud/websocket` | IngressClass, Ingress | Enables global WebSocket support. |
+| `alb.stackit.cloud/web-application-firewall-name`| IngressClass, Ingress | Attaches a specific WAF configuration. |
+| `alb.stackit.cloud/cookie-persistence-name` | IngressClass, Ingress | Sets the name for session cookie persistence. |
+| `alb.stackit.cloud/cookie-persistence-ttl-seconds`| IngressClass, Ingress | Sets the TTL (in seconds) for cookie persistence. |
+| `alb.stackit.cloud/priority` | IngressClass, Ingress | Defines the evaluation priority of the Ingress. |
+| `alb.stackit.cloud/traget-pool-tls-enabled` | IngressClass, Ingress, Service | Enables TLS bridging using OS trusted CAs. |
+| `alb.stackit.cloud/traget-pool-tls-custom-ca` | IngressClass, Ingress, Service | Enables TLS bridging with a custom CA. |
+| `alb.stackit.cloud/traget-pool-tls-skip-certificate-validation`| IngressClass, Ingress, Service | Enables TLS bridging but skips certificate validation. |
