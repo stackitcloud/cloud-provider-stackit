@@ -104,3 +104,33 @@ spec:
             port:
               number: 80
 ```
+
+### WebSockets Support
+You can enable WebSocket support for your applications by adding a specific annotation to your Ingress resource. Note that in this initial release, enabling this annotation applies globally to all routing rules defined within that specific Ingress.
+
+To enable it, add the alb.stackit.cloud/websocket annotation to your Ingress metadata:
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alb-ingress
+  namespace: default
+  annotations:
+    alb.stackit.cloud/websocket: "true"
+spec:
+  # ... rest of your ingress spec
+```
+
+### Web Application Firewall (WAF)
+You can secure your applications by attaching a WAF configuration using the `alb.stackit.cloud/web-application-firewall-name` annotation:
+
+IngressClass Level (Global): Applies the WAF configuration to all listeners created by any Ingress using this class. Note: This takes precedence and overwrites any WAF configuration specified on individual Ingress resources.
+
+Ingress Level (Specific): Applies the WAF configuration only to the listeners created by that individual Ingress, provided the IngressClass does not enforce a global WAF.
+
+Example:
+```
+metadata:
+  annotations:
+    alb.stackit.cloud/web-application-firewall-name: "my-waf-config"
+```
