@@ -84,11 +84,7 @@ func nodePredicate() predicate.Predicate {
 				return false
 			}
 
-			if !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses) {
-				return true
-			}
-
-			return false
+			return !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
 		},
 		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return true
