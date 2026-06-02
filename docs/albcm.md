@@ -25,6 +25,9 @@ Check out our sample manifests to quickly deploy and expose your applications:
 3. **[IngressClass](../samples/ingress/ingress-class.yaml)**: Specifies the `stackit.cloud/alb-ingress` controller.
 4. **[Ingress](../samples/ingress/ingress.yaml)**: Routes external traffic to your service.
 
+### Ingress to ALB Mapping
+All Ingress resources that reference the same IngressClass are grouped together and provisioned on a single, shared Application Load Balancer (ALB). If you need separate ALBs (for instance, if you want to assign different static IP addresses or need one public and one internal ALB) then you must create a distinct IngressClass for each one.
+
 ### WebSockets Support
 You can enable WebSocket support for your applications by adding a specific annotation to your Ingress resource. Note that in this initial release, enabling this annotation applies globally to all routing rules defined within that specific Ingress.
 
