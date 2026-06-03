@@ -57,7 +57,7 @@ func ingressEventHandler(c client.Client) handler.EventHandler {
 			return nil
 		}
 
-		if ingressClass.Spec.Controller == controllerName {
+		if ingressClass.Spec.Controller != controllerName {
 			return nil
 		}
 		
