@@ -28,6 +28,13 @@ Check out our sample manifests to quickly deploy and expose your applications:
 ### Ingress to ALB Mapping
 All Ingress resources that reference the same IngressClass are grouped together and provisioned on a single, shared Application Load Balancer (ALB). If you need separate ALBs (for instance, if you want to assign different static IP addresses or need one public and one internal ALB) then you must create a distinct IngressClass for each one.
 
+### Ingress Rule Evaluation Order
+When multiple Ingress resources share the same ALB, the controller must sort them to determine the order in which routing rules are evaluated. By default, resources are sorted by their CreationTimestamp, meaning older Ingresses are evaluated first.
+
+If you need to explicitly prioritize certain rules over others, you can override this default behavior using the `alb.stackit.cloud/priority` annotation on your Ingress resource. Ingresses with a higher priority value are evaluated first. If multiple Ingresses share the same priority score, the controller falls back to sorting them by their creation timestamp.
+
+Note that this sorting only applies across different Ingress resources. The top-to-bottom sequence of rules and paths defined within a single Ingress YAML is not preserved and is processed non-deterministically. If you need to preserve the exact top-to-bottom order specified in your YAML, you must separate them into distinct Ingress resources and use the priority annotation.
+
 ### WebSockets Support
 You can enable WebSocket support for your applications by adding a specific annotation to your Ingress resource. Note that in this initial release, enabling this annotation applies globally to all routing rules defined within that specific Ingress.
 
