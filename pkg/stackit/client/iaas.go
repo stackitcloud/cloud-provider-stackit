@@ -148,6 +148,7 @@ func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
 	return nil
 }
 
+//nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
 func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -205,6 +206,7 @@ func (i iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	return &resp.Items, nil
 }
 
+//nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
 func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -563,7 +565,6 @@ func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string,
 		AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
 		AddVolumeToServerPayload(payload).
 		Execute(); err != nil {
-
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
 			return "", stackiterrors.WrapErrorWithResponseID(err, reqID)
