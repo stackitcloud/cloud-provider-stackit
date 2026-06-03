@@ -407,8 +407,6 @@ var _ = Describe("LoadBalancer", func() {
 		})
 
 		It("should finalize deletion if load balancer is state terminating", func() {
-			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(&loadbalancer.LoadBalancer{
-				Status: new(lbwait.LOADBALANCERSTATUS_TERMINATING),
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), projectID, gomock.Any()).Return(&loadbalancer.LoadBalancer{
 				Status: new(loadbalancer.LOADBALANCERSTATUS_STATUS_TERMINATING),
 			}, nil)
