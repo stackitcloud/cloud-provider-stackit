@@ -94,7 +94,7 @@ require (
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
-	github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.23.0 // indirect
+	github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.24.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.8 // indirect
