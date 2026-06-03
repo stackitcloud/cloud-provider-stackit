@@ -103,11 +103,7 @@ func handle() {
 			iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 		}
 
-		region := os.Getenv("STACKIT_REGION")
-		if region == "" {
-			klog.Fatalf("The environment variable STACKIT_REGION must be set to the region of the cluster")
-		}
-		iaasClient, err := stackitclient.New(region, cfg.Global.ProjectID).IaaS(iaasOpts)
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
 		if err != nil {
 			klog.Fatalf("Failed to create STACKIT stackitclient: %v", err)
 		}
