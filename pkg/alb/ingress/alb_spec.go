@@ -18,7 +18,10 @@ import (
 	certsdk "github.com/stackitcloud/stackit-sdk-go/services/certificates/v2api"
 )
 
-func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, class *networkingv1.IngressClass) (*albsdk.CreateLoadBalancerPayload, []errorEvent, error) {
+func (r *IngressClassReconciler) getAlbSpecForIngressClass(
+	ctx context.Context,
+	class *networkingv1.IngressClass,
+) (payload *albsdk.CreateLoadBalancerPayload, validationErrors []error, err error) {
 	ingresses, err := r.getIngressesForIngressClass(ctx, class)
 	if err != nil {
 		return nil, nil, err
@@ -27,15 +30,19 @@ func (r *IngressClassReconciler) getAlbSpecForIngressClass(ctx context.Context, 
 	return r.getAlbSpecForIngresses(ctx, class, ingresses)
 }
 
-func (r *IngressClassReconciler) getAlbSpecForIngresses(ctx context.Context, class *networkingv1.IngressClass, ingresses []networkingv1.Ingress) (*albsdk.CreateLoadBalancerPayload, []errorEvent, error) {
-	errorList := []errorEvent{}
+func (r *IngressClassReconciler) getAlbSpecForIngresses(
+	ctx context.Context,
+	class *networkingv1.IngressClass,
+	ingresses []networkingv1.Ingress,
+) (payload *albsdk.CreateLoadBalancerPayload, validationErrors []error, err error) {
+	errorList := []error{}
 
 	listeners := albListeners{}
 	certificates := albCertificates{}
 	targetPools := albTargetPools{}
 
 	for _, ingress := range ingresses {
-		var listenerMergeError, targetPoolMergeError []errorEvent
+		var listenerMergeError, targetPoolMergeError []error
 		ingressListeners, ingressCertificates, ingressTargetPools, ingressErrorList := r.getALBResourcesForIngress(ctx, class, &ingress)
 		errorList = append(errorList, ingressErrorList...)
 
@@ -54,8 +61,14 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(ctx context.Context, cla
 	return alb, errorList, err
 }
 
-func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, class *networkingv1.IngressClass, listeners albListeners, targetPools albTargetPools, certNameToId map[string]string) (*albsdk.CreateLoadBalancerPayload, []errorEvent, error) {
-	errorList := []errorEvent{}
+func (r *IngressClassReconciler) getAlbSpecForResources(
+	ctx context.Context,
+	class *networkingv1.IngressClass,
+	listeners albListeners,
+	targetPools albTargetPools,
+	certNameToId map[string]string,
+) (payload *albsdk.CreateLoadBalancerPayload, validationErrors []error, err error) {
+	errorList := []error{}
 
 	alb := &albsdk.CreateLoadBalancerPayload{
 		Options: &albsdk.LoadBalancerOptions{},
@@ -157,7 +170,7 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 
 		}
 		if listener.protocol == "PROTOCOL_HTTPS" && len(albsdkListener.Https.CertificateConfig.CertificateIds) == 0 {
-			errorList = append(errorList, errorEvent{
+			errorList = append(errorList, &errorEvent{
 				ingressRef:  listener.ingressRef,
 				description: "Certificate not found for protocol HTTPS",
 				typ:         "Error",
@@ -185,20 +198,20 @@ func (r *IngressClassReconciler) getAlbSpecForResources(ctx context.Context, cla
 	return alb, errorList, nil
 }
 
-func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress) (albListeners, albCertificates, albTargetPools, []errorEvent) {
+func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, class *networkingv1.IngressClass, ingress *networkingv1.Ingress) (albListeners, albCertificates, albTargetPools, []error) {
 	ref := getIngressRefForIngress(r.Scheme, ingress)
 
 	certificates := albCertificates{}
 	certificateIDs := []string{}
 	httpsHosts := map[string]struct{}{}
-	errorList := []errorEvent{}
+	errorList := []error{}
 
 	for _, tls := range ingress.Spec.TLS {
 		for _, host := range tls.Hosts {
 			httpsHosts[host] = struct{}{}
 			name, cert, err := r.getCertificateForSecretName(ctx, class, ingress, tls.SecretName)
 			if err != nil {
-				errorList = append(errorList, errorEvent{
+				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
 					typ:         "error",
 					description: err.Error(),
@@ -222,7 +235,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 		}
 		for _, path := range rule.HTTP.Paths {
 			if _, ok := hosts[rule.Host].path[path.Path]; ok {
-				errorList = append(errorList, errorEvent{
+				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
 					typ:         "error",
 					description: fmt.Sprintf("path %q already exists within same ingress", path.Path),
@@ -232,14 +245,14 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 
 			poolName, targetPool, err := r.getTargetPoolForPath(ctx, class, ingress, path)
 			if err != nil {
-				errorList = append(errorList, errorEvent{
+				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
 					typ:         "error",
 					description: err.Error(),
 				})
 				continue
 			}
-			var tagetMergeErrors []errorEvent
+			var tagetMergeErrors []error
 			targets, tagetMergeErrors = mergeTargetPools(targets, albTargetPools{poolName: targetPool})
 			errorList = append(errorList, tagetMergeErrors...)
 
@@ -386,8 +399,8 @@ func (r *IngressClassReconciler) getCertificateForSecretName(ctx context.Context
 	}, nil
 }
 
-func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *networkingv1.IngressClass, certificates albCertificates) (map[string]string, []errorEvent) {
-	errorList := []errorEvent{}
+func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *networkingv1.IngressClass, certificates albCertificates) (map[string]string, []error) {
+	errorList := []error{}
 	nameToID := map[string]string{}
 	for name, certificate := range certificates {
 		createCertificatePayload := &certsdk.CreateCertificatePayload{
@@ -402,7 +415,7 @@ func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *n
 		response, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {
 			for _, ref := range certificate.ingressRefs {
-				errorList = append(errorList, errorEvent{
+				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
 					description: fmt.Sprintf("Error creating certificate for ingress %q: %s", ref, err),
 					typ:         "error",

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"errors"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
@@ -94,10 +95,15 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "failed to update alb")
 	}
 
-	for _, errorEvent := range errorList {
-		log.Info(errorEvent.description, "typ", errorEvent.typ, "ingressRef", errorEvent.ingressRef)
-	}
-
+	for _, errItem := range errorList {
+        var evtErr *errorEvent
+        
+        if errors.As(errItem, &evtErr) {
+            log.Info(evtErr.description, "typ", evtErr.typ, "ingressRef", evtErr.ingressRef)
+        } else {
+            log.Info(errItem.Error())
+        }
+    }
 	r.SendEvents(ingressClass, errorList)
 
 	requeue, err := r.updateStatus(ctx, ingressClass)
