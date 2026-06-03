@@ -58,14 +58,14 @@ type albCertificate struct {
 
 // mergeTargetPools returns a compiled list of albTargetPools.
 // It will not return an error if something is already there as the pools are uniq due to the nodePort.
-func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []errorEvents) {
-	var mergeErrors []errorEvents
+func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []errorEvent) {
+	var mergeErrors []errorEvent
 
 	for name, srcTargetPool := range src {
 		dstTargetPool, ok := dst[name]
 		if !ok {
 			if len(dst) >= 20 {
-				mergeErrors = append(mergeErrors, errorEvents{
+				mergeErrors = append(mergeErrors, errorEvent{
 					ingressRef:  srcTargetPool.ingressRef,
 					description: fmt.Sprintf("Target pool for %s could not be created due to maximum already reached", name),
 				})
@@ -76,21 +76,21 @@ func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []errorEvents) {
 			continue
 		}
 		if dstTargetPool.skipCertificateValidation != srcTargetPool.skipCertificateValidation {
-			mergeErrors = append(mergeErrors, errorEvents{
+			mergeErrors = append(mergeErrors, errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSSkipCertificateValidation, dstTargetPool.ingressRef),
 				typ:         "Warning",
 			})
 		}
 		if dstTargetPool.tlsEnabled != srcTargetPool.tlsEnabled {
-			mergeErrors = append(mergeErrors, errorEvents{
+			mergeErrors = append(mergeErrors, errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSEnabled, dstTargetPool.ingressRef),
 				typ:         "Warning",
 			})
 		}
 		if dstTargetPool.customCA != srcTargetPool.customCA {
-			mergeErrors = append(mergeErrors, errorEvents{
+			mergeErrors = append(mergeErrors, errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configred differently in ingress %v", AnnotationTargetPoolTLSCustomCa, dstTargetPool.ingressRef),
 				typ:         "Warning",
@@ -116,8 +116,8 @@ func mergeCertificates(dst, src albCertificates) albCertificates {
 	return dst
 }
 
-func mergeListeners(dst, src albListeners) (albListeners, []errorEvents) {
-	var mergeErrors []errorEvents
+func mergeListeners(dst, src albListeners) (albListeners, []errorEvent) {
+	var mergeErrors []errorEvent
 
 	for port, srcListener := range src {
 		dstListener, ok := dst[port]
@@ -126,7 +126,7 @@ func mergeListeners(dst, src albListeners) (albListeners, []errorEvents) {
 			continue
 		}
 		if dstListener.protocol != srcListener.protocol {
-			mergeErrors = append(mergeErrors, errorEvents{
+			mergeErrors = append(mergeErrors, errorEvent{
 				ingressRef: srcListener.ingressRef,
 				typ:        "warning",
 				description: fmt.Sprintf(
@@ -136,7 +136,7 @@ func mergeListeners(dst, src albListeners) (albListeners, []errorEvents) {
 			})
 		}
 		if dstListener.wafConfigName != srcListener.wafConfigName {
-			mergeErrors = append(mergeErrors, errorEvents{
+			mergeErrors = append(mergeErrors, errorEvent{
 				ingressRef: srcListener.ingressRef,
 				typ:        "warning",
 				description: fmt.Sprintf(
@@ -145,7 +145,7 @@ func mergeListeners(dst, src albListeners) (albListeners, []errorEvents) {
 				)})
 		}
 
-		var hostsMergeError []errorEvents
+		var hostsMergeError []errorEvent
 		dstListener.hosts, hostsMergeError = mergeListenerHosts(dstListener.hosts, srcListener.hosts)
 		mergeErrors = append(mergeErrors, hostsMergeError...)
 
@@ -168,8 +168,8 @@ func mergeIngressRefs(ref1, ref2 []corev1.ObjectReference) []corev1.ObjectRefere
 	return ref
 }
 
-func mergeListenerHosts(dst, src map[string]albListenerHost) (map[string]albListenerHost, []errorEvents) {
-	var mergeErrors []errorEvents
+func mergeListenerHosts(dst, src map[string]albListenerHost) (map[string]albListenerHost, []errorEvent) {
+	var mergeErrors []errorEvent
 
 	for host, srcListenerHost := range src {
 		dstListenerHost, ok := dst[host]
@@ -177,7 +177,7 @@ func mergeListenerHosts(dst, src map[string]albListenerHost) (map[string]albList
 			dst[host] = srcListenerHost
 			continue
 		}
-		var hostMergeError []errorEvents
+		var hostMergeError []errorEvent
 		dstListenerHost.path, hostMergeError = mergeListenerHostPath(dstListenerHost.path, srcListenerHost.path)
 		mergeErrors = append(mergeErrors, hostMergeError...)
 
@@ -186,8 +186,8 @@ func mergeListenerHosts(dst, src map[string]albListenerHost) (map[string]albList
 	return dst, mergeErrors
 }
 
-func mergeListenerHostPath(dst, src map[string]albListenerRule) (map[string]albListenerRule, []errorEvents) {
-	var mergeErrors []errorEvents
+func mergeListenerHostPath(dst, src map[string]albListenerRule) (map[string]albListenerRule, []errorEvent) {
+	var mergeErrors []errorEvent
 
 	for path, srcListenerRule := range src {
 		dstListenerRule, ok := dst[path]
@@ -195,7 +195,7 @@ func mergeListenerHostPath(dst, src map[string]albListenerRule) (map[string]albL
 			dst[path] = srcListenerRule
 			continue
 		}
-		mergeErrors = append(mergeErrors, errorEvents{
+		mergeErrors = append(mergeErrors, errorEvent{
 			ingressRef:  srcListenerRule.ingressRef,
 			typ:         "error",
 			description: fmt.Sprintf("Could not apply path %q as this is already configured in %s in namespace %s", path, dstListenerRule.ingressRef.Name, dstListenerRule.ingressRef.Namespace),

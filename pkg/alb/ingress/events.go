@@ -5,13 +5,13 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
-type errorEvents struct {
+type errorEvent struct {
 	ingressRef  corev1.ObjectReference
 	description string
 	typ         string
 }
 
-func (r *IngressClassReconciler) SendEvents(class *networkingv1.IngressClass, events []errorEvents) {
+func (r *IngressClassReconciler) SendEvents(class *networkingv1.IngressClass, events []errorEvent) {
 	for _, event := range events {
 		if event.ingressRef.Name == "" {
 			continue
