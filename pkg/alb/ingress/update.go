@@ -55,115 +55,100 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, alb *albsdk.Creat
 	return nil
 }
 
-// detectChange checks if there is any difference between the current and desired ALB configuration.
-func updateNeeded(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool { //nolint:gocyclo,funlen // We check a lot of fields. Not much complexity.
-	if len(alb.Listeners) != len(albPayload.Listeners) {
+func updateNeeded(alb *albsdk.LoadBalancer, albPayload *albsdk.CreateLoadBalancerPayload) bool {
+	return listenersChanged(alb.Listeners, albPayload.Listeners) || targetPoolsChanged(alb.TargetPools, albPayload.TargetPools)
+}
+
+func listenersChanged(current, desired []albsdk.Listener) bool {
+	if len(current) != len(desired) {
 		return true
 	}
+	for i := range current {
+		c, d := current[i], desired[i]
 
-	for i := range alb.Listeners {
-		listener := (alb.Listeners)[i]
-		payloadListener := (albPayload.Listeners)[i]
-
-		if ptr.Deref(listener.Protocol, "") != ptr.Deref(payloadListener.Protocol, "") ||
-			ptr.Deref(listener.Port, 0) != ptr.Deref(payloadListener.Port, 0) {
+		if ptr.Deref(c.Protocol, "") != ptr.Deref(d.Protocol, "") ||
+			ptr.Deref(c.Port, 0) != ptr.Deref(d.Port, 0) ||
+			ptr.Deref(c.WafConfigName, "") != ptr.Deref(d.WafConfigName, "") {
 			return true
 		}
 
-		// WAF config check
-		if ptr.Deref(listener.WafConfigName, "") != ptr.Deref(payloadListener.WafConfigName, "") {
-			return true
-		}
-
-		// HTTP rules comparison (via Hosts)
-		if listener.Http != nil && payloadListener.Http != nil {
-			albHosts := listener.Http.Hosts
-			payloadHosts := payloadListener.Http.Hosts
-
-			if len(albHosts) != len(payloadHosts) {
-				return true
-			}
-
-			for j := range albHosts {
-				albHost := albHosts[j]
-				payloadHost := payloadHosts[j]
-
-				if ptr.Deref(albHost.Host, "") != ptr.Deref(payloadHost.Host, "") {
-					return true
-				}
-
-				if len(albHost.Rules) != len(payloadHost.Rules) {
-					return true
-				}
-
-				for k := range albHost.Rules {
-					albRule := albHost.Rules[k]
-					payloadRule := payloadHost.Rules[k]
-
-					if albRule.Path != nil || payloadRule.Path != nil {
-						if albRule.Path == nil || payloadRule.Path == nil {
-							return true
-						}
-						if ptr.Deref(albRule.Path.Prefix, "") != ptr.Deref(payloadRule.Path.Prefix, "") {
-							return true
-						}
-						if ptr.Deref(albRule.Path.ExactMatch, "") != ptr.Deref(payloadRule.Path.ExactMatch, "") {
-							return true
-						}
-					}
-					if ptr.Deref(albRule.WebSocket, false) != ptr.Deref(payloadRule.WebSocket, false) {
-						return true
-					}
-					if ptr.Deref(albRule.TargetPool, "") != ptr.Deref(payloadRule.TargetPool, "") {
-						return true
-					}
-				}
-			}
-		} else if listener.Http != nil || payloadListener.Http != nil {
-			// One is nil, one isn't
-			return true
-		}
-
-		// HTTPS certificate comparison
-		if listener.Https != nil && payloadListener.Https != nil {
-			a := listener.Https.CertificateConfig
-			b := payloadListener.Https.CertificateConfig
-			if len(a.CertificateIds) != len(b.CertificateIds) {
-				return true
-			}
-		} else if listener.Https != nil || payloadListener.Https != nil {
-			// One is nil, one isn't
+		if httpOptionsChanged(c.Http, d.Http) || httpsOptionsChanged(c.Https, d.Https) {
 			return true
 		}
 	}
+	return false
+}
 
-	// TargetPools comparison
-	if len(alb.TargetPools) != len(albPayload.TargetPools) {
+func httpOptionsChanged(c, d *albsdk.ProtocolOptionsHTTP) bool {
+	if c == nil && d == nil {
+		return false
+	}
+	if c == nil || d == nil || len(c.Hosts) != len(d.Hosts) {
 		return true
 	}
-	for i := range alb.TargetPools {
-		a := alb.TargetPools[i]
-		b := albPayload.TargetPools[i]
-
-		if ptr.Deref(a.Name, "") != ptr.Deref(b.Name, "") ||
-			ptr.Deref(a.TargetPort, 0) != ptr.Deref(b.TargetPort, 0) {
+	
+	for i := range c.Hosts {
+		ch, dh := c.Hosts[i], d.Hosts[i]
+		if ptr.Deref(ch.Host, "") != ptr.Deref(dh.Host, "") || len(ch.Rules) != len(dh.Rules) {
 			return true
 		}
-
-		if len(a.Targets) != len(b.Targets) {
-			return true
-		}
-
-		if (a.TlsConfig == nil) != (b.TlsConfig == nil) {
-			return true
-		}
-		if a.TlsConfig != nil && b.TlsConfig != nil {
-			if ptr.Deref(a.TlsConfig.SkipCertificateValidation, false) != ptr.Deref(b.TlsConfig.SkipCertificateValidation, false) ||
-				ptr.Deref(a.TlsConfig.CustomCa, "") != ptr.Deref(b.TlsConfig.CustomCa, "") {
+		
+		for j := range ch.Rules {
+			cr, dr := ch.Rules[j], dh.Rules[j]
+			if pathChanged(cr.Path, dr.Path) {
+				return true
+			}
+			if ptr.Deref(cr.WebSocket, false) != ptr.Deref(dr.WebSocket, false) ||
+				ptr.Deref(cr.TargetPool, "") != ptr.Deref(dr.TargetPool, "") {
 				return true
 			}
 		}
 	}
+	return false
+}
 
+func pathChanged(c, d *albsdk.Path) bool {
+	if c == nil && d == nil {
+		return false
+	}
+	if c == nil || d == nil {
+		return true
+	}
+	return ptr.Deref(c.Prefix, "") != ptr.Deref(d.Prefix, "") || ptr.Deref(c.ExactMatch, "") != ptr.Deref(d.ExactMatch, "")
+}
+
+func httpsOptionsChanged(c, d *albsdk.ProtocolOptionsHTTPS) bool {
+	if c == nil && d == nil {
+		return false
+	}
+	if c == nil || d == nil {
+		return true
+	}
+	return len(c.CertificateConfig.CertificateIds) != len(d.CertificateConfig.CertificateIds)
+}
+
+func targetPoolsChanged(current, desired []albsdk.TargetPool) bool {
+	if len(current) != len(desired) {
+		return true
+	}
+	for i := range current {
+		c, d := current[i], desired[i]
+
+		if ptr.Deref(c.Name, "") != ptr.Deref(d.Name, "") ||
+			ptr.Deref(c.TargetPort, 0) != ptr.Deref(d.TargetPort, 0) ||
+			len(c.Targets) != len(d.Targets) {
+			return true
+		}
+
+		if (c.TlsConfig == nil) != (d.TlsConfig == nil) {
+			return true
+		}
+		if c.TlsConfig != nil && d.TlsConfig != nil {
+			if ptr.Deref(c.TlsConfig.SkipCertificateValidation, false) != ptr.Deref(d.TlsConfig.SkipCertificateValidation, false) ||
+				ptr.Deref(c.TlsConfig.CustomCa, "") != ptr.Deref(d.TlsConfig.CustomCa, "") {
+				return true
+			}
+		}
+	}
 	return false
 }
