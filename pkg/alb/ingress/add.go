@@ -20,8 +20,53 @@ func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&networkingv1.IngressClass{}, builder.WithPredicates(ingressClassPredicate())).
 		Watches(&corev1.Node{}, nodeEventHandler(r.Client), builder.WithPredicates(nodePredicate())).
 		Watches(&networkingv1.Ingress{}, ingressEventHandler(r.Client)).
+		Watches(&corev1.Secret{}, secretEventHandler(r.Client)).
 		Named("ingressclass").
 		Complete(r)
+}
+
+func secretEventHandler(c client.Client) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []ctrl.Request {
+		// Filter out non-TLS Secrets.
+		secret, ok := o.(*corev1.Secret)
+		if !ok || secret.Type != corev1.SecretTypeTLS {
+			return nil
+		}
+
+		ingressList := &networkingv1.IngressList{}
+		if err := c.List(ctx, ingressList, client.InNamespace(secret.Namespace)); err != nil {
+			return nil
+		}
+
+		classNames := make(map[string]struct{})
+		for _, ingress := range ingressList.Items {
+			if ingress.Spec.IngressClassName == nil {
+				continue
+			}
+
+			for _, tls := range ingress.Spec.TLS {
+				if tls.SecretName == secret.Name {
+					classNames[*ingress.Spec.IngressClassName] = struct{}{}
+					break
+				}
+			}
+		}
+
+		var requestList []ctrl.Request
+		for className := range classNames {
+			ingressClass := &networkingv1.IngressClass{}
+			err := c.Get(ctx, client.ObjectKey{Name: className}, ingressClass)
+			if err != nil || ingressClass.Spec.Controller != controllerName {
+				continue
+			}
+
+			requestList = append(requestList, ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(ingressClass),
+			})
+		}
+
+		return requestList
+	})
 }
 
 func nodeEventHandler(c client.Client) handler.EventHandler {
