@@ -487,7 +487,7 @@ func lbSpecFromService(
 			address := node.Status.Addresses[j]
 			if address.Type == corev1.NodeInternalIP {
 				targets = append(targets, loadbalancer.Target{
-					DisplayName: new(getSanitizeNodeNameForTarget(node.Name)),
+					DisplayName: new(sanitizeNodeName(node.Name)),
 					Ip:          &address.Address,
 				})
 				break
@@ -762,23 +762,23 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	return fulfills, immutableChanged
 }
 
-// getSanitizeNodeNameForTarget returns a node name which fits in the DisplayName of a target.
+// sanitizeNodeName returns a node name which fits in the DisplayName of a target.
 // Replaces not allowed chars with
-func getSanitizeNodeNameForTarget(nodeName string) string {
-	var cleanName string
-	cleanName = invalidTargetDisplayNameCharsRegexp.ReplaceAllString(nodeName, "-")
+func sanitizeNodeName(nodeName string) string {
+	var sanitizedNodeName string
+	sanitizedNodeName = invalidTargetDisplayNameCharsRegexp.ReplaceAllString(nodeName, "-")
 
 	// return node name if not to long and if not contain any invalid chars
-	if len(cleanName) <= 63 &&
-		nodeName == cleanName {
+	if len(sanitizedNodeName) <= 63 &&
+		nodeName == sanitizedNodeName {
 		return nodeName
 	}
 
-	if len(cleanName) > 54 {
-		cleanName = cleanName[0:54]
+	if len(sanitizedNodeName) > 54 {
+		sanitizedNodeName = sanitizedNodeName[0:54]
 	}
 
-	cleanName += fmt.Sprintf("-%x", sha256.Sum256([]byte(nodeName)))[:8]
+	sanitizedNodeName += fmt.Sprintf("-%x", sha256.Sum256([]byte(nodeName)))[:8]
 
-	return cleanName
+	return sanitizedNodeName
 }
