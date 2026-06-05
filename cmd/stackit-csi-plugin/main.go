@@ -105,7 +105,7 @@ func handle() {
 
 		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
 		if err != nil {
-			klog.Fatalf("Failed to create STACKIT stackitclient: %v", err)
+			klog.Fatalf("Failed to create STACKIT provider: %v", err)
 		}
 
 		d.SetupControllerService(iaasClient)

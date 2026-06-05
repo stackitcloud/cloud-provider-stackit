@@ -390,11 +390,12 @@ func (c *MockLoadBalancingClientUpdateCredentialsCall) DoAndReturn(f func(contex
 }
 
 // UpdateLoadBalancer mocks base method.
-func (m *MockLoadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *v2api.UpdateLoadBalancerPayload) error {
+func (m *MockLoadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *v2api.UpdateLoadBalancerPayload) (*v2api.LoadBalancer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateLoadBalancer", ctx, lbName, updates)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*v2api.LoadBalancer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // UpdateLoadBalancer indicates an expected call of UpdateLoadBalancer.
@@ -410,19 +411,19 @@ type MockLoadBalancingClientUpdateLoadBalancerCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockLoadBalancingClientUpdateLoadBalancerCall) Return(arg0 error) *MockLoadBalancingClientUpdateLoadBalancerCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockLoadBalancingClientUpdateLoadBalancerCall) Return(arg0 *v2api.LoadBalancer, arg1 error) *MockLoadBalancingClientUpdateLoadBalancerCall {
+	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockLoadBalancingClientUpdateLoadBalancerCall) Do(f func(context.Context, string, *v2api.UpdateLoadBalancerPayload) error) *MockLoadBalancingClientUpdateLoadBalancerCall {
+func (c *MockLoadBalancingClientUpdateLoadBalancerCall) Do(f func(context.Context, string, *v2api.UpdateLoadBalancerPayload) (*v2api.LoadBalancer, error)) *MockLoadBalancingClientUpdateLoadBalancerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockLoadBalancingClientUpdateLoadBalancerCall) DoAndReturn(f func(context.Context, string, *v2api.UpdateLoadBalancerPayload) error) *MockLoadBalancingClientUpdateLoadBalancerCall {
+func (c *MockLoadBalancingClientUpdateLoadBalancerCall) DoAndReturn(f func(context.Context, string, *v2api.UpdateLoadBalancerPayload) (*v2api.LoadBalancer, error)) *MockLoadBalancingClientUpdateLoadBalancerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

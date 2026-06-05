@@ -162,7 +162,8 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
-		if err := l.client.UpdateLoadBalancer(ctx, name, updatePayload); err != nil {
+		lb, err = l.client.UpdateLoadBalancer(ctx, name, updatePayload)
+		if err != nil {
 			return nil, fmt.Errorf("failed to update load balancer: %w", err)
 		}
 		// Clean up observability credentials if Argus extension is enabled.
@@ -307,7 +308,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 			PlanId:      lb.PlanId,
 			Labels:      lb.Labels,
 		}
-		err = l.client.UpdateLoadBalancer(ctx, name, payload)
+		_, err = l.client.UpdateLoadBalancer(ctx, name, payload)
 		if err != nil {
 			return fmt.Errorf("failed to update load balancer: %w", err)
 		}

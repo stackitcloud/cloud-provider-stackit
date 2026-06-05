@@ -83,7 +83,7 @@ var _ = Describe("LoadBalancer", func() {
 				Return(loadbalancer.ApiUpdateLoadBalancerRequest{ApiService: mockLBClient})
 			mockLBClient.EXPECT().UpdateLoadBalancerExecute(gomock.Any()).Return(nil, nil)
 
-			err := client.UpdateLoadBalancer(context.Background(), lbName, &loadbalancer.UpdateLoadBalancerPayload{})
+			_, err := client.UpdateLoadBalancer(context.Background(), lbName, &loadbalancer.UpdateLoadBalancerPayload{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 

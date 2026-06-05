@@ -12,7 +12,7 @@ type LoadBalancingClient interface {
 	ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, lbName string) error
 	GetLoadBalancer(ctx context.Context, id string) (*loadbalancer.LoadBalancer, error)
-	UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) error
+	UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error)
 	UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error
 
 	CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error)
@@ -62,12 +62,9 @@ func (l loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string)
 	return l.Client.GetLoadBalancer(ctx, l.projectID, l.region, lbName).Execute()
 }
 
-func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) error {
-	if _, err := l.Client.UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).UpdateLoadBalancerPayload(*updates).Execute(); err != nil {
-		return err
-	}
-
-	return nil
+func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	lb, err := l.Client.UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).UpdateLoadBalancerPayload(*updates).Execute()
+	return lb, err
 }
 
 func (l loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
