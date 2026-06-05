@@ -1,8 +1,10 @@
 package ccm
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"net/netip"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -199,6 +201,11 @@ var appoximateFlavorsMap = map[string]string{
 	"25129382-dbe8-43eb-b71b-72253dd69452": p10, // t1.1
 	"22b37153-8817-4c85-9805-92426b2f903c": p10, // t2i.1
 }
+
+var (
+	// invalidTargetDisplayNameCharsRegexp matches any character that is NOT alphanumeric or a hyphen
+	invalidTargetDisplayNameCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9-]`)
+)
 
 // proxyProtocolEnableForPort determines whether portNumber should use the TCP proxy protocol (instead of TCP).
 func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPortFilter []uint16, portNumber int32) bool {
@@ -480,7 +487,7 @@ func lbSpecFromService(
 			address := node.Status.Addresses[j]
 			if address.Type == corev1.NodeInternalIP {
 				targets = append(targets, loadbalancer.Target{
-					DisplayName: &node.Name,
+					DisplayName: new(getSanitizeNodeNameForTarget(node.Name)),
 					Ip:          &address.Address,
 				})
 				break
@@ -753,4 +760,25 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 	}
 
 	return fulfills, immutableChanged
+}
+
+// getSanitizeNodeNameForTarget returns a node name which fits in the DisplayName of a target.
+// Replaces not allowed chars with
+func getSanitizeNodeNameForTarget(nodeName string) string {
+	var cleanName string
+	cleanName = invalidTargetDisplayNameCharsRegexp.ReplaceAllString(nodeName, "-")
+
+	// return node name if not to long and if not contain any invalid chars
+	if len(cleanName) <= 63 &&
+		nodeName == cleanName {
+		return nodeName
+	}
+
+	if len(cleanName) > 54 {
+		cleanName = cleanName[0:54]
+	}
+
+	cleanName += fmt.Sprintf("-%x", sha256.Sum256([]byte(nodeName)))[:8]
+
+	return cleanName
 }
