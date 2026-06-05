@@ -1990,9 +1990,9 @@ var _ = DescribeTable("compareLBwithSpec",
 	}),
 )
 
-var _ = DescribeTable("getSafeNodeName",
+var _ = DescribeTable("sanitizeNodeName",
 	func(name, safe string) {
-		Expect(getSanitizeNodeNameForTarget(name)).To(Equal(safe))
+		Expect(sanitizeNodeName(name)).To(Equal(safe))
 	},
 	Entry("Already safe",
 		"localhost",
