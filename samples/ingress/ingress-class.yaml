@@ -1,7 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
-  # annotations:
+  annotations:
+    alb.stackit.cloud/network-mode: "NodePort" # Mandatory annotation to specify the network mode for the ALB Ingress Controller
   #   alb.stackit.cloud/internal-alb: "false"
   #   alb.stackit.cloud/external-address: "192.214.175.149" # Make sure to replace this with your external IP
   name: sample-alb-ingress
