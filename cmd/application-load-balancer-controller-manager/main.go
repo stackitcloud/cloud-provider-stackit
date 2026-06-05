@@ -30,34 +30,40 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 }
 
+// options holds the command-line options used to initialize the controller manager.
+type options struct {
+	metricsAddr             string
+	enableLeaderElection    bool
+	leaderElectionNamespace string
+	leaderElectionID        string
+	probeAddr               string
+	cloudConfig             string
+}
+
 // nolint:funlen // TODO: Refactor into smaller functions.
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var leaderElectionNamespace string
-	var leaderElectionID string
-	var probeAddr string
-	var cloudConfig string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+	var opts options
+	
+	flag.StringVar(&opts.metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+	flag.StringVar(&opts.probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&opts.enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "default", "The namespace in which the leader "+
+	flag.StringVar(&opts.leaderElectionNamespace, "leader-election-namespace", "default", "The namespace in which the leader "+
 		"election resource will be created.")
-	flag.StringVar(&leaderElectionID, "leader-election-id", "d0fbe9c4.stackit.cloud", "The name of the resource that "+
+	flag.StringVar(&opts.leaderElectionID, "leader-election-id", "d0fbe9c4.stackit.cloud", "The name of the resource that "+
 		"leader election will use for holding the leader lock.")
-	flag.StringVar(&cloudConfig, "cloud-config", "cloud.yaml", "The path to the cloud config file.")
-	opts := zap.Options{
+	flag.StringVar(&opts.cloudConfig, "cloud-config", "cloud.yaml", "The path to the cloud config file.")
+	
+	zapOpts := zap.Options{
 		Development: true,
 	}
-	opts.BindFlags(flag.CommandLine)
+	zapOpts.BindFlags(flag.CommandLine)
 	flag.Parse()
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	config, err := stackitconfig.ReadALBConfigFromFile(cloudConfig)
+	config, err := stackitconfig.ReadALBConfigFromFile(opts.cloudConfig)
 	if err != nil {
 		setupLog.Error(err, "Failed to read cloud config")
 		os.Exit(1)
@@ -66,12 +72,12 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			BindAddress: metricsAddr,
+			BindAddress: opts.metricsAddr,
 		},
-		HealthProbeBindAddress:        probeAddr,
-		LeaderElection:                enableLeaderElection,
-		LeaderElectionID:              leaderElectionID,
-		LeaderElectionNamespace:       leaderElectionNamespace,
+		HealthProbeBindAddress:        opts.probeAddr,
+		LeaderElection:                opts.enableLeaderElection,
+		LeaderElectionID:              opts.leaderElectionID,
+		LeaderElectionNamespace:       opts.leaderElectionNamespace,
 		LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
