@@ -21,10 +21,10 @@ import (
 func (r *IngressClassReconciler) getAlbSpecForIngressClass(
 	ctx context.Context,
 	class *networkingv1.IngressClass,
-) (payload *albsdk.CreateLoadBalancerPayload, validationErrors []error, err error) {
+) (payload *albsdk.CreateLoadBalancerPayload, activeCertIDs map[string]string, validationErrors []error, err error) {
 	ingresses, err := r.getIngressesForIngressClass(ctx, class)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	return r.getAlbSpecForIngresses(ctx, class, ingresses)
@@ -34,7 +34,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(
 	ctx context.Context,
 	class *networkingv1.IngressClass,
 	ingresses []networkingv1.Ingress,
-) (payload *albsdk.CreateLoadBalancerPayload, validationErrors []error, err error) {
+) (payload *albsdk.CreateLoadBalancerPayload, activeCertIDs map[string]string, validationErrors []error, err error) {
 	errorList := []error{}
 
 	listeners := albListeners{}
@@ -58,7 +58,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(
 
 	alb, albSpecErrorList, err := r.getAlbSpecForResources(ctx, class, listeners, targetPools, certNameToId)
 	errorList = append(errorList, albSpecErrorList...)
-	return alb, errorList, err
+	return alb, certNameToId, errorList, err
 }
 
 func (r *IngressClassReconciler) getAlbSpecForResources(

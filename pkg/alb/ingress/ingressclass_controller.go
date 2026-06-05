@@ -83,7 +83,7 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	alb, errorList, err := r.getAlbSpecForIngressClass(ctx, ingressClass)
+	alb, activeCertIDs, errorList, err := r.getAlbSpecForIngressClass(ctx, ingressClass)
 	if err != nil {
 		// todo handle error (write event)
 		log.Error(err, "failed to get alb spec for IngressClass")
@@ -93,6 +93,11 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		// todo handle error (write event)
 		log.Error(err, "failed to update alb")
+	} else {
+		// Clean up orphaned certificates now that the ALB is successfully detached from them
+		if cleanupErr := r.cleanupUnusedCertificates(ctx, ingressClass, activeCertIDs); cleanupErr != nil {
+			log.Error(cleanupErr, "failed to cleanup unused certificates")
+		}
 	}
 
 	for _, errItem := range errorList {
@@ -196,7 +201,7 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 		return fmt.Errorf("failed to delete load balancer: %w", err)
 	}
 
-	err = r.deleteAllCertsForClass(ctx, ingressClass)
+	err = r.cleanupUnusedCertificates(ctx, ingressClass, nil)
 	if err != nil {
 		return err
 	}
