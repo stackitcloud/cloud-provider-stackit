@@ -41,7 +41,7 @@ func (r *IngressClassReconciler) getAlbSpecForIngresses(
 	certificates := albCertificates{}
 	targetPools := albTargetPools{}
 
-		for i, ingress := range ingresses {
+	for i, ingress := range ingresses {
 		var listenerMergeError, targetPoolMergeError []error
 		ingressListeners, ingressCertificates, ingressTargetPools, ingressErrorList := r.getALBResourcesForIngress(ctx, class, &ingress, i)
 		errorList = append(errorList, ingressErrorList...)
@@ -91,6 +91,7 @@ func (r *IngressClassReconciler) getAlbSpecForResources(
 
 	if getAnnotation(AnnotationInternal, false, class) {
 		alb.Options.PrivateNetworkOnly = new(true)
+		alb.Options.EphemeralAddress = new(false)
 	}
 
 	if plan := getAnnotation(AnnotationPlanID, "", class); plan != "" {
@@ -280,6 +281,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 				path:       map[string]albListenerRule{},
 			}
 		}
+
 		for _, path := range rule.HTTP.Paths {
 			if _, ok := hosts[rule.Host].path[path.Path]; ok {
 				errorList = append(errorList, &errorEvent{
@@ -313,6 +315,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 				sequenceIndex:               sequenceIndex,
 			}
 		}
+
 	}
 
 	httpPort := getAnnotation(AnnotationHTTPPort, 80, ingress, class)

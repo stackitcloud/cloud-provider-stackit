@@ -16,7 +16,7 @@ const (
 	AnnotationExternalIP = "alb.stackit.cloud/external-address"
 	// AnnotationInternal If true, the application load balancer is not exposed via a floating IP.
 	// Can be set on IngressClass.
-	AnnotationInternal = "alb.stackit.cloud/internal"
+	AnnotationInternal = "alb.stackit.cloud/internal-alb"
 	// AnnotationPlanID sets the plan for the ALB.
 	// Can be set on IngressClass.
 	AnnotationPlanID = "alb.stackit.cloud/plan-id"
