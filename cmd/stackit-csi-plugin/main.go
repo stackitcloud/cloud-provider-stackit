@@ -96,7 +96,7 @@ func handle() {
 		}
 
 		iaasOpts := []sdkconfig.ConfigurationOption{
-			sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()), // TODO: Ask if this is needed or not
+			sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 		}
 
 		if cfg.Global.APIEndpoints.IaasAPI != "" {
