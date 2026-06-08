@@ -44,6 +44,7 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 	}, nil
 }
 
+//nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
 func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
