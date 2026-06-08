@@ -135,7 +135,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 
 	loadbalancingClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).LoadBalancing(lbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Load Balancing stackitclient: %v", err)
+		return nil, fmt.Errorf("failed to create lb client: %v", err)
 	}
 
 	iaasOpts := []sdkconfig.ConfigurationOption{
@@ -148,7 +148,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 
 	iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create IaaS stackitclient: %v", err)
+		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
 
 	instances, err := NewInstance(iaasClient, cfg.Global.ProjectID, cfg.Global.Region)

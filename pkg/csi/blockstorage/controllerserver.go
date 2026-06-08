@@ -451,7 +451,7 @@ func (cs *controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	var volumeList []iaas.Volume
 	// TODO: There is not pagination for listing volumes so we will just pass empty to startingToken
 	// It's not used anyway.
-	volumeList, err = cloud.ListVolumes(ctx, maxEntries, "")
+	volumeList, _, err = cloud.ListVolumes(ctx, maxEntries, "")
 	if err != nil {
 		klog.Errorf("Failed to ListVolumes: %v", err)
 		if stackiterrors.IsInvalidError(err) {

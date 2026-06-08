@@ -653,7 +653,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					Size:     new(int64(10)),
 					ServerId: new("serverID"),
 				},
-			}, nil)
+			}, "",nil)
 			resp, err := fakeCs.ListVolumes(context.Background(), req)
 			Expect(err).Should(Not(HaveOccurred()))
 			Expect(resp.GetEntries()).Should(Equal(expectedVolumeResponseList))

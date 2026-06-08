@@ -44,7 +44,7 @@ type IaaSClient interface {
 	GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error)
 	GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error)
 	GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error)
-	ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, error)
+	ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error)
 	ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error
 	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
@@ -556,8 +556,6 @@ func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string,
 		return *volume.Id, nil
 	}
 
-	payload.DeleteOnTermination = new(false)
-
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -630,7 +628,8 @@ func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Vol
 	return &vols[0], nil
 }
 
-func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, error) {
+func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
+	// TODO: Add support for pagination when IaaS adds it
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -638,13 +637,13 @@ func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Vo
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+			return nil, "", stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 
-		return nil, err
+		return nil, "", err
 	}
 
-	return volumes.Items, nil
+	return volumes.Items, "", nil
 }
 
 func (i iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {

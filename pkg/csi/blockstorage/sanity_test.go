@@ -124,12 +124,12 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			iaasClient.EXPECT().ListVolumes(
 				gomock.Any(), gomock.Any(), gomock.Eq(""),
-			).DoAndReturn(func(_ context.Context, _ int, _ string) ([]iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
 				var volList []iaas.Volume
 				for _, vol := range createdVolumes {
 					volList = append(volList, *vol) // Append the value
 				}
-				return volList, nil
+				return volList, "", nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().DeleteVolume(
