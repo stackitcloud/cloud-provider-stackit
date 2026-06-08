@@ -87,7 +87,7 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	for _, errItem := range errorList {
 		var evtErr *errorEvent
 		if errors.As(errItem, &evtErr) {
-			log.Info(evtErr.description, "typ", evtErr.typ, "ingressRef", evtErr.ingressRef)
+			log.Info(evtErr.Error(), "ingressRef", evtErr.ingressRef)
 			evtErr.RecordEvent(ingressClass, r.Recorder)
 		} else {
 			log.Info(errItem.Error())

@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 type albListeners map[int]albListener
@@ -69,6 +70,7 @@ func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []error) {
 				mergeErrors = append(mergeErrors, &errorEvent{
 					ingressRef:  srcTargetPool.ingressRef,
 					description: fmt.Sprintf("Target pool for %s could not be created due to maximum already reached", name),
+					fieldPath:   field.NewPath("spec", "backend"),
 				})
 				continue
 			}
@@ -80,21 +82,21 @@ func mergeTargetPools(dst, src albTargetPools) (albTargetPools, []error) {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSSkipCertificateValidation, dstTargetPool.ingressRef),
-				typ:         "Warning",
+				fieldPath:   field.NewPath("annotations", AnnotationTargetPoolTLSSkipCertificateValidation),
 			})
 		}
 		if dstTargetPool.tlsEnabled != srcTargetPool.tlsEnabled {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSEnabled, dstTargetPool.ingressRef),
-				typ:         "Warning",
+				fieldPath:   field.NewPath("annotations", AnnotationTargetPoolTLSEnabled),
 			})
 		}
 		if dstTargetPool.customCA != srcTargetPool.customCA {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef:  srcTargetPool.ingressRef,
 				description: fmt.Sprintf("%s annotation ignored as it already is configured differently in ingress %v", AnnotationTargetPoolTLSCustomCa, dstTargetPool.ingressRef),
-				typ:         "Warning",
+				fieldPath:   field.NewPath("annotations", AnnotationTargetPoolTLSCustomCa),
 			})
 		}
 	}
@@ -129,7 +131,7 @@ func mergeListeners(dst, src albListeners) (albListeners, []error) {
 		if dstListener.protocol != srcListener.protocol {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef: srcListener.ingressRef,
-				typ:        "warning",
+				fieldPath:  field.NewPath("annotations", AnnotationHTTPPort),
 				description: fmt.Sprintf(
 					"Could not use protocol %s for port %d as this is already configured in %s in namespace %s",
 					srcListener.protocol, port, dstListener.ingressRef.Name, dstListener.ingressRef.Namespace,
@@ -139,11 +141,12 @@ func mergeListeners(dst, src albListeners) (albListeners, []error) {
 		if dstListener.wafConfigName != srcListener.wafConfigName {
 			mergeErrors = append(mergeErrors, &errorEvent{
 				ingressRef: srcListener.ingressRef,
-				typ:        "warning",
+				fieldPath:  field.NewPath("annotations", AnnotationWAFName),
 				description: fmt.Sprintf(
 					"Could not use wafconfig %s for port %d as this is already configured in %s in namespace %s",
 					srcListener.wafConfigName, port, dstListener.ingressRef.Name, dstListener.ingressRef.Namespace,
-				)})
+				),
+			})
 		}
 
 		var hostsMergeError []error
@@ -198,7 +201,7 @@ func mergeListenerHostPath(dst, src map[string]albListenerRule) (map[string]albL
 		}
 		mergeErrors = append(mergeErrors, &errorEvent{
 			ingressRef:  srcListenerRule.ingressRef,
-			typ:         "error",
+			fieldPath:   field.NewPath("spec", "rules"),
 			description: fmt.Sprintf("Could not apply path %q as this is already configured in %s in namespace %s", path, dstListenerRule.ingressRef.Name, dstListenerRule.ingressRef.Namespace),
 		})
 	}

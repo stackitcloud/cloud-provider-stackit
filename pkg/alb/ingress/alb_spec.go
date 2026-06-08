@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -201,7 +202,7 @@ func (r *IngressClassReconciler) getAlbSpecForResources(
 			errorList = append(errorList, &errorEvent{
 				ingressRef:  listener.ingressRef,
 				description: "Certificate not found for protocol HTTPS",
-				typ:         "Error",
+				fieldPath:   field.NewPath("spec", "tls"),
 			})
 			continue
 		}
@@ -261,7 +262,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 			if err != nil {
 				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
-					typ:         "error",
+					fieldPath:   field.NewPath("spec", "tls"),
 					description: err.Error(),
 				})
 				continue
@@ -286,7 +287,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 			if _, ok := hosts[rule.Host].path[path.Path]; ok {
 				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
-					typ:         "error",
+					fieldPath:   field.NewPath("spec", "rules"),
 					description: fmt.Sprintf("path %q already exists within same ingress", path.Path),
 				})
 				continue
@@ -296,7 +297,7 @@ func (r *IngressClassReconciler) getALBResourcesForIngress(ctx context.Context, 
 			if err != nil {
 				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
-					typ:         "error",
+					fieldPath:   field.NewPath("spec", "rules"),
 					description: err.Error(),
 				})
 				continue
@@ -469,7 +470,7 @@ func (r *IngressClassReconciler) applyCertificates(ctx context.Context, class *n
 				errorList = append(errorList, &errorEvent{
 					ingressRef:  ref,
 					description: fmt.Sprintf("Error creating certificate for ingress %q: %s", ref, err),
-					typ:         "error",
+					fieldPath:   field.NewPath("spec", "tls"),
 				})
 			}
 			continue
