@@ -17,6 +17,7 @@ quotas*
 hmac
 
 cloud.yaml
+cloud-config.yaml
 __debug_*
 
 test/e2e/inventory*
