@@ -2,8 +2,12 @@ package client
 
 import (
 	"context"
+	"net/http"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
+	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 )
 
@@ -40,76 +44,216 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 	}, nil
 }
 
-func (l loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	lb, err := l.Client.CreateLoadBalancer(ctx, l.projectID, l.region).CreateLoadBalancerPayload(*payload).Execute()
-	return lb, err
-}
+func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
-func (l loadBalancingClient) ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error) {
-	lbResponse, err := l.Client.ListLoadBalancers(ctx, l.projectID, l.region).Execute()
+	lb, err := l.Client.
+		CreateLoadBalancer(ctx, l.projectID, l.region).
+		CreateLoadBalancerPayload(*payload).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
+
+	return lb, nil
+}
+
+func (l *loadBalancingClient) ListLoadBalancers(ctx context.Context) ([]loadbalancer.LoadBalancer, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	lbResponse, err := l.Client.
+		ListLoadBalancers(ctx, l.projectID, l.region).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
 	return lbResponse.GetLoadBalancers(), nil
 }
 
-func (l loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName string) error {
-	_, err := l.Client.DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).Execute()
-	return err
-}
+func (l *loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName string) error {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
-func (l loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string) (*loadbalancer.LoadBalancer, error) {
-	return l.Client.GetLoadBalancer(ctx, l.projectID, l.region, lbName).Execute()
-}
-
-func (l loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	lb, err := l.Client.UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).UpdateLoadBalancerPayload(*updates).Execute()
-	return lb, err
-}
-
-func (l loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
-	_, err := l.Client.UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
-	return err
-}
-
-func (l loadBalancingClient) UpdateTargatPool(ctx context.Context, lbName, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
-	_, err := l.Client.UpdateTargetPool(ctx, l.projectID, l.region, lbName, targetPoolName).UpdateTargetPoolPayload(payload).Execute()
-	return err
-}
-
-func (l loadBalancingClient) CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
-	resp, err := l.Client.CreateCredentials(ctx, l.projectID, l.region).CreateCredentialsPayload(payload).Execute()
+	_, err := l.Client.
+		DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (l *loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string) (*loadbalancer.LoadBalancer, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	lb, err := l.Client.
+		GetLoadBalancer(ctx, l.projectID, l.region, lbName).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
+	return lb, nil
+}
+
+func (l *loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	lb, err := l.Client.
+		UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).
+		UpdateLoadBalancerPayload(*updates).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return nil, err
+	}
+
+	return lb, nil
+}
+
+func (l *loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	_, err := l.Client.
+		UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).
+		UpdateTargetPoolPayload(payload).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (l *loadBalancingClient) CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	resp, err := l.Client.
+		CreateCredentials(ctx, l.projectID, l.region).
+		CreateCredentialsPayload(payload).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
 	return resp, nil
 }
 
-func (l loadBalancingClient) GetCredentials(ctx context.Context, credentialsRef string) (*loadbalancer.GetCredentialsResponse, error) {
-	resp, err := l.Client.GetCredentials(ctx, l.projectID, l.region, credentialsRef).Execute()
+func (l *loadBalancingClient) GetCredentials(ctx context.Context, credentialsRef string) (*loadbalancer.GetCredentialsResponse, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	resp, err := l.Client.
+		GetCredentials(ctx, l.projectID, l.region, credentialsRef).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
 	return resp, nil
 }
 
-func (l loadBalancingClient) ListCredentials(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
-	resp, err := l.Client.ListCredentials(ctx, l.projectID, l.region).Execute()
+func (l *loadBalancingClient) ListCredentials(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	resp, err := l.Client.
+		ListCredentials(ctx, l.projectID, l.region).
+		Execute()
 	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
 		return nil, err
 	}
 
 	return resp, nil
 }
 
-func (l loadBalancingClient) UpdateCredentials(ctx context.Context, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
-	_, err := l.Client.UpdateCredentials(ctx, l.projectID, l.region, credentialsRef).UpdateCredentialsPayload(payload).Execute()
-	return err
+func (l *loadBalancingClient) UpdateCredentials(ctx context.Context, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	_, err := l.Client.
+		UpdateCredentials(ctx, l.projectID, l.region, credentialsRef).
+		UpdateCredentialsPayload(payload).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
-func (l loadBalancingClient) DeleteCredentials(ctx context.Context, credentialsRef string) error {
-	_, err := l.Client.DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).Execute()
-	return err
+func (l *loadBalancingClient) DeleteCredentials(ctx context.Context, credentialsRef string) error {
+	var httpResp *http.Response
+	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
+
+	_, err := l.Client.
+		DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).
+		Execute()
+	if err != nil {
+		if httpResp != nil {
+			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
+			return stackiterrors.WrapErrorWithResponseID(err, reqID)
+		}
+
+		return err
+	}
+
+	return nil
 }

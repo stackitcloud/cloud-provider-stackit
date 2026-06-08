@@ -950,10 +950,7 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		}, nil
 	}
 
-	payload := iaas.ResizeVolumePayload{
-		Size: volSizeGB,
-	}
-	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, payload)
+	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, iaas.ResizeVolumePayload{Size: volSizeGB})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q to size %v: %v", volumeID, volSizeGB, err)
 	}

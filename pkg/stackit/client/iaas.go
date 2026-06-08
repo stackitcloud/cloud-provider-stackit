@@ -114,7 +114,7 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 	}, nil
 }
 
-func (i iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
+func (i *iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -131,7 +131,7 @@ func (i iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Serve
 	return server, nil
 }
 
-func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
+func (i *iaasClient) DeleteServer(ctx context.Context, serverID string) error {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -149,7 +149,7 @@ func (i iaasClient) DeleteServer(ctx context.Context, serverID string) error {
 }
 
 //nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
-func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
+func (i *iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerPayload) (*iaas.Server, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -169,7 +169,7 @@ func (i iaasClient) CreateServer(ctx context.Context, create *iaas.CreateServerP
 	return server, nil
 }
 
-func (i iaasClient) UpdateServer(ctx context.Context, serverID string, update iaas.UpdateServerPayload) (*iaas.Server, error) {
+func (i *iaasClient) UpdateServer(ctx context.Context, serverID string, update iaas.UpdateServerPayload) (*iaas.Server, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -189,7 +189,7 @@ func (i iaasClient) UpdateServer(ctx context.Context, serverID string, update ia
 	return server, nil
 }
 
-func (i iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
+func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -207,7 +207,7 @@ func (i iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 }
 
 //nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
-func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+func (i *iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -227,7 +227,7 @@ func (i iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnap
 	return snapshot, nil
 }
 
-func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+func (i *iaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -246,7 +246,7 @@ func (i iaasClient) ListSnapshots(ctx context.Context, filters map[string]string
 	return filteredSnapshots, "", nil
 }
 
-func (i iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
+func (i *iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -263,7 +263,7 @@ func (i iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error
 	return nil
 }
 
-func (i iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
+func (i *iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -280,7 +280,7 @@ func (i iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.S
 	return snapshot, nil
 }
 
-func (i iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error) {
+func (i *iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error) {
 	backoff := wait.Backoff{
 		Duration: snapReadyDuration,
 		Factor:   snapReadyFactor,
@@ -309,7 +309,7 @@ func (i iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*
 	return new("Failed to get Snapshot status"), err
 }
 
-func (i iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (bool, error) {
+func (i *iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (bool, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -326,7 +326,7 @@ func (i iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (boo
 	return *snapshot.Status == SnapshotReadyStatus, nil
 }
 
-func (i iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
+func (i *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*iaas.Backup, error) {
 	payload, err := BuildCreateBackupPayload(name, volID, snapshotID, tags)
 	if err != nil {
 		return nil, err
@@ -386,7 +386,7 @@ func BuildCreateBackupPayload(name, volID, snapshotID string, tags map[string]st
 	return opts, nil
 }
 
-func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
+func (i *iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -405,7 +405,7 @@ func (i iaasClient) ListBackups(ctx context.Context, filters map[string]string) 
 	return filteredBackups, nil
 }
 
-func (i iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
+func (i *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -422,7 +422,7 @@ func (i iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	return nil
 }
 
-func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error) {
+func (i *iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -439,7 +439,7 @@ func (i iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backu
 	return backup, nil
 }
 
-func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
+func (i *iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
 	duration := time.Duration(int64(backupMaxDurationSecondsPerGB)*snapshotSize + backupBaseDurationSeconds)
 	err := i.waitBackupReadyWithContext(backupID, duration)
 	if err != nil {
@@ -461,7 +461,7 @@ func (i iaasClient) WaitBackupReady(ctx context.Context, backupID string, snapsh
 	return new("Failed to get backup status"), nil
 }
 
-func (i iaasClient) waitBackupReadyWithContext(backupID string, duration time.Duration) error {
+func (i *iaasClient) waitBackupReadyWithContext(backupID string, duration time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), duration*time.Second)
 	defer cancel()
 	var done bool
@@ -488,7 +488,7 @@ func (i iaasClient) waitBackupReadyWithContext(backupID string, duration time.Du
 
 // Supporting function for waitBackupReadyWithContext().
 // Returns true when the backup is ready.
-func (i iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, error) {
+func (i *iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, error) {
 	backup, err := i.GetBackup(ctx, backupID)
 	if err != nil {
 		return false, err
@@ -501,7 +501,7 @@ func (i iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, e
 	return *backup.Status == backupReadyStatus, nil
 }
 
-func (i iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+func (i *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
 
 	var httpResp *http.Response
@@ -520,7 +520,7 @@ func (i iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolume
 	return volume, nil
 }
 
-func (i iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
+func (i *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 	used, err := i.diskIsUsed(ctx, volumeID)
 	if err != nil {
 		return err
@@ -545,7 +545,7 @@ func (i iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 	return nil
 }
 
-func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error) {
+func (i *iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error) {
 	volume, err := i.GetVolume(ctx, volumeID)
 	if err != nil {
 		return "", err
@@ -574,7 +574,7 @@ func (i iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string,
 	return volume.GetId(), nil
 }
 
-func (i iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
+func (i *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -591,7 +591,7 @@ func (i iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volum
 	return volume, nil
 }
 
-func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error) {
+func (i *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error) {
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
@@ -611,7 +611,7 @@ func (i iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaa
 	return filteredVolumes, nil
 }
 
-func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error) {
+func (i *iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Volume, error) {
 	vols, err := i.GetVolumesByName(ctx, name)
 	if err != nil {
 		return nil, err
@@ -628,7 +628,7 @@ func (i iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.Vol
 	return &vols[0], nil
 }
 
-func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
+func (i *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
 	// TODO: Add support for pagination when IaaS adds it
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
@@ -646,7 +646,7 @@ func (i iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Vo
 	return volumes.Items, "", nil
 }
 
-func (i iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {
+func (i *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {
 	switch volumeStatus {
 	case VolumeAttachedStatus, VolumeAvailableStatus:
 		var httpResp *http.Response
@@ -672,7 +672,7 @@ func (i iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus str
 	}
 }
 
-func (i iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+func (i *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
 	backoff := wait.Backoff{
 		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
@@ -702,7 +702,7 @@ func (i iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string,
 	return waitErr
 }
 
-func (i iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
+func (i *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
 	backoff := wait.Backoff{
 		Duration: diskAttachInitDelay,
 		Factor:   diskAttachFactor,
@@ -726,7 +726,7 @@ func (i iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID s
 	return err
 }
 
-func (i iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error {
+func (i *iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error {
 	backoff := wait.Backoff{
 		Duration: diskDetachInitDelay,
 		Factor:   diskDetachFactor,
@@ -748,7 +748,7 @@ func (i iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID s
 	return err
 }
 
-func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string) error {
+func (i *iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string) error {
 	volume, err := i.GetVolume(ctx, volumeID)
 	if err != nil {
 		return err
@@ -785,7 +785,7 @@ func (i iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string)
 	return nil
 }
 
-func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
+func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
 		vol, err := i.GetVolume(ctx, volumeID)
 		if err != nil {
@@ -810,7 +810,7 @@ func (i iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context,
 }
 
 // diskIsAttached queries if a volume is attached to a compute instance
-func (i iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID string) (bool, error) {
+func (i *iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID string) (bool, error) {
 	volume, err := i.GetVolume(ctx, volumeID)
 	if err != nil {
 		return false, err
@@ -823,7 +823,7 @@ func (i iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID str
 }
 
 // diskIsUsed returns true whether a disk is attached to any node
-func (i iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, error) {
+func (i *iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, error) {
 	volume, err := i.GetVolume(ctx, volumeID)
 	if err != nil {
 		return false, err
