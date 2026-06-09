@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	// AnnotationExternalIP references a STACKIT floating IP that should be used by the application load balancer.
+	// AnnotationExternalIP references a STACKIT public IP that should be used by the application load balancer.
 	// If set it will be used instead of an ephemeral IP. The IP must be created by the customer. When the service is deleted,
-	// the floating IP will not be deleted. The IP is ignored if the alb.stackit.cloud/internal-alb is set.
+	// the public IP will not be deleted. The IP is ignored if the alb.stackit.cloud/internal-alb is set.
 	// If the annotation is set after the creation it must match the ephemeral IP.
 	// This will promote the ephemeral IP to a static IP.
 	// Can be set on IngressClass.
 	AnnotationExternalIP = "alb.stackit.cloud/external-address"
-	// AnnotationInternal If true, the application load balancer is not exposed via a floating IP.
+	// AnnotationInternal If true, the application load balancer is not exposed via a public IP.
 	// Can be set on IngressClass.
 	AnnotationInternal = "alb.stackit.cloud/internal-alb"
 	// AnnotationPlanID sets the plan for the ALB.

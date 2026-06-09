@@ -69,7 +69,7 @@ metadata:
 
 | Annotation | Allowed On | Requirement | Description |
 | :--- | :--- | :--- | :--- |
-| `alb.stackit.cloud/external-address` | IngressClass | Optional | Uses a specific STACKIT floating IP instead of an ephemeral one. |
+| `alb.stackit.cloud/external-address` | IngressClass | Optional | Uses a specific STACKIT public IP instead of an ephemeral one. |
 | `alb.stackit.cloud/internal` | IngressClass | Optional | If `true`, the ALB is not exposed via a public IP. |
 | `alb.stackit.cloud/plan-id` | IngressClass | Optional | Sets the service plan for the ALB. |
 | `alb.stackit.cloud/http-port` | IngressClass, Ingress | Optional | Specifies the custom HTTP port. |
