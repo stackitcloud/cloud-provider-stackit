@@ -659,14 +659,6 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
 	properties := map[string]string{}
 
-	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
-	// Also, we don't want to tag every param, but we do honor the RecognizedCSISnapshotterParams
-	for _, mKey := range sharedcsi.RecognizedCSISnapshotterParams {
-		if v, ok := parameters[mKey]; ok {
-			properties[mKey] = v
-		}
-	}
-
 	payload := &iaas.CreateSnapshotPayload{
 		Name:     new(name),
 		VolumeId: volumeID,
