@@ -75,7 +75,7 @@ func CountFreePCIeSlots() (int64, error) {
 				return pciAddressRegex.MatchString(s.Name())
 			})
 			if !hasDownStreamFolder {
-				freePCIeSlots += 1
+				freePCIeSlots++
 			}
 		} else {
 			klog.V(4).Infof("skipping class %s: path: %s", class, devPath)
