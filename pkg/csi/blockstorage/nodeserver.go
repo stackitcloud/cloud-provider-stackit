@@ -302,23 +302,9 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] unable to retrieve instance id of node %v", err)
 	}
 
-	emptyPCIeRootPorts, err := mount.CountFreePCIeSlots()
-	if err != nil {
-		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports %v", err)
-		emptyPCIeRootPorts = 0
-	}
-
-	vols, err := mount.CountLocalCSIVolumes(driverName)
-	if err != nil {
-		klog.Errorf("[NodeGetInfo] unable to retrieve volume count %v", err)
-	}
-
-	// maxVolumesPerNode is the result of all free/empty PCIClassBridgePCI ports plus all already mounted volumes.
-	maxVolumesPerNode := emptyPCIeRootPorts + vols
-
 	nodeInfo := &csi.NodeGetInfoResponse{
 		NodeId:            nodeID,
-		MaxVolumesPerNode: maxVolumesPerNode,
+		MaxVolumesPerNode: ns.calculateMaxVolumesPerNode(),
 	}
 
 	zone, err := ns.Metadata.GetAvailabilityZone(ctx)
@@ -334,6 +320,22 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	nodeInfo.AccessibleTopology = &csi.Topology{Segments: segments}
 
 	return nodeInfo, nil
+}
+
+func (ns *nodeServer) calculateMaxVolumesPerNode() int64 {
+	freePCIeRootPorts, err := mount.CountFreePCIeSlots()
+	if err != nil {
+		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports: %v", err)
+		freePCIeRootPorts = 0
+	}
+
+	mountedCSIVolumes, err := mount.CountLocalCSIVolumes(driverName)
+	if err != nil {
+		klog.Errorf("[NodeGetInfo] unable to retrieve volume count: %v", err)
+		mountedCSIVolumes = 0
+	}
+
+	return freePCIeRootPorts + mountedCSIVolumes
 }
 
 func (ns *nodeServer) NodeGetCapabilities(_ context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {

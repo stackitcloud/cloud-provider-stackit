@@ -10,11 +10,13 @@ import (
 	"github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 )
 
+const tooManyDiskDevicesMessageFragment = "maximum allowed number of disk devices"
+
 var ErrNotFound = errors.New("failed to find object")
 
 func IsNotFound(err error) bool {
-	var oAPIError *oapiError.GenericOpenAPIError
-	if ok := errors.As(err, &oAPIError); !ok {
+	oAPIError, ok := genericOpenAPIError(err)
+	if !ok {
 		return false
 	}
 
@@ -22,14 +24,13 @@ func IsNotFound(err error) bool {
 }
 
 func IsTooManyDevicesError(err error) bool {
-	var oAPIError *oapiError.GenericOpenAPIError
-	if ok := errors.As(err, &oAPIError); !ok {
+	oAPIError, ok := genericOpenAPIError(err)
+	if !ok {
 		return false
 	}
 
-	// TODO: Improve this if possible
 	return oAPIError.StatusCode == http.StatusForbidden &&
-		strings.Contains(string(oAPIError.Body), "maximum allowed number of disk devices")
+		strings.Contains(string(oAPIError.Body), tooManyDiskDevicesMessageFragment)
 }
 
 func IgnoreNotFound(err error) error {
@@ -52,10 +53,19 @@ func WrapErrorWithResponseID(err error, reqID string) error {
 }
 
 func IsInvalidError(err error) bool {
-	var oAPIError *oapiError.GenericOpenAPIError
-	if ok := errors.As(err, &oAPIError); !ok {
+	oAPIError, ok := genericOpenAPIError(err)
+	if !ok {
 		return false
 	}
 
 	return oAPIError.StatusCode == http.StatusBadRequest
+}
+
+func genericOpenAPIError(err error) (*oapiError.GenericOpenAPIError, bool) {
+	var oAPIError *oapiError.GenericOpenAPIError
+	if ok := errors.As(err, &oAPIError); !ok {
+		return nil, false
+	}
+
+	return oAPIError, true
 }
