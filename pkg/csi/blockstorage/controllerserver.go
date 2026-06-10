@@ -659,6 +659,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
 	properties := map[string]string{}
 
+	// TODO: Add support for sharedcsi.RecognizedCSISnapshotterParams later.
 	payload := &iaas.CreateSnapshotPayload{
 		Name:     new(name),
 		VolumeId: volumeID,
