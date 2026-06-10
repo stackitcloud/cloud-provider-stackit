@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-
 	corev1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
@@ -47,12 +47,12 @@ var oldProviderIDRegexp = regexp.MustCompile(`^` + oldProviderName + `://([^/]*)
 // Instances encapsulates an implementation of Instances for OpenStack.
 type Instances struct {
 	regionProviderID bool
-	iaasClient       stackit.NodeClient
+	iaasClient       stackitclient.IaaSClient
 	projectID        string
 	region           string
 }
 
-func NewInstance(client stackit.NodeClient, projectID, region string) (*Instances, error) {
+func NewInstance(client stackitclient.IaaSClient, projectID, region string) (*Instances, error) {
 	return &Instances{
 		iaasClient:       client,
 		projectID:        projectID,
@@ -203,8 +203,8 @@ func instanceIDFromProviderID(providerID string) (instanceID, region string, err
 	}
 }
 
-func getServerByName(ctx context.Context, client stackit.NodeClient, name, projectID, region string) (*iaas.Server, error) {
-	servers, err := client.ListServers(ctx, projectID, region)
+func getServerByName(ctx context.Context, client stackitclient.IaaSClient, name string) (*iaas.Server, error) {
+	servers, err := client.ListServers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
@@ -227,7 +227,7 @@ func getServerByName(ctx context.Context, client stackit.NodeClient, name, proje
 
 func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.Server, error) {
 	if node.Spec.ProviderID == "" {
-		return getServerByName(ctx, i.iaasClient, node.Name, i.projectID, i.region)
+		return getServerByName(ctx, i.iaasClient, node.Name)
 	}
 
 	instanceID, instanceRegion, err := instanceIDFromProviderID(node.Spec.ProviderID)
@@ -239,8 +239,8 @@ func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.S
 		return nil, fmt.Errorf("ProviderID \"%s\" didn't match supported region \"%s\"", node.Spec.ProviderID, i.region)
 	}
 
-	server, err := i.iaasClient.GetServer(ctx, i.projectID, i.region, instanceID)
-	if stackit.IsNotFound(err) {
+	server, err := i.iaasClient.GetServer(ctx, instanceID)
+	if stackiterrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
