@@ -105,7 +105,7 @@ func mustMkdirAll(path string) {
 	Expect(os.MkdirAll(path, 0o755)).To(Succeed())
 }
 
-func mustWriteFile(path string, content string) {
+func mustWriteFile(path, content string) {
 	GinkgoHelper()
 	Expect(os.WriteFile(path, []byte(content), 0o644)).To(Succeed())
 }
