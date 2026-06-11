@@ -3,160 +3,109 @@ package mount
 import (
 	"os"
 	"path/filepath"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestCountFreePCIeSlotsAtMissingRoot(t *testing.T) {
-	t.Parallel()
+var _ = Describe("Mount helpers", func() {
+	Describe("countFreePCIeSlotsAt", func() {
+		It("returns an error when the PCI devices root is missing", func() {
+			_, err := countFreePCIeSlotsAt(filepath.Join(GinkgoT().TempDir(), "missing"))
+			Expect(err).To(HaveOccurred())
+		})
 
-	_, err := countFreePCIeSlotsAt(filepath.Join(t.TempDir(), "missing"))
-	if err == nil {
-		t.Fatal("countFreePCIeSlotsAt() error = nil, want error")
-	}
-}
+		It("counts only free bridge-backed PCIe slots", func() {
+			devicesPath := GinkgoT().TempDir()
 
-func TestCountFreePCIeSlotsAtCountsOnlyFreeBridgeSlots(t *testing.T) {
-	t.Parallel()
+			createPCIDevice(devicesPath, "0000:00:00.0", "0x060400")
+			createPCIDevice(devicesPath, "0000:00:01.0", "0x060400", "0000:01:00.0")
+			createPCIDevice(devicesPath, "0000:00:02.0", "0x010000", "0000:02:00.0")
 
-	devicesPath := t.TempDir()
+			count, err := countFreePCIeSlotsAt(devicesPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(1)))
+		})
 
-	createPCIDevice(t, devicesPath, "0000:00:00.0", "0x060400")
-	createPCIDevice(t, devicesPath, "0000:00:01.0", "0x060400", "0000:01:00.0")
-	createPCIDevice(t, devicesPath, "0000:00:02.0", "0x010000", "0000:02:00.0")
+		It("skips devices whose class cannot be read", func() {
+			devicesPath := GinkgoT().TempDir()
 
-	count, err := countFreePCIeSlotsAt(devicesPath)
-	if err != nil {
-		t.Fatalf("countFreePCIeSlotsAt() error = %v", err)
-	}
+			createPCIDevice(devicesPath, "0000:00:00.0", "0x060400")
+			mustMkdirAll(filepath.Join(devicesPath, "0000:00:01.0"))
 
-	if count != 1 {
-		t.Fatalf("countFreePCIeSlotsAt() = %d, want 1", count)
-	}
-}
+			count, err := countFreePCIeSlotsAt(devicesPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(1)))
+		})
 
-func TestCountFreePCIeSlotsAtSkipsDevicesWithoutClass(t *testing.T) {
-	t.Parallel()
+		It("ignores non-PCI child entries when checking bridge occupancy", func() {
+			devicesPath := GinkgoT().TempDir()
+			devPath := filepath.Join(devicesPath, "0000:00:00.0")
+			mustMkdirAll(devPath)
+			mustWriteFile(filepath.Join(devPath, "class"), "0x060400")
+			mustMkdirAll(filepath.Join(devPath, "driver"))
+			mustMkdirAll(filepath.Join(devPath, "not-a-pci-child"))
 
-	devicesPath := t.TempDir()
+			count, err := countFreePCIeSlotsAt(devicesPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(1)))
+		})
+	})
 
-	createPCIDevice(t, devicesPath, "0000:00:00.0", "0x060400")
-	mustMkdirAll(t, filepath.Join(devicesPath, "0000:00:01.0"))
+	Describe("countLocalCSIVolumesAt", func() {
+		It("returns zero for a missing driver directory", func() {
+			count, err := countLocalCSIVolumesAt(filepath.Join(GinkgoT().TempDir(), "missing"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		})
 
-	count, err := countFreePCIeSlotsAt(devicesPath)
-	if err != nil {
-		t.Fatalf("countFreePCIeSlotsAt() error = %v", err)
-	}
+		It("counts only global mount directories", func() {
+			driverPluginDir := GinkgoT().TempDir()
 
-	if count != 1 {
-		t.Fatalf("countFreePCIeSlotsAt() = %d, want 1", count)
-	}
-}
+			mustMkdirAll(filepath.Join(driverPluginDir, "volume-a", globalMountDir))
+			mustMkdirAll(filepath.Join(driverPluginDir, "volume-b", globalMountDir))
+			mustMkdirAll(filepath.Join(driverPluginDir, "volume-c", "not-a-globalmount"))
 
-func TestCountFreePCIeSlotsAtIgnoresNonPCIChildren(t *testing.T) {
-	t.Parallel()
+			count, err := countLocalCSIVolumesAt(driverPluginDir)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+		})
 
-	devicesPath := t.TempDir()
-	devPath := filepath.Join(devicesPath, "0000:00:00.0")
-	mustMkdirAll(t, devPath)
-	mustWriteFile(t, filepath.Join(devPath, "class"), "0x060400")
-	mustMkdirAll(t, filepath.Join(devPath, "driver"))
-	mustMkdirAll(t, filepath.Join(devPath, "not-a-pci-child"))
+		It("returns zero for an empty driver directory", func() {
+			count, err := countLocalCSIVolumesAt(GinkgoT().TempDir())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		})
 
-	count, err := countFreePCIeSlotsAt(devicesPath)
-	if err != nil {
-		t.Fatalf("countFreePCIeSlotsAt() error = %v", err)
-	}
+		It("returns zero when the driver path is a file", func() {
+			driverPluginDir := filepath.Join(GinkgoT().TempDir(), "driver")
+			mustWriteFile(driverPluginDir, "not a directory")
 
-	if count != 1 {
-		t.Fatalf("countFreePCIeSlotsAt() = %d, want 1", count)
-	}
-}
+			count, err := countLocalCSIVolumesAt(driverPluginDir)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		})
+	})
+})
 
-func TestCountLocalCSIVolumesAtMissingDir(t *testing.T) {
-	t.Parallel()
-
-	count, err := countLocalCSIVolumesAt(filepath.Join(t.TempDir(), "missing"))
-	if err != nil {
-		t.Fatalf("countLocalCSIVolumesAt() error = %v", err)
-	}
-
-	if count != 0 {
-		t.Fatalf("countLocalCSIVolumesAt() = %d, want 0", count)
-	}
-}
-
-func TestCountLocalCSIVolumesAtCountsOnlyGlobalMountDirs(t *testing.T) {
-	t.Parallel()
-
-	driverPluginDir := t.TempDir()
-
-	mustMkdirAll(t, filepath.Join(driverPluginDir, "volume-a", globalMountDir))
-	mustMkdirAll(t, filepath.Join(driverPluginDir, "volume-b", globalMountDir))
-	mustMkdirAll(t, filepath.Join(driverPluginDir, "volume-c", "not-a-globalmount"))
-
-	count, err := countLocalCSIVolumesAt(driverPluginDir)
-	if err != nil {
-		t.Fatalf("countLocalCSIVolumesAt() error = %v", err)
-	}
-
-	if count != 2 {
-		t.Fatalf("countLocalCSIVolumesAt() = %d, want 2", count)
-	}
-}
-
-func TestCountLocalCSIVolumesAtEmptyDir(t *testing.T) {
-	t.Parallel()
-
-	count, err := countLocalCSIVolumesAt(t.TempDir())
-	if err != nil {
-		t.Fatalf("countLocalCSIVolumesAt() error = %v", err)
-	}
-
-	if count != 0 {
-		t.Fatalf("countLocalCSIVolumesAt() = %d, want 0", count)
-	}
-}
-
-func TestCountLocalCSIVolumesAtReturnsZeroWhenDriverPathIsFile(t *testing.T) {
-	t.Parallel()
-
-	driverPluginDir := filepath.Join(t.TempDir(), "driver")
-	mustWriteFile(t, driverPluginDir, "not a directory")
-
-	count, err := countLocalCSIVolumesAt(driverPluginDir)
-	if err != nil {
-		t.Fatalf("countLocalCSIVolumesAt() error = %v", err)
-	}
-
-	if count != 0 {
-		t.Fatalf("countLocalCSIVolumesAt() = %d, want 0", count)
-	}
-}
-
-func createPCIDevice(t *testing.T, rootPath, deviceName, class string, children ...string) {
-	t.Helper()
+func createPCIDevice(rootPath, deviceName, class string, children ...string) {
+	GinkgoHelper()
 
 	devPath := filepath.Join(rootPath, deviceName)
-	mustMkdirAll(t, devPath)
-	mustWriteFile(t, filepath.Join(devPath, "class"), class)
+	mustMkdirAll(devPath)
+	mustWriteFile(filepath.Join(devPath, "class"), class)
 
 	for _, child := range children {
-		mustMkdirAll(t, filepath.Join(devPath, child))
+		mustMkdirAll(filepath.Join(devPath, child))
 	}
 }
 
-func mustMkdirAll(t *testing.T, path string) {
-	t.Helper()
-
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatalf("MkdirAll(%q) error = %v", path, err)
-	}
+func mustMkdirAll(path string) {
+	GinkgoHelper()
+	Expect(os.MkdirAll(path, 0o755)).To(Succeed())
 }
 
-func mustWriteFile(t *testing.T, path string, content string) {
-	t.Helper()
-
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("WriteFile(%q) error = %v", path, err)
-	}
+func mustWriteFile(path string, content string) {
+	GinkgoHelper()
+	Expect(os.WriteFile(path, []byte(content), 0o644)).To(Succeed())
 }
