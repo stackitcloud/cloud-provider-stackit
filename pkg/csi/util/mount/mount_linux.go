@@ -35,6 +35,5 @@ func CountFreePCIeSlots() (int64, error) {
 // CountLocalCSIVolumes counts staged CSI volumes for the given driver.
 func CountLocalCSIVolumes(driverName string) (int64, error) {
 	csiPluginDir := filepath.Join(kubeletDir, "plugins", "kubernetes.io", "csi")
-	driverPluginDir := filepath.Join(csiPluginDir, driverName)
-	return countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, driverName)
+	return countLocalCSIVolumesAt(csiPluginDir, driverName)
 }

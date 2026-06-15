@@ -56,7 +56,7 @@ var _ = Describe("Mount helpers", func() {
 		It("returns zero for a missing driver directory", func() {
 			tempDir := GinkgoT().TempDir()
 
-			count, err := countLocalCSIVolumesAt(filepath.Join(tempDir, "missing"), tempDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(tempDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
 		})
@@ -72,7 +72,7 @@ var _ = Describe("Mount helpers", func() {
 			mustWriteVolumeMetadata(csiPluginDir, "block-volume-b", "block-storage.csi.stackit.cloud")
 			mustWriteVolumeMetadata(csiPluginDir, "other-driver-volume", "other.csi.example")
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(int64(4)))
 		})
@@ -80,17 +80,17 @@ var _ = Describe("Mount helpers", func() {
 		It("returns zero for an empty driver directory", func() {
 			csiPluginDir := GinkgoT().TempDir()
 
-			count, err := countLocalCSIVolumesAt(filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud"), csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
 		})
 
-		It("returns zero when the driver path is a file", func() {
+		It("returns zero when the computed driver path is a file", func() {
 			csiPluginDir := GinkgoT().TempDir()
-			driverPluginDir := filepath.Join(GinkgoT().TempDir(), "driver")
+			driverPluginDir := filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud")
 			mustWriteFile(driverPluginDir, "not a directory")
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
 		})
@@ -100,24 +100,22 @@ var _ = Describe("Mount helpers", func() {
 			driverPluginDir := filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud")
 			mustMkdirAll(filepath.Join(driverPluginDir, "volume-a", globalMountDir))
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(int64(1)))
 		})
 
 		It("ignores block metadata for other CSI drivers", func() {
 			csiPluginDir := GinkgoT().TempDir()
-			driverPluginDir := filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud")
 			mustWriteVolumeMetadata(csiPluginDir, "block-volume-a", "other.csi.example")
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
 		})
 
 		It("skips malformed or unreadable block metadata files", func() {
 			csiPluginDir := GinkgoT().TempDir()
-			driverPluginDir := filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud")
 			mustWriteVolumeMetadata(csiPluginDir, "good-volume", "block-storage.csi.stackit.cloud")
 			malformedPath := filepath.Join(csiPluginDir, volumeDevicesDir, "malformed-volume", volumeDataDir, volumeDataFile)
 			mustMkdirAll(filepath.Dir(malformedPath))
@@ -130,18 +128,17 @@ var _ = Describe("Mount helpers", func() {
 				Expect(os.Chmod(unreadablePath, 0o644)).To(Succeed())
 			}()
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(int64(1)))
 		})
 
 		It("does not count publish or staging directories without metadata", func() {
 			csiPluginDir := GinkgoT().TempDir()
-			driverPluginDir := filepath.Join(csiPluginDir, "block-storage.csi.stackit.cloud")
 			mustMkdirAll(filepath.Join(csiPluginDir, volumeDevicesDir, "spec-a", "publish", "pod-a"))
 			mustMkdirAll(filepath.Join(csiPluginDir, volumeDevicesDir, "spec-b", "staging"))
 
-			count, err := countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, "block-storage.csi.stackit.cloud")
+			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
 		})
