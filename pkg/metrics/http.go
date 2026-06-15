@@ -36,8 +36,8 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 
 	if response != nil && response.StatusCode >= 400 {
 		HTTPErrorCount.With(prometheus.Labels{
-			"method":     request.Method,
-			"code":       strconv.Itoa(response.StatusCode),
+			"method": request.Method,
+			"code":   strconv.Itoa(response.StatusCode),
 		}).Inc()
 	}
 
