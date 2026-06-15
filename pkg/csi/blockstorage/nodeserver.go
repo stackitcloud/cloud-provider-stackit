@@ -304,7 +304,7 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 
 	nodeInfo := &csi.NodeGetInfoResponse{
 		NodeId:            nodeID,
-		MaxVolumesPerNode: ns.calculateMaxVolumesPerNode(),
+		MaxVolumesPerNode: calculateMaxVolumesPerNode(),
 	}
 
 	zone, err := ns.Metadata.GetAvailabilityZone(ctx)
@@ -322,7 +322,7 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	return nodeInfo, nil
 }
 
-func (ns *nodeServer) calculateMaxVolumesPerNode() int64 {
+func calculateMaxVolumesPerNode() int64 {
 	freePCIeRootPorts, err := mount.CountFreePCIeSlots()
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports: %v", err)

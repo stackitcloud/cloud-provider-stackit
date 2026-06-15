@@ -24,5 +24,6 @@ func CountLocalCSIVolumes(_ string) (int64, error) {
 }
 
 func CountFreePCIeSlots() (int64, error) {
+	// not implemented
 	return 0, nil
 }
