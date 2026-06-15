@@ -1,23 +1,26 @@
 package mount
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/klog/v2"
 )
 
-const (
+var (
 	// pciClassBridgePCI matches the Linux PCI-to-PCI bridge class prefix.
-	pciClassBridgePCI = "0x0604"
-	globalMountDir    = "globalmount"
-	volumeDevicesDir  = "volumeDevices"
-	volumeDataDir     = "data"
-	volumeDataFile    = "vol_data.json"
-	driverNameKey     = "driverName"
+	pciClassBridgePCI = []byte("0x0604")
+)
+
+const (
+	globalMountDir   = "globalmount"
+	volumeDevicesDir = "volumeDevices"
+	volumeDataDir    = "data"
+	volumeDataFile   = "vol_data.json"
+	driverNameKey    = "driverName"
 )
 
 func countFreePCIeSlotsAt(devicesPath string) (int64, error) {
@@ -37,14 +40,14 @@ func countFreePCIeSlotsAt(devicesPath string) (int64, error) {
 			continue
 		}
 
-		class := strings.TrimSpace(string(classBuf))
-		if !strings.HasPrefix(class, pciClassBridgePCI) {
+		if !bytes.HasPrefix(bytes.TrimSpace(classBuf), pciClassBridgePCI) {
 			continue
 		}
 
 		children, err := filepath.Glob(filepath.Join(devPath, "????:??:??.?"))
 		if err != nil {
-			return 0, fmt.Errorf("failed to glob PCI children for %s: %w", devPath, err)
+			klog.Errorf("failed to glob PCI children for %s: %v", devPath, err)
+			continue
 		}
 
 		if len(children) == 0 {
@@ -55,7 +58,9 @@ func countFreePCIeSlotsAt(devicesPath string) (int64, error) {
 	return freePCIeSlots, nil
 }
 
-func countLocalCSIVolumesAt(driverPluginDir, csiPluginDir, driverName string) (int64, error) {
+func countLocalCSIVolumesAt(csiPluginDir, driverName string) (int64, error) {
+	driverPluginDir := filepath.Join(csiPluginDir, driverName)
+
 	filesystemVolumes, err := countLocalCSIFilesystemVolumesAt(driverPluginDir)
 	if err != nil {
 		return 0, err
