@@ -19,13 +19,12 @@ var (
 		ConstLabels: nil,
 	}, []string{operationLabel})
 
-	LoadBalancerErrorCount = prometheus.NewCounter(prometheus.CounterOpts{
+	HTTPErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   cloudProviderMetricPrefix,
-		Subsystem:   loadBalancerSubSystem,
-		Name:        "errors_total",
-		Help:        "the number of server errors reported when calling the load balancer API",
+		Name:        "http_errors_total",
+		Help:        "Number of HTTP errors returned by external APIs",
 		ConstLabels: nil,
-	})
+	}, []string{"method", "code"})
 
 	LoadBalancerResponseTimeHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   cloudProviderMetricPrefix,
@@ -56,12 +55,12 @@ func (e *Exporter) Collect(metrics chan<- prometheus.Metric) {
 
 func (e *Exporter) describeCloudProvider(descs chan<- *prometheus.Desc) {
 	LoadBalancerRequestCount.Describe(descs)
-	LoadBalancerErrorCount.Describe(descs)
+	HTTPErrorCount.Describe(descs)
 	LoadBalancerResponseTimeHistogram.Describe(descs)
 }
 
 func (e *Exporter) collectCloudProvider(metrics chan<- prometheus.Metric) {
 	LoadBalancerRequestCount.Collect(metrics)
-	LoadBalancerErrorCount.Collect(metrics)
+	HTTPErrorCount.Collect(metrics)
 	LoadBalancerResponseTimeHistogram.Collect(metrics)
 }

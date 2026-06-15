@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,8 +34,11 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 		With(prometheus.Labels{operationLabel: operation}).
 		Inc()
 
-	if response != nil && response.StatusCode >= http.StatusInternalServerError {
-		LoadBalancerErrorCount.Inc()
+	if response != nil && response.StatusCode >= 400 {
+		HTTPErrorCount.With(prometheus.Labels{
+			"method":     request.Method,
+			"code":       strconv.Itoa(response.StatusCode),
+		}).Inc()
 	}
 
 	return response, err
