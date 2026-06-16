@@ -5,7 +5,7 @@ import sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 // Factory produces clients for various STACKIT services.
 type Factory interface {
 	// LoadBalancing returns a STACKIT load balancing service client.
-	LoadBalancing(ptions []sdkconfig.ConfigurationOption) (LoadBalancingClient, error)
+	LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBalancingClient, error)
 
 	// IaaS returns a STACKIT IaaS service client.
 	IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error)
