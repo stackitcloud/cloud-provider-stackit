@@ -158,7 +158,6 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			PrivateAddress:  spec.PrivateAddress,
 			Region:          spec.Region,
 			Labels:          spec.Labels,
-			Status:          new(loadbalancer.UpdateLoadBalancerPayloadStatus(spec.GetStatus())),
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
