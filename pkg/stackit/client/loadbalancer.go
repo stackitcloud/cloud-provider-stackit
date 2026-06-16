@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
@@ -49,6 +50,7 @@ func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *l
 	lb, err := l.Client.
 		CreateLoadBalancer(ctx, l.projectID, l.region).
 		CreateLoadBalancerPayload(*payload).
+		XRequestID(uuid.NewString()).
 		Execute()
 	if err != nil {
 		if httpResp != nil {
@@ -147,6 +149,7 @@ func (l *loadBalancingClient) CreateCredentials(ctx context.Context, payload loa
 	resp, err := l.Client.
 		CreateCredentials(ctx, l.projectID, l.region).
 		CreateCredentialsPayload(payload).
+		XRequestID(uuid.NewString()).
 		Execute()
 	if err != nil {
 		if httpResp != nil {

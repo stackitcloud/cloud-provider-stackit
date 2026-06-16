@@ -48,14 +48,12 @@ var oldProviderIDRegexp = regexp.MustCompile(`^` + oldProviderName + `://([^/]*)
 type Instances struct {
 	regionProviderID bool
 	iaasClient       stackitclient.IaaSClient
-	projectID        string
 	region           string
 }
 
-func NewInstance(client stackitclient.IaaSClient, projectID, region string) (*Instances, error) {
+func NewInstance(client stackitclient.IaaSClient, region string) (*Instances, error) {
 	return &Instances{
 		iaasClient:       client,
-		projectID:        projectID,
 		region:           region,
 		regionProviderID: false,
 	}, nil
