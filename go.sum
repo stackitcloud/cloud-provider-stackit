@@ -185,6 +185,8 @@ github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/soheilhy/cmux v0.1.5 h1:jjzc5WVemNEDTLwv9tlmemhC73tI08BNOIGwBOo10Js=
 github.com/soheilhy/cmux v0.1.5/go.mod h1:T7TcVDs9LWfQgPlPsdngu6I6QIoyIFZDDC6sNE1GqG0=
+github.com/spf13/afero v1.12.0 h1:UcOPyRBYczmFn6yvphxkn9ZEOY65cpwGKb5mL36mrqs=
+github.com/spf13/afero v1.12.0/go.mod h1:ZTlWwG4/ahT8W7T0WQ5uYmjI9duaLQGy3Q2OAl4sk/4=
 github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
 github.com/spf13/cobra v1.10.2/go.mod h1:7C1pvHqHw5A4vrJfjNwvOdzYu0Gml16OCs2GRiTUUS4=
 github.com/spf13/pflag v1.0.9/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
@@ -198,6 +200,8 @@ github.com/stackitcloud/stackit-sdk-go/services/alb v0.14.2 h1:hGzfOJjlCRoFpri5e
 github.com/stackitcloud/stackit-sdk-go/services/alb v0.14.2/go.mod h1:eK6oRB5Tmpt6KbXQ4UYBGg2LgW5bPtVoncL9E8JSRww=
 github.com/stackitcloud/stackit-sdk-go/services/certificates v1.7.0 h1:J7BVVHjRTS5YUyGf6DZEIE1uD9f/S4v9dDbpZWVEd3U=
 github.com/stackitcloud/stackit-sdk-go/services/certificates v1.7.0/go.mod h1:eJpB3/pukz+KzVPVHQ4g3DVtQkxGga18VbFBhq9ugdY=
+github.com/stackitcloud/stackit-sdk-go/services/certificates v1.8.0 h1:bINitVHAyfFfRhkt8/eXDXEjpuH72n9HykZhthGkEg4=
+github.com/stackitcloud/stackit-sdk-go/services/certificates v1.8.0/go.mod h1:eJpB3/pukz+KzVPVHQ4g3DVtQkxGga18VbFBhq9ugdY=
 github.com/stackitcloud/stackit-sdk-go/services/iaas v1.11.1 h1:HcKqjwIjv4OAW1aWI0U/JWjnzTwzSvdr6DLasH940EU=
 github.com/stackitcloud/stackit-sdk-go/services/iaas v1.11.1/go.mod h1:Ts06id0KejUlQWbpR+/rm+tKng6QkTuFV1VQTPJ4dA4=
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.13.0 h1:UuLNwFHjJCpL11y4F7B9oBKtZkxpu01VkNPILNkpex4=
@@ -396,6 +400,8 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 h1:hSfpvjjTQXQY2
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
 sigs.k8s.io/controller-runtime v0.24.1 h1:miPEwrmirImAvgME1L9qebGHrOnGJoVmVdtOU9fRfo4=
 sigs.k8s.io/controller-runtime v0.24.1/go.mod h1:vFkfY5fGt5xAC/sKb8IBFKgWPNKG9OUG29dR8Y2wImw=
+sigs.k8s.io/controller-runtime/tools/setup-envtest v0.24.1 h1:l2AjyGE/PWub6EB165ij4/bpCK0TlY5NlhzIHfmGvmg=
+sigs.k8s.io/controller-runtime/tools/setup-envtest v0.24.1/go.mod h1:wpkYufRHTSw9ABET21/PkEL7kdGnmiZJ6o72t9p/1I8=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730/go.mod h1:mdzfpAEoE6DHQEN0uh9ZbOCuHbLK5wOm7dK4ctXE9Tg=
 sigs.k8s.io/randfill v1.0.0 h1:JfjMILfT8A6RbawdsK2JXGBR5AQVfd+9TbzrlneTyrU=

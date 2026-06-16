@@ -14,14 +14,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	// fieldIndexIngressClass indexes the ingress class on an ingress.
+	fieldIndexIngressClass = ".spec.ingressClassName"
+)
+
 // SetupWithManager sets up the controller with the Manager.
-func (r *IngressClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *IngressClassReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlName string) error {
+	mgr.GetCache().IndexField(ctx, &networkingv1.Ingress{}, fieldIndexIngressClass, func(o client.Object) []string {
+		ingress := o.(*networkingv1.Ingress)
+		if ingress.Spec.IngressClassName == nil {
+			return nil
+		}
+		return []string{*ingress.Spec.IngressClassName}
+	})
+
+	if ctrlName == "" {
+		ctrlName = "ingressclass"
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1.IngressClass{}, builder.WithPredicates(ingressClassPredicate())).
 		Watches(&corev1.Node{}, nodeEventHandler(r.Client), builder.WithPredicates(nodePredicate())).
 		Watches(&networkingv1.Ingress{}, ingressEventHandler(r.Client)).
 		Watches(&corev1.Secret{}, secretEventHandler(r.Client)).
-		Named("ingressclass").
+		// TODO: Services are missing
+		Named(ctrlName).
 		Complete(r)
 }
 
@@ -105,7 +123,7 @@ func ingressEventHandler(c client.Client) handler.EventHandler {
 		if ingressClass.Spec.Controller != controllerName {
 			return nil
 		}
-		
+
 		return []ctrl.Request{
 			{
 				NamespacedName: client.ObjectKeyFromObject(ingressClass),
@@ -129,6 +147,7 @@ func nodePredicate() predicate.Predicate {
 				return false
 			}
 
+			// TODO: include more updates such as annotations
 			return !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
 		},
 		DeleteFunc: func(_ event.DeleteEvent) bool {

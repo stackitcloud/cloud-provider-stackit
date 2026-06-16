@@ -1,4 +1,4 @@
-package ingress
+package spec
 
 import (
 	"strconv"
@@ -25,7 +25,7 @@ const (
 	// It uses the trusted CAs from the operating system for validation.
 	// Can be set on IngressClass, Ingress and Service.
 	AnnotationTargetPoolTLSEnabled = "alb.stackit.cloud/target-pool-tls-enabled"
-	// AnnotationTargetPoolTLSCustomCa If set, the application load balancer enables TLS bridging with a custom CA provided as value.
+	// AnnotationTargetPoolTLSCustomCa If set, the application load balancer enables TLS bridging with a custom CA provided as value. Is this an inlined field? What is its format? Can this be set to an empty string to reset it?
 	// Can be set on IngressClass, Ingress and Service
 	AnnotationTargetPoolTLSCustomCa = "alb.stackit.cloud/target-pool-tls-custom-ca"
 	// AnnotationTargetPoolTLSSkipCertificateValidation If true, the application load balancer enables TLS bridging but skips validation.
@@ -38,16 +38,10 @@ const (
 	// AnnotationHTTPSPort Specifies the HTTPS port.
 	// Can be set on IngressClass and Ingress.
 	AnnotationHTTPSPort = "alb.stackit.cloud/https-port"
-	// AnnotationHTTPSOnly if true, the ingress will not be reachable via HTTP.
+	// AnnotationHTTPSOnly if true, the ingress will not be reachable via HTTP. Does that mean all ingresses are always available via HTTPS?
 	// Can be set on IngressClass and Ingress.
 	AnnotationHTTPSOnly = "alb.stackit.cloud/https-only"
 
-	// AnnotationCookiePersistenceName TODO
-	// Can be set on IngressClass and Ingress.
-	AnnotationCookiePersistenceName = "alb.stackit.cloud/cookie-persistence-name"
-	// AnnotationCookiePersistenceTTLSeconds TODO
-	// Can be set on IngressClass and Ingress.
-	AnnotationCookiePersistenceTTLSeconds = "alb.stackit.cloud/cookie-persistence-ttl-seconds"
 	// AnnotationWebSocket TODO
 	// Can be set on IngressClass and Ingress.
 	AnnotationWebSocket = "alb.stackit.cloud/websocket"
@@ -56,13 +50,24 @@ const (
 	// Can be set on IngressClass and Ingress.
 	AnnotationWAFName = "alb.stackit.cloud/web-application-firewall-name"
 
-	// AnnotationPriority is used to set the priority of the Ingress. Can be only set to ingress objects.
+	// AnnotationPriority is used to set the priority of the Ingress. Can be only set on ingress objects.
 	// Can be set on IngressClass and Ingress.
 	AnnotationPriority = "alb.stackit.cloud/priority"
 )
 
-// getIngressPriority retrieves the priority of the Ingress from its annotations.
-func getAnnotation[T any](annotation string, defaultValue T, objects ...client.Object) T {
+// GetAnnotation retrieves an annotation value from objects.
+// If multiple objects contain the annotation, the later object in the slice takes precedence.
+// If no object contains the annotation then defaultValue is returned.
+//
+// GetAnnotation parses the value of the annotation and return type T.
+// If T is string then the value is returned raw.
+// For int and bool Atoi and ParseBool are called respectively.
+// If parsing fails or T is any other type, defaultValue is returned.
+// Only the latest found value is parsed.
+//
+// TODO: Return parser errors?!
+// TODO: Allow unsetting a value by setting the annotation to an empty string?!
+func GetAnnotation[T any](annotation string, defaultValue T, objects ...client.Object) T {
 	var rawVal string
 	var found bool
 

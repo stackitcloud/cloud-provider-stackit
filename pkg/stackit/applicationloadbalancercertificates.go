@@ -7,6 +7,7 @@ import (
 )
 
 type CertificatesClient interface {
+	// TODO: hard-code region and project into client
 	GetCertificate(ctx context.Context, projectID, region, name string) (*certsdk.GetCertificateResponse, error)
 	DeleteCertificate(ctx context.Context, projectID, region, name string) error
 	CreateCertificate(ctx context.Context, projectID, region string, certificate *certsdk.CreateCertificatePayload) (*certsdk.GetCertificateResponse, error)

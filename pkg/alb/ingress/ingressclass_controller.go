@@ -2,7 +2,6 @@ package ingress
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -48,7 +47,8 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("Reconciling IngressClass", "Name", ingressClass.Name)
+	// TODO: Use proper verbosity levels
+	log.V(10).Info("Reconciling IngressClass")
 
 	if !ingressClass.DeletionTimestamp.IsZero() {
 		err := r.handleIngressClassDeletion(ctx, ingressClass)
@@ -67,32 +67,19 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	alb, activeCertIDs, errorList, err := r.getAlbSpecForIngressClass(ctx, ingressClass)
-	if err != nil {
-		// todo handle error (write event)
-		log.Error(err, "failed to get alb spec for IngressClass")
+	if err := r.applyALB(ctx, ingressClass); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to apply ALB: %w", err)
 	}
 
-	err = r.applyALB(ctx, alb)
-	if err != nil {
-		// todo handle error (write event)
-		log.Error(err, "failed to update alb")
-	} else {
-		// Clean up orphaned certificates now that the ALB is successfully detached from them
-		if cleanupErr := r.cleanupUnusedCertificates(ctx, ingressClass, activeCertIDs); cleanupErr != nil {
-			log.Error(cleanupErr, "failed to cleanup unused certificates")
-		}
-	}
-
-	for _, errItem := range errorList {
-		var evtErr *errorEvent
-		if errors.As(errItem, &evtErr) {
-			log.Info(evtErr.Error(), "ingressRef", evtErr.ingressRef)
-			evtErr.RecordEvent(ingressClass, r.Recorder)
-		} else {
-			log.Info(errItem.Error())
-		}
-	}
+	// for _, errItem := range errorList {
+	// 	var evtErr *errorEvent
+	// 	if errors.As(errItem, &evtErr) {
+	// 		log.Info(evtErr.Error(), "ingressRef", evtErr.ingressRef)
+	// 		evtErr.RecordEvent(ingressClass, r.Recorder)
+	// 	} else {
+	// 		log.Info(errItem.Error())
+	// 	}
+	// }
 
 	requeue, err := r.updateStatus(ctx, ingressClass)
 	if err != nil {
@@ -153,8 +140,16 @@ func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingressClass 
 	return ctrl.Result{}, nil
 }
 
+func (r *IngressClassReconciler) getIngressesForIngressClass(ctx context.Context, ingressClass *networkingv1.IngressClass) ([]networkingv1.Ingress, error) {
+	ingresses := networkingv1.IngressList{}
+	if err := r.Client.List(ctx, &ingresses, client.MatchingFields{fieldIndexIngressClass: ingressClass.Name}); err != nil {
+		return nil, err
+	}
+	return ingresses.Items, nil
+}
+
 // handleIngressClassDeletion handles the deletion of IngressClass resource.
-// It does not wait until all ingresses are deleted. It just removes the status from the ingresses and removes the Alb.
+// It does not wait until all ingresses are deleted. It just removes the status from the ingresses and removes the ALB.
 // If this blocked the IngressClass would be there forever as there is no ownerReference in the ingresses.
 func (r *IngressClassReconciler) handleIngressClassDeletion(
 	ctx context.Context,

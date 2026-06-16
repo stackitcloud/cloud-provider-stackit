@@ -11,7 +11,7 @@ func Test_updateNeeded(t *testing.T) {
 	tests := []struct {
 		name     string
 		current  *albsdk.LoadBalancer
-		desired  *albsdk.CreateLoadBalancerPayload
+		desired  *albsdk.UpdateLoadBalancerPayload
 		expected bool
 	}{
 		{
@@ -21,7 +21,7 @@ func Test_updateNeeded(t *testing.T) {
 					{Port: ptr.To[int32](80)},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{Port: ptr.To[int32](80)},
 				},
@@ -35,7 +35,7 @@ func Test_updateNeeded(t *testing.T) {
 					{Port: ptr.To[int32](80)},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{Port: ptr.To[int32](443)},
 				},
@@ -49,7 +49,7 @@ func Test_updateNeeded(t *testing.T) {
 					{WafConfigName: ptr.To("waf-1")},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{WafConfigName: ptr.To("waf-2")},
 				},
@@ -73,7 +73,7 @@ func Test_updateNeeded(t *testing.T) {
 					},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{
 						Http: &albsdk.ProtocolOptionsHTTP{
@@ -107,7 +107,7 @@ func Test_updateNeeded(t *testing.T) {
 					},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{
 						Http: &albsdk.ProtocolOptionsHTTP{
@@ -141,7 +141,7 @@ func Test_updateNeeded(t *testing.T) {
 					},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{
 						Http: &albsdk.ProtocolOptionsHTTP{
@@ -171,7 +171,7 @@ func Test_updateNeeded(t *testing.T) {
 					},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				Listeners: []albsdk.Listener{
 					{
 						Https: &albsdk.ProtocolOptionsHTTPS{
@@ -191,7 +191,7 @@ func Test_updateNeeded(t *testing.T) {
 					{TargetPort: ptr.To[int32](80)},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				TargetPools: []albsdk.TargetPool{
 					{TargetPort: ptr.To[int32](443)},
 				},
@@ -209,7 +209,7 @@ func Test_updateNeeded(t *testing.T) {
 					},
 				},
 			},
-			desired: &albsdk.CreateLoadBalancerPayload{
+			desired: &albsdk.UpdateLoadBalancerPayload{
 				TargetPools: []albsdk.TargetPool{
 					{
 						TlsConfig: &albsdk.TlsConfig{
