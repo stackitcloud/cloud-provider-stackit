@@ -27,10 +27,10 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	response, err := rt.base.RoundTrip(request)
 	duration := time.Since(startTime)
 
-	LoadBalancerResponseTimeHistogram.
+	HTTPRequestDurationHistogram.
 		With(prometheus.Labels{operationLabel: operation}).
 		Observe(float64(duration.Seconds()))
-	LoadBalancerRequestCount.
+	HTTPRequestCount.
 		With(prometheus.Labels{operationLabel: operation}).
 		Inc()
 
