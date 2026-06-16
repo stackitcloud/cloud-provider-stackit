@@ -2,13 +2,9 @@ package client
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
-	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
-	sdkWait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 )
 
@@ -44,179 +40,84 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 }
 
 func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	lb, err := l.Client.
-		CreateLoadBalancer(ctx, l.projectID, l.region).
-		CreateLoadBalancerPayload(*payload).
-		XRequestID(uuid.NewString()).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return nil, err
-	}
-
-	return lb, nil
+	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+		return l.Client.
+			CreateLoadBalancer(ctx, l.projectID, l.region).
+			CreateLoadBalancerPayload(*payload).
+			XRequestID(uuid.NewString()).
+			Execute()
+	})
 }
 
 func (l *loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName string) error {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	_, err := l.Client.
-		DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return err
-	}
-
-	return nil
+	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+		return l.Client.
+			DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).
+			Execute()
+	})
+	return err
 }
 
 func (l *loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string) (*loadbalancer.LoadBalancer, error) {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	lb, err := l.Client.
-		GetLoadBalancer(ctx, l.projectID, l.region, lbName).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return nil, err
-	}
-
-	return lb, nil
+	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+		return l.Client.
+			GetLoadBalancer(ctx, l.projectID, l.region, lbName).
+			Execute()
+	})
 }
 
 func (l *loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	lb, err := l.Client.
-		UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).
-		UpdateLoadBalancerPayload(*updates).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return nil, err
-	}
-
-	return lb, nil
+	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+		return l.Client.
+			UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).
+			UpdateLoadBalancerPayload(*updates).
+			Execute()
+	})
 }
 
 func (l *loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	_, err := l.Client.
-		UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).
-		UpdateTargetPoolPayload(payload).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return err
-	}
-
-	return nil
+	_, err := withResponseID(ctx, func(ctx context.Context) (*loadbalancer.TargetPool, error) {
+		return l.Client.
+			UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).
+			UpdateTargetPoolPayload(payload).
+			Execute()
+	})
+	return err
 }
 
 func (l *loadBalancingClient) CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	resp, err := l.Client.
-		CreateCredentials(ctx, l.projectID, l.region).
-		CreateCredentialsPayload(payload).
-		XRequestID(uuid.NewString()).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return nil, err
-	}
-
-	return resp, nil
+	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.CreateCredentialsResponse, error) {
+		return l.Client.
+			CreateCredentials(ctx, l.projectID, l.region).
+			CreateCredentialsPayload(payload).
+			XRequestID(uuid.NewString()).
+			Execute()
+	})
 }
 
 func (l *loadBalancingClient) ListCredentials(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	resp, err := l.Client.
-		ListCredentials(ctx, l.projectID, l.region).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return nil, stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return nil, err
-	}
-
-	return resp, nil
+	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
+		return l.Client.
+			ListCredentials(ctx, l.projectID, l.region).
+			Execute()
+	})
 }
 
 func (l *loadBalancingClient) UpdateCredentials(ctx context.Context, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	_, err := l.Client.
-		UpdateCredentials(ctx, l.projectID, l.region, credentialsRef).
-		UpdateCredentialsPayload(payload).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return err
-	}
-
-	return nil
+	_, err := withResponseID(ctx, func(ctx context.Context) (*loadbalancer.UpdateCredentialsResponse, error) {
+		return l.Client.
+			UpdateCredentials(ctx, l.projectID, l.region, credentialsRef).
+			UpdateCredentialsPayload(payload).
+			Execute()
+	})
+	return err
 }
 
 func (l *loadBalancingClient) DeleteCredentials(ctx context.Context, credentialsRef string) error {
-	var httpResp *http.Response
-	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-
-	_, err := l.Client.
-		DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).
-		Execute()
-	if err != nil {
-		if httpResp != nil {
-			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return stackiterrors.WrapErrorWithResponseID(err, reqID)
-		}
-
-		return err
-	}
-
-	return nil
+	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+		return l.Client.
+			DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).
+			Execute()
+	})
+	return err
 }
