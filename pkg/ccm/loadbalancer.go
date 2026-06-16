@@ -148,17 +148,14 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		spec.Version = lb.Version
 		spec.Name = &name
 		updatePayload := &loadbalancer.UpdateLoadBalancerPayload{
-			Errors:          spec.Errors,
 			ExternalAddress: spec.ExternalAddress,
 			Listeners:       spec.Listeners,
 			Name:            spec.Name,
 			Networks:        spec.Networks,
 			Options:         spec.Options,
 			PlanId:          spec.PlanId,
-			PrivateAddress:  spec.PrivateAddress,
 			Region:          spec.Region,
 			Labels:          spec.Labels,
-			Status:          new(loadbalancer.UpdateLoadBalancerPayloadStatus(spec.GetStatus())),
 			TargetPools:     spec.TargetPools,
 			Version:         spec.Version,
 		}
