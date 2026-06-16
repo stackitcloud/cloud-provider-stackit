@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 )
 
 var _ = Describe("Metrics", func() {
@@ -27,6 +28,44 @@ var _ = Describe("Metrics", func() {
 	)
 
 	Describe("InstrumentedRoundTripper", func() {
+		It("increments HTTPRequestCount for responses", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			labels := prometheus.Labels{
+				operationLabel: "get_request-count-test",
+			}
+			before := testutil.ToFloat64(HTTPRequestCount.With(labels))
+
+			response, err := NewInstrumentedHTTPClient().Get(server.URL + "/request-count-test")
+			Expect(err).NotTo(HaveOccurred())
+			defer response.Body.Close()
+
+			after := testutil.ToFloat64(HTTPRequestCount.With(labels))
+			Expect(after - before).To(Equal(float64(1)))
+		})
+
+		It("records HTTPRequestDurationHistogram observations for responses", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			labels := prometheus.Labels{
+				operationLabel: "get_request-duration-test",
+			}
+			before := histogramSampleCount(HTTPRequestDurationHistogram.With(labels))
+
+			response, err := NewInstrumentedHTTPClient().Get(server.URL + "/request-duration-test")
+			Expect(err).NotTo(HaveOccurred())
+			defer response.Body.Close()
+
+			after := histogramSampleCount(HTTPRequestDurationHistogram.With(labels))
+			Expect(after - before).To(Equal(uint64(1)))
+		})
+
 		It("increments HTTPErrorCount for 400 responses", func() {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
@@ -88,3 +127,13 @@ var _ = Describe("Metrics", func() {
 		})
 	})
 })
+
+func histogramSampleCount(observer prometheus.Observer) uint64 {
+	metric, ok := observer.(prometheus.Metric)
+	Expect(ok).To(BeTrue())
+
+	dtoMetric := &dto.Metric{}
+	Expect(metric.Write(dtoMetric)).To(Succeed())
+
+	return dtoMetric.GetHistogram().GetSampleCount()
+}
