@@ -31,25 +31,23 @@ var _ = Describe("LoadBalancer", func() {
 		lbInModeIgnoreAndObs *LoadBalancer
 		loadBalancer         *LoadBalancer
 		clusterName          string
-		projectID            string
 		lbOpts               stackitconfig.LoadBalancerOpts
 	)
 
 	BeforeEach(func() {
 		clusterName = "my-cluster"
-		projectID = "my-project"
 		lbOpts = stackitconfig.LoadBalancerOpts{NetworkID: "my-network"}
 
 		ctrl := gomock.NewController(GinkgoT())
 		mockClient = stackitclientmock.NewMockLoadBalancingClient(ctrl)
 		var err error
-		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, projectID, lbOpts, &MetricsRemoteWrite{
+		lbInModeIgnoreAndObs, err = NewLoadBalancer(mockClient, lbOpts, &MetricsRemoteWrite{
 			endpoint: "test-endpoint",
 			username: "test-username",
 			password: "test-password",
 		})
 		Expect(err).NotTo(HaveOccurred())
-		loadBalancer, err = NewLoadBalancer(mockClient, projectID, lbOpts, nil)
+		loadBalancer, err = NewLoadBalancer(mockClient, lbOpts, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

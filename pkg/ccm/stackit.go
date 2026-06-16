@@ -151,12 +151,12 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
 
-	instances, err := NewInstance(iaasClient, cfg.Global.ProjectID, cfg.Global.Region)
+	instances, err := NewInstance(iaasClient, cfg.Global.Region)
 	if err != nil {
 		return nil, err
 	}
 
-	lb, err := NewLoadBalancer(loadbalancingClient, cfg.Global.ProjectID, cfg.LoadBalancer, obs)
+	lb, err := NewLoadBalancer(loadbalancingClient, cfg.LoadBalancer, obs)
 	if err != nil {
 		return nil, err
 	}

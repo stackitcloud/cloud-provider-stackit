@@ -37,13 +37,11 @@ var _ = Describe("Node Controller", func() {
 		nodeMockClient *stackitclientmock.MockIaaSClient
 		instance       *Instances
 
-		projectID string
-		region    string
-		serverID  string
+		region   string
+		serverID string
 	)
 
 	BeforeEach(func() {
-		projectID = "my-project"
 		region = "eu01"
 		serverID = "my-server"
 
@@ -51,7 +49,7 @@ var _ = Describe("Node Controller", func() {
 		nodeMockClient = stackitclientmock.NewMockIaaSClient(ctrl)
 
 		var err error
-		instance, err = NewInstance(nodeMockClient, projectID, "eu01")
+		instance, err = NewInstance(nodeMockClient, "eu01")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
