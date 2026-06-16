@@ -273,7 +273,10 @@ var _ = Describe("LoadBalancer", func() {
 			mockClient.EXPECT().UpdateLoadBalancer(
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
-				versionMatcher("current-version"),
+				gomock.All(
+					versionMatcher("current-version"),
+					statusNotSet(),
+				),
 			).MinTimes(1).Return(myLb, nil)
 
 			svc = svc.DeepCopy()
@@ -330,7 +333,10 @@ var _ = Describe("LoadBalancer", func() {
 			mockClient.EXPECT().UpdateLoadBalancer(
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
-				versionMatcher("current-version"),
+				gomock.All(
+					versionMatcher("current-version"),
+					statusNotSet(),
+				),
 			).MinTimes(1).Return(myLb, nil)
 
 			_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{nodeA, nodeB})
@@ -690,6 +696,14 @@ func versionMatcher(version string) gomock.Matcher {
 			return false
 		}
 		return *lb.Version == version
+	})
+}
+
+// statusNotSet ensures that the given UpdateLoadBalancerPayload does not set status.
+func statusNotSet() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Status == nil
 	})
 }
 
