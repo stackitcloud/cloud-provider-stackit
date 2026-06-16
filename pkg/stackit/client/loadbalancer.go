@@ -50,7 +50,7 @@ func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *l
 }
 
 func (l *loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]any, error) {
 		return l.Client.
 			DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).
 			Execute()
@@ -114,7 +114,7 @@ func (l *loadBalancingClient) UpdateCredentials(ctx context.Context, credentials
 }
 
 func (l *loadBalancingClient) DeleteCredentials(ctx context.Context, credentialsRef string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]any, error) {
 		return l.Client.
 			DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).
 			Execute()
