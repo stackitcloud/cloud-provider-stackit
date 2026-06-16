@@ -38,7 +38,7 @@ func (i *iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Serv
 	var httpResp *http.Response
 	ctx = runtime.WithCaptureHTTPResponse(ctx, &httpResp)
 
-	server, err := i.Client.GetServer(ctx, i.projectID, i.region, serverID).Execute()
+	server, err := i.Client.GetServer(ctx, i.projectID, i.region, serverID).Details(true).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
