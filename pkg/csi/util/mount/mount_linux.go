@@ -2,7 +2,16 @@
 
 package mount
 
-import "golang.org/x/sys/unix"
+import (
+	"path/filepath"
+
+	"golang.org/x/sys/unix"
+)
+
+const (
+	pciDevicesPath = "/sys/bus/pci/devices"
+	kubeletDir     = "/var/lib/kubelet"
+)
 
 func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
 	return &DeviceStats{
@@ -16,4 +25,15 @@ func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
 		TotalInodes:     int64(statfs.Files),
 		UsedInodes:      int64(statfs.Files) - int64(statfs.Ffree),
 	}
+}
+
+// CountFreePCIeSlots returns the number of PCIe root ports that are not occupied.
+func CountFreePCIeSlots() (int64, error) {
+	return countFreePCIeSlotsAt(pciDevicesPath)
+}
+
+// CountLocalCSIVolumes counts staged CSI volumes for the given driver.
+func CountLocalCSIVolumes(driverName string) (int64, error) {
+	csiPluginDir := filepath.Join(kubeletDir, "plugins", "kubernetes.io", "csi")
+	return countLocalCSIVolumesAt(csiPluginDir, driverName)
 }
