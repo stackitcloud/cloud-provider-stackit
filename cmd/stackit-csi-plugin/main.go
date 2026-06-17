@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
 
@@ -109,7 +111,15 @@ func handle() {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIaaSClient(&cfg)
+		iaasHTTPClient, err := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
+		if err != nil {
+			klog.Fatalf("create IaaS metrics HTTP client: %v", err)
+		}
+		iaasOpts := []sdkconfig.ConfigurationOption{
+			sdkconfig.WithHTTPClient(iaasHTTPClient),
+		}
+
+		iaasClient, err := stackit.CreateIaaSClient(&cfg, iaasOpts...)
 		if err != nil {
 			klog.Fatalf("Failed to create IaaS client: %v", err)
 		}

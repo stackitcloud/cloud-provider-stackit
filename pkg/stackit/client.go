@@ -171,7 +171,7 @@ func CreateSTACKITProvider(client iaas.DefaultAPI, cfg *stackitconfig.CSIConfig)
 	return instance, nil
 }
 
-func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultAPI, error) {
+func CreateIaaSClient(cfg *stackitconfig.CSIConfig, clientOpts ...sdkconfig.ConfigurationOption) (iaas.DefaultAPI, error) {
 	var userAgent []string
 	var opts []sdkconfig.ConfigurationOption
 	userAgent = append(userAgent, fmt.Sprintf("%s/%s", "block-storage-csi-driver", version.Version))
@@ -186,6 +186,7 @@ func CreateIaaSClient(cfg *stackitconfig.CSIConfig) (iaas.DefaultAPI, error) {
 	}
 
 	opts = append(opts, sdkconfig.WithUserAgent(strings.Join(userAgent, " ")))
+	opts = append(opts, clientOpts...)
 
 	client, err := iaas.NewAPIClient(opts...)
 	if err != nil {
