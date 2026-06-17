@@ -1,36 +1,10 @@
-package stackit
+package client
 
 import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
-// TODO: Remove this once the IaaS API supports filtering by name, status, and volume ID.
-
-//nolint:dupl // We don't feel like doing generics to undupe this.
-func filterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Backup {
-	filteredBackups := make([]iaas.Backup, 0)
-
-	if filters == nil {
-		return backups
-	}
-
-	for _, obj := range backups {
-		if val, ok := filters["Status"]; ok && val != obj.GetStatus() {
-			continue
-		}
-		if val, ok := filters["VolumeID"]; ok && val != obj.GetVolumeId() {
-			continue
-		}
-		if val, ok := filters["Name"]; ok && val != obj.GetName() {
-			continue
-		}
-		filteredBackups = append(filteredBackups, obj)
-	}
-
-	return filteredBackups
-}
-
-func filterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
+func FilterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
 	filteredVolumes := make([]iaas.Volume, 0)
 
 	if filters == nil {
@@ -49,7 +23,7 @@ func filterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volu
 }
 
 //nolint:dupl // We don't feel like doing generics to undupe this.
-func filterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaas.Snapshot {
+func FilterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaas.Snapshot {
 	filteredSnapshots := make([]iaas.Snapshot, 0)
 
 	if filters == nil {
@@ -70,4 +44,28 @@ func filterSnapshots(snapshots []iaas.Snapshot, filters map[string]string) []iaa
 	}
 
 	return filteredSnapshots
+}
+
+//nolint:dupl // We don't feel like doing generics to undupe this.
+func FilterBackups(backups []iaas.Backup, filters map[string]string) []iaas.Backup {
+	filteredBackups := make([]iaas.Backup, 0)
+
+	if filters == nil {
+		return backups
+	}
+
+	for _, obj := range backups {
+		if val, ok := filters["Status"]; ok && val != obj.GetStatus() {
+			continue
+		}
+		if val, ok := filters["VolumeID"]; ok && val != obj.GetVolumeId() {
+			continue
+		}
+		if val, ok := filters["Name"]; ok && val != obj.GetName() {
+			continue
+		}
+		filteredBackups = append(filteredBackups, obj)
+	}
+
+	return filteredBackups
 }

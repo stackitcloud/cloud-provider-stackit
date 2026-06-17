@@ -1,4 +1,4 @@
-package stackit
+package client
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -13,7 +13,7 @@ var _ = Describe("Labels", func() {
 				"key2": "value2",
 			}
 
-			labels := labelsFromTags(tags)
+			labels := LabelsFromTags(tags)
 
 			Expect(labels).To(HaveKeyWithValue("key1", "value1"))
 			Expect(labels).To(HaveKeyWithValue("key2", "value2"))
@@ -22,7 +22,7 @@ var _ = Describe("Labels", func() {
 		It("should handle empty tags", func() {
 			tags := map[string]string{}
 
-			labels := labelsFromTags(tags)
+			labels := LabelsFromTags(tags)
 
 			Expect(labels).To(BeEmpty())
 		})
@@ -30,7 +30,7 @@ var _ = Describe("Labels", func() {
 		It("should handle nil tags", func() {
 			var tags map[string]string
 
-			labels := labelsFromTags(tags)
+			labels := LabelsFromTags(tags)
 
 			Expect(labels).To(BeEmpty())
 		})
