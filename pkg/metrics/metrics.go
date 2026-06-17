@@ -7,6 +7,8 @@ import (
 const (
 	cloudProviderMetricPrefix = "cloud_provider_stackit"
 	apiLabel                  = "api"
+	methodLabel               = "method"
+	codeLabel                 = "code"
 	operationLabel            = "op"
 
 	APINameLoadBalancer = "loadbalancer"
@@ -26,7 +28,7 @@ var (
 		Name:        "http_errors_total",
 		Help:        "Number of HTTP errors returned by external APIs",
 		ConstLabels: nil,
-	}, []string{apiLabel, "method", "code"})
+	}, []string{apiLabel, methodLabel, codeLabel})
 
 	HTTPRequestDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   cloudProviderMetricPrefix,
