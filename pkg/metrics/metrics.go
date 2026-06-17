@@ -6,7 +6,11 @@ import (
 
 const (
 	cloudProviderMetricPrefix = "cloud_provider_stackit"
+	apiLabel                  = "api"
 	operationLabel            = "op"
+
+	APINameLoadBalancer = "loadbalancer"
+	APINameIaaS         = "iaas"
 )
 
 var (
@@ -15,14 +19,14 @@ var (
 		Name:        "http_requests_total",
 		Help:        "The number of requests to external APIs",
 		ConstLabels: nil,
-	}, []string{operationLabel})
+	}, []string{apiLabel, operationLabel})
 
 	HTTPErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   cloudProviderMetricPrefix,
 		Name:        "http_errors_total",
 		Help:        "Number of HTTP errors returned by external APIs",
 		ConstLabels: nil,
-	}, []string{"method", "code"})
+	}, []string{apiLabel, "method", "code"})
 
 	HTTPRequestDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   cloudProviderMetricPrefix,
@@ -30,7 +34,7 @@ var (
 		Help:        "The response times of external API requests",
 		ConstLabels: nil,
 		Buckets:     nil,
-	}, []string{operationLabel})
+	}, []string{apiLabel, operationLabel})
 )
 
 type Exporter struct {
