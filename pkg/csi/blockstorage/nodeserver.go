@@ -304,7 +304,7 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 
 	nodeInfo := &csi.NodeGetInfoResponse{
 		NodeId:            nodeID,
-		MaxVolumesPerNode: calculateMaxVolumesPerNode(),
+		MaxVolumesPerNode: ns.calculateMaxVolumesPerNode(),
 	}
 
 	zone, err := ns.Metadata.GetAvailabilityZone(ctx)
@@ -327,14 +327,20 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 	return nodeInfo, nil
 }
 
-func calculateMaxVolumesPerNode() int64 {
+func (ns *nodeServer) calculateMaxVolumesPerNode() int64 {
 	freePCIeRootPorts, err := mount.CountFreePCIeSlots()
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve PCIe root ports: %v", err)
 		freePCIeRootPorts = 0
 	}
 
-	mountedCSIVolumes, err := mount.CountLocalCSIVolumes(driverName)
+	csiDriverName := driverName
+	if ns.Driver.legacyDriver {
+		// If driver launched in legacy-mode use "cinder.csi.openstack.org"
+		csiDriverName = legacyDriverName
+	}
+
+	mountedCSIVolumes, err := mount.CountLocalCSIVolumes(csiDriverName)
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve volume count: %v", err)
 		mountedCSIVolumes = 0
