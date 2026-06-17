@@ -28,6 +28,12 @@ var _ = Describe("Metrics", func() {
 	)
 
 	Describe("InstrumentedRoundTripper", func() {
+		It("requires an API name", func() {
+			client, err := NewInstrumentedHTTPClient("")
+			Expect(err).To(MatchError("api name is required"))
+			Expect(client).To(BeNil())
+		})
+
 		It("increments HTTPRequestCount for responses", func() {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -35,11 +41,15 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
+				apiLabel:       "test",
 				operationLabel: "get_request-count-test",
 			}
 			before := testutil.ToFloat64(HTTPRequestCount.With(labels))
 
-			response, err := NewInstrumentedHTTPClient().Get(server.URL + "/request-count-test")
+			client, err := NewInstrumentedHTTPClient("test")
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := client.Get(server.URL + "/request-count-test")
 			Expect(err).NotTo(HaveOccurred())
 			defer response.Body.Close()
 
@@ -54,11 +64,15 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
+				apiLabel:       "test",
 				operationLabel: "get_request-duration-test",
 			}
 			before := histogramSampleCount(HTTPRequestDurationHistogram.With(labels))
 
-			response, err := NewInstrumentedHTTPClient().Get(server.URL + "/request-duration-test")
+			client, err := NewInstrumentedHTTPClient("test")
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := client.Get(server.URL + "/request-duration-test")
 			Expect(err).NotTo(HaveOccurred())
 			defer response.Body.Close()
 
@@ -73,12 +87,16 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
+				apiLabel: "test",
 				"method": http.MethodGet,
 				"code":   "400",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
-			response, err := NewInstrumentedHTTPClient().Get(server.URL)
+			client, err := NewInstrumentedHTTPClient("test")
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := client.Get(server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			defer response.Body.Close()
 
@@ -93,12 +111,16 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
+				apiLabel: "test",
 				"method": http.MethodPost,
 				"code":   "500",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
-			response, err := NewInstrumentedHTTPClient().Post(server.URL, "application/json", nil)
+			client, err := NewInstrumentedHTTPClient("test")
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := client.Post(server.URL, "application/json", nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer response.Body.Close()
 
@@ -113,12 +135,16 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
+				apiLabel: "test",
 				"method": http.MethodGet,
 				"code":   "200",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
-			response, err := NewInstrumentedHTTPClient().Get(server.URL)
+			client, err := NewInstrumentedHTTPClient("test")
+			Expect(err).NotTo(HaveOccurred())
+
+			response, err := client.Get(server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			defer response.Body.Close()
 
