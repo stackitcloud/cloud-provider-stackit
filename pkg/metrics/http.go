@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,13 +11,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func NewInstrumentedHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &InstrumentedRoundTripper{http.DefaultTransport},
+func NewInstrumentedHTTPClient(api string) (*http.Client, error) {
+	if api == "" {
+		return nil, errors.New("api name is required")
 	}
+
+	return &http.Client{
+		Transport: &InstrumentedRoundTripper{
+			api:  api,
+			base: http.DefaultTransport,
+		},
+	}, nil
 }
 
 type InstrumentedRoundTripper struct {
+	api  string
 	base http.RoundTripper
 }
 
@@ -28,14 +37,21 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	duration := time.Since(startTime)
 
 	HTTPRequestDurationHistogram.
-		With(prometheus.Labels{operationLabel: operation}).
+		With(prometheus.Labels{
+			apiLabel:       rt.api,
+			operationLabel: operation,
+		}).
 		Observe(float64(duration.Seconds()))
 	HTTPRequestCount.
-		With(prometheus.Labels{operationLabel: operation}).
+		With(prometheus.Labels{
+			apiLabel:       rt.api,
+			operationLabel: operation,
+		}).
 		Inc()
 
 	if response != nil && response.StatusCode >= 400 {
 		HTTPErrorCount.With(prometheus.Labels{
+			apiLabel: rt.api,
 			"method": request.Method,
 			"code":   strconv.Itoa(response.StatusCode),
 		}).Inc()
