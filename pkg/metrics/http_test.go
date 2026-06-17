@@ -35,7 +35,7 @@ var _ = Describe("Metrics", func() {
 		})
 
 		It("increments HTTPRequestCount for responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
@@ -58,7 +58,7 @@ var _ = Describe("Metrics", func() {
 		})
 
 		It("records HTTPRequestDurationHistogram observations for responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
@@ -81,15 +81,15 @@ var _ = Describe("Metrics", func() {
 		})
 
 		It("increments HTTPErrorCount for 400 responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 			}))
 			defer server.Close()
 
 			labels := prometheus.Labels{
-				apiLabel: "test",
-				"method": http.MethodGet,
-				"code":   "400",
+				apiLabel:    "test",
+				methodLabel: http.MethodGet,
+				codeLabel:   "400",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
@@ -105,15 +105,15 @@ var _ = Describe("Metrics", func() {
 		})
 
 		It("increments HTTPErrorCount for 500 responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			}))
 			defer server.Close()
 
 			labels := prometheus.Labels{
-				apiLabel: "test",
-				"method": http.MethodPost,
-				"code":   "500",
+				apiLabel:    "test",
+				methodLabel: http.MethodPost,
+				codeLabel:   "500",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
@@ -129,15 +129,15 @@ var _ = Describe("Metrics", func() {
 		})
 
 		It("does not increment HTTPErrorCount for successful responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 			defer server.Close()
 
 			labels := prometheus.Labels{
-				apiLabel: "test",
-				"method": http.MethodGet,
-				"code":   "200",
+				apiLabel:    "test",
+				methodLabel: http.MethodGet,
+				codeLabel:   "200",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
