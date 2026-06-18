@@ -154,10 +154,8 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 			PlanId:          spec.PlanId,
 			Region:          spec.Region,
 			Labels:          spec.Labels,
-			// we keep the current setting for DisableTargetSecurityGroupAssignment
-			DisableTargetSecurityGroupAssignment: lb.DisableTargetSecurityGroupAssignment,
-			TargetPools:                          spec.TargetPools,
-			Version:                              spec.Version,
+			TargetPools:     spec.TargetPools,
+			Version:         spec.Version,
 		}
 		lb, err = l.client.UpdateLoadBalancer(ctx, name, updatePayload)
 		if err != nil {
