@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 
@@ -44,7 +44,7 @@ func NewVolumeCapabilityAccessMode(mode csi.VolumeCapability_AccessMode_Mode) *c
 }
 
 //revive:disable:unexported-return
-func NewControllerServer(d *Driver, instance stackit.IaasClient) *controllerServer {
+func NewControllerServer(d *Driver, instance stackitclient.IaaSClient) *controllerServer {
 	return &controllerServer{
 		Driver:   d,
 		Instance: instance,

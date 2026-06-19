@@ -57,16 +57,16 @@ func (mr *MockFactoryMockRecorder) IaaS(options any) *gomock.Call {
 }
 
 // LoadBalancing mocks base method.
-func (m *MockFactory) LoadBalancing(options []config.ConfigurationOption) (client.LoadBalancingClient, error) {
+func (m *MockFactory) LoadBalancing(ptions []config.ConfigurationOption) (client.LoadBalancingClient, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LoadBalancing", options)
+	ret := m.ctrl.Call(m, "LoadBalancing", ptions)
 	ret0, _ := ret[0].(client.LoadBalancingClient)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // LoadBalancing indicates an expected call of LoadBalancing.
-func (mr *MockFactoryMockRecorder) LoadBalancing(options any) *gomock.Call {
+func (mr *MockFactoryMockRecorder) LoadBalancing(ptions any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadBalancing", reflect.TypeOf((*MockFactory)(nil).LoadBalancing), options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadBalancing", reflect.TypeOf((*MockFactory)(nil).LoadBalancing), ptions)
 }

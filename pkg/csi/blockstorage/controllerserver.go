@@ -26,7 +26,10 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,15 +37,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-
-	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
 
 type controllerServer struct {
 	Driver   *Driver
-	Instance stackit.IaasClient
+	Instance stackitclient.IaaSClient
 	csi.UnimplementedControllerServer
 }
 
@@ -135,7 +134,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if volSizeGB != *vols[0].Size {
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
-		if *vols[0].Status != stackit.VolumeAvailableStatus {
+		if *vols[0].Status != stackitclient.VolumeAvailableStatus {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, vols[0].AvailabilityZone, *vols[0].Size)
@@ -159,21 +158,21 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	var sourceVolID string
 	var sourceBackupID string
 	var sourceSnapshotID string
-	var volumeSourceType stackit.VolumeSourceTypes
+	var volumeSourceType stackitclient.VolumeSourceTypes
 
 	if content != nil && content.GetSnapshot() != nil {
 		// Backups and Snapshots are the same for Kubernetes
 		sourceSnapshotID = content.GetSnapshot().GetSnapshotId()
 		sourceBackupID = content.GetSnapshot().GetSnapshotId()
 		// By default, we try to clone volumes from snapshots
-		volumeSourceType = stackit.SnapshotSource
+		volumeSourceType = stackitclient.SnapshotSource
 
-		snap, err := cloud.GetSnapshotByID(ctx, sourceSnapshotID)
+		snap, err := cloud.GetSnapshot(ctx, sourceSnapshotID)
 		if stackiterrors.IgnoreNotFound(err) != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to retrieve the source snapshot %s: %v", sourceSnapshotID, err)
 		}
 		// If the snapshot exists but is not yet available, fail.
-		if err == nil && *snap.Status != stackit.SnapshotReadyStatus {
+		if err == nil && *snap.Status != stackitclient.SnapshotReadyStatus {
 			return nil, status.Errorf(codes.Unavailable, "VolumeContentSource Snapshot %s is not yet available. status: %s", sourceSnapshotID, *snap.Status)
 		}
 		// Only continue checking if the Snapshot is found
@@ -192,17 +191,17 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		// check if a Backup with the same ID exists
 		if stackiterrors.IsNotFound(err) {
 			var back *iaas.Backup
-			back, err = cloud.GetBackupByID(ctx, sourceBackupID)
+			back, err = cloud.GetBackup(ctx, sourceBackupID)
 			if err != nil {
 				// If there is an error getting the backup as well, fail.
 				return nil, status.Errorf(codes.NotFound, "VolumeContentSource Snapshot or Backup with ID %s not found", sourceBackupID)
 			}
-			if *back.Status != stackit.SnapshotReadyStatus {
+			if *back.Status != stackitclient.SnapshotReadyStatus {
 				// If the backup exists but is not yet available, fail.
 				return nil, status.Errorf(codes.Unavailable, "VolumeContentSource Backup %s is not yet available. status: %s", sourceBackupID, *back.Status)
 			}
 			// If an available backup is found, create the volume from the backup. Implies that a Snapshot was not found.
-			volumeSourceType = stackit.BackupSource
+			volumeSourceType = stackitclient.BackupSource
 		}
 	}
 
@@ -219,7 +218,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if volAvailability != sourceVolume.AvailabilityZone {
 			return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Volume. Got %s Required: %s", volAvailability, sourceVolume.AvailabilityZone)
 		}
-		volumeSourceType = stackit.VolumeSource
+		volumeSourceType = stackitclient.VolumeSource
 	}
 
 	opts := &iaas.CreateVolumePayload{
@@ -233,7 +232,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Only set CreateVolumePayload.Source when actually creating volume from source/snapshot/backup
 	if volumeSourceType != "" {
-		if volumeSourceType == stackit.SnapshotSource || volumeSourceType == stackit.VolumeSource {
+		if volumeSourceType == stackitclient.SnapshotSource || volumeSourceType == stackitclient.VolumeSource {
 			// Changing the performance class while restoring from Snapshot or Volume is not supported
 			opts.PerformanceClass = nil
 		}
@@ -249,7 +248,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// The encryption config is already set for volumes created from snapshot or volume. We MUST never set it when
 	// restoring from snapshot or volume.
 	// TODO: Unclear if BackupSource is the same as the above or is actually changeable. IaaS is testing.
-	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackit.BackupSource) {
+	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackitclient.BackupSource) {
 		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")
@@ -267,7 +266,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.Internal, "CreateVolume failed with error %v", err)
 	}
 
-	targetStatus := []string{stackit.VolumeAvailableStatus}
+	targetStatus := []string{stackitclient.VolumeAvailableStatus}
 	// Recheck after: 0s (immediate), 20s, 45.6s, 78.36s, 120.31s
 	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, *vol.Id, targetStatus,
 		&wait.Backoff{
@@ -368,7 +367,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] get volume failed with error %v", err)
 	}
 
-	_, err = cloud.GetInstanceByID(ctx, instanceID)
+	_, err = cloud.GetServer(ctx, instanceID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
@@ -376,12 +375,11 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
 	}
 
-	_, err = cloud.AttachVolume(ctx, instanceID, volumeID)
+	payload := iaas.AddVolumeToServerPayload{
+		DeleteOnTermination: new(false),
+	}
+	_, err = cloud.AttachVolume(ctx, instanceID, volumeID, payload)
 	if err != nil {
-		// Trigger's an immediate `NodeGetInfo` RPC call when MutableCSINodeAllocatableCount is enabled
-		if stackiterrors.IsTooManyDevicesError(err) {
-			return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
-		}
 		klog.Errorf("Failed to AttachVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error %v", err)
 	}
@@ -409,7 +407,7 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "[ControllerUnpublishVolume] Volume ID must be provided")
 	}
-	_, err := cloud.GetInstanceByID(ctx, instanceID)
+	_, err := cloud.GetServer(ctx, instanceID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because node %s does not exist", volumeID, instanceID)
@@ -490,9 +488,9 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	name := req.Name
 	volumeID := req.GetSourceVolumeId()
-	snapshotType := req.Parameters[stackit.SnapshotType]
+	snapshotType := req.Parameters[stackitclient.SnapshotType]
 	filters := map[string]string{"Name": name}
-	backupMaxDurationSecondsPerGB := stackit.BackupMaxDurationSecondsPerGBDefault
+	backupMaxDurationSecondsPerGB := stackitclient.BackupMaxDurationSecondsPerGBDefault
 
 	// Current time, used for CreatedAt
 	var ctime *timestamppb.Timestamp
@@ -551,7 +549,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		}
 
 		// Get the max duration to wait in seconds per GB of snapshot and fail if parsing fails
-		if item, ok := (req.Parameters)[stackit.BackupMaxDurationPerGB]; ok {
+		if item, ok := (req.Parameters)[stackitclient.BackupMaxDurationPerGB]; ok {
 			backupMaxDurationSecondsPerGB, err = strconv.Atoi(item)
 			if err != nil {
 				klog.Errorf("Setting backup-max-duration-seconds-per-gb failed due to a parsing error: %v", err)
@@ -562,7 +560,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	// Create the snapshot if the backup does not already exist and wait for it to be ready
 	if !backupAlreadyExists {
-		snap, err = cs.createSnapshot(ctx, cloud, name, volumeID, req.Parameters)
+		snap, err = cs.createSnapshot(ctx, name, volumeID, req.Parameters)
 		if err != nil {
 			return nil, err
 		}
@@ -615,7 +613,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	// Necessary to get all the backup information, including size.
-	backup, err = cloud.GetBackupByID(ctx, *backup.Id)
+	backup, err = cloud.GetBackup(ctx, *backup.Id)
 	if err != nil {
 		klog.Errorf("Failed to GetBackupByID after backup creation: %v", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("GetBackupByID failed with error %v", err))
@@ -638,12 +636,12 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}, nil
 }
 
-func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.IaasClient, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
 	filters := map[string]string{}
 	filters["Name"] = name
 
 	// List existing snapshots with the same name
-	snapshots, _, err := cloud.ListSnapshots(ctx, filters)
+	snapshots, _, err := cs.Instance.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to query for existing Snapshot during CreateSnapshot: %v", err)
 		return nil, status.Error(codes.Internal, "Failed to get snapshots")
@@ -673,15 +671,16 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.Ia
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
 	properties := map[string]string{}
 
-	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
-	// Also, we don't want to tag every param, but we do honor the RecognizedCSISnapshotterParams
-	for _, mKey := range sharedcsi.RecognizedCSISnapshotterParams {
-		if v, ok := parameters[mKey]; ok {
-			properties[mKey] = v
-		}
+	// TODO: Add support for sharedcsi.RecognizedCSISnapshotterParams later.
+	payload := &iaas.CreateSnapshotPayload{
+		Name:     new(name),
+		VolumeId: volumeID,
+	}
+	if len(properties) > 0 {
+		payload.Labels = stackitclient.LabelsFromTags(properties)
 	}
 
-	snap, err := cloud.CreateSnapshot(ctx, name, volumeID, properties)
+	snap, err := cs.Instance.CreateSnapshot(ctx, payload)
 	if err != nil {
 		klog.Errorf("Failed to Create snapshot: %v", err)
 		return nil, status.Errorf(codes.Internal, "CreateSnapshot failed with error %v", err)
@@ -692,7 +691,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, cloud stackit.Ia
 	return snap, nil
 }
 
-func (cs *controllerServer) createBackup(ctx context.Context, cloud stackit.IaasClient, name, volumeID string, snap *iaas.Snapshot, parameters map[string]string) (*iaas.Backup, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createBackup(ctx context.Context, cloud stackitclient.IaaSClient, name, volumeID string, snap *iaas.Snapshot, parameters map[string]string) (*iaas.Backup, error) { //nolint:lll // looks weird when shortened
 	// Add cluster ID to the snapshot metadata
 	// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
@@ -700,7 +699,7 @@ func (cs *controllerServer) createBackup(ctx context.Context, cloud stackit.Iaas
 
 	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
 	// Also, we don't want to tag every param, but we do honor the RecognizedCSISnapshotterParams
-	for _, mKey := range append(sharedcsi.RecognizedCSISnapshotterParams, stackit.SnapshotType) {
+	for _, mKey := range append(sharedcsi.RecognizedCSISnapshotterParams, stackitclient.SnapshotType) {
 		if v, ok := parameters[mKey]; ok {
 			properties[mKey] = v
 		}
@@ -728,7 +727,7 @@ func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	}
 
 	// If volumeSnapshot object was linked to a cinder backup, delete the backup.
-	back, err := cloud.GetBackupByID(ctx, id)
+	back, err := cloud.GetBackup(ctx, id)
 	if err == nil && back != nil {
 		err = cloud.DeleteBackup(ctx, id)
 		if err != nil {
@@ -755,7 +754,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 	snapshotID := req.GetSnapshotId()
 	if snapshotID != "" {
-		snap, err := cloud.GetSnapshotByID(ctx, snapshotID)
+		snap, err := cloud.GetSnapshot(ctx, snapshotID)
 		if err != nil {
 			if stackiterrors.IsNotFound(err) {
 				klog.V(3).Infof("Snapshot %s not found", snapshotID)
@@ -797,7 +796,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}
 
 	// Only retrieve snapshots that are available
-	filters["Status"] = stackit.SnapshotReadyStatus
+	filters["Status"] = stackitclient.SnapshotReadyStatus
 	slist, nextPageToken, err = cloud.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to ListSnapshots: %v", err)
@@ -956,13 +955,13 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		}, nil
 	}
 
-	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, volSizeGB)
+	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, iaas.ResizeVolumePayload{Size: volSizeGB})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q to size %v: %v", volumeID, volSizeGB, err)
 	}
 
 	// we need wait for the volume to be available or InUse, it might be error_extending in some scenario
-	targetStatus := []string{stackit.VolumeAvailableStatus, stackit.VolumeAttachedStatus}
+	targetStatus := []string{stackitclient.VolumeAvailableStatus, stackitclient.VolumeAttachedStatus}
 	err = cloud.WaitVolumeTargetStatus(ctx, volumeID, targetStatus)
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", volumeID, err)
@@ -979,13 +978,13 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.CreateVolumeResponse {
 	var volsrc *csi.VolumeContentSource
-	var volumeSourceType stackit.VolumeSourceTypes
+	var volumeSourceType stackitclient.VolumeSourceTypes
 	volCnx := map[string]string{}
 
 	if vol.Source != nil {
-		volumeSourceType = stackit.VolumeSourceTypes(vol.Source.Type)
+		volumeSourceType = stackitclient.VolumeSourceTypes(vol.Source.Type)
 		switch volumeSourceType {
-		case stackit.VolumeSource:
+		case stackitclient.VolumeSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -995,7 +994,7 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 					},
 				},
 			}
-		case stackit.BackupSource:
+		case stackitclient.BackupSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -1005,7 +1004,7 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 					},
 				},
 			}
-		case stackit.SnapshotSource:
+		case stackitclient.SnapshotSource:
 			volCnx[ResizeRequired] = "true"
 
 			volsrc = &csi.VolumeContentSource{
@@ -1042,14 +1041,14 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 	return resp
 }
 
-// determineSourceIDForSourceType returns the correct sourceID for the given stackit.VolumeSourceTypes
-func determineSourceIDForSourceType(srcType stackit.VolumeSourceTypes, sourceSnapshotID, sourceVolID string) string {
+// determineSourceIDForSourceType returns the correct sourceID for the given stackitclient.VolumeSourceTypes
+func determineSourceIDForSourceType(srcType stackitclient.VolumeSourceTypes, sourceSnapshotID, sourceVolID string) string {
 	switch srcType {
-	case stackit.BackupSource:
+	case stackitclient.BackupSource:
 		return sourceSnapshotID
-	case stackit.SnapshotSource:
+	case stackitclient.SnapshotSource:
 		return sourceSnapshotID
-	case stackit.VolumeSource:
+	case stackitclient.VolumeSource:
 		return sourceVolID
 	default:
 		return ""
