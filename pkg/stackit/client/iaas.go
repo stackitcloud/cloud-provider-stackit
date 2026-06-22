@@ -124,7 +124,6 @@ func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	})
 }
 
-//nolint:dupl // SDK request execution and response-ID wrapping pattern intentionally repeated for typed API methods.
 func (i *iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.
