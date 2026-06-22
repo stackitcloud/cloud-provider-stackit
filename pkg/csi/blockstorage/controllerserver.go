@@ -560,7 +560,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	// Create the snapshot if the backup does not already exist and wait for it to be ready
 	if !backupAlreadyExists {
-		snap, err = cs.createSnapshot(ctx, name, volumeID, req.Parameters)
+		snap, err = cs.createSnapshot(ctx, name, volumeID)
 		if err != nil {
 			return nil, err
 		}
@@ -636,7 +636,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}, nil
 }
 
-func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
 	filters := map[string]string{}
 	filters["Name"] = name
 

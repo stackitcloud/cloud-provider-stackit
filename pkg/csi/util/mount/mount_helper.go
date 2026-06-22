@@ -58,7 +58,7 @@ func countFreePCIeSlotsAt(devicesPath string) (int64, error) {
 	return freePCIeSlots, nil
 }
 
-func countLocalCSIVolumesAt(csiPluginDir, driverName string) (int64, error) {
+func countLocalCSIVolumesAt(csiPluginDir, driverName string) (int64, error) { //nolint:unparam // driverName always receives "block-storage.csi.stackit.cloud" but is kept for consistency and potential future support
 	driverPluginDir := filepath.Join(csiPluginDir, driverName)
 
 	filesystemVolumes, err := countLocalCSIFilesystemVolumesAt(driverPluginDir)
