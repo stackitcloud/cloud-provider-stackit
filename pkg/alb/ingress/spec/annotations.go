@@ -53,6 +53,8 @@ const (
 	// AnnotationPriority is used to set the priority of the Ingress. Can be only set on ingress objects.
 	// Can be set on IngressClass and Ingress.
 	AnnotationPriority = "alb.stackit.cloud/priority"
+
+	// TODO: source ACL
 )
 
 // GetAnnotation retrieves an annotation value from objects.

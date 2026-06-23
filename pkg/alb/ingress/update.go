@@ -40,7 +40,7 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, ingressClass *net
 		return fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	existingALB, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, "my-alb") // TODO: Set real name
+	existingALB, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, spec.LoadBalancerName(ingressClass))
 	if err != nil && !errors.Is(err, stackit.ErrorNotFound) {
 		return fmt.Errorf("failed to get load balancer: %w", err)
 	}
@@ -57,25 +57,26 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, ingressClass *net
 		existingALB,
 	)
 
-	// Create certificates that are needed and get an ID mapping
 	// TODO: Deal with paging.
 	projectCertificates, err := r.CertificateClient.ListCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region)
 	if err != nil {
 		return fmt.Errorf("failed to list certificates: %w", err)
 	}
+
+	// ingressClassCertificates contains all certificates that belong to the reconciled ingress class.
+	// Certificates that are created in this function are to be added to this slice.
 	ingressClassCertificates := []certsdk.GetCertificateResponse{}
 	for _, cert := range projectCertificates.Items {
 		if cert.Labels != nil && (*cert.Labels)[labels.LabelIngressClassUID] == string(ingressClass.UID) {
-			// TODO: Check for nil-ness
+			// TODO: Check for nil-ness in cert
 			ingressClassCertificates = append(ingressClassCertificates, cert)
 		}
 	}
-	// Optional: Delete any that are already no longer used and will not be used with the update.
 
 	missingCertificates := tree.GetMissingCertificates(ingressClassCertificates)
 	for fingerprint, c := range missingCertificates {
 		createCertificatePayload := &certsdk.CreateCertificatePayload{
-			Name:       new(string(fingerprint)), // TODO: Add some identifying prefix and shorten it to 63 characters
+			Name:       new(string("alb-cert")), // TODO: Add some identifying prefix and shorten it to 63 characters
 			ProjectId:  &r.ALBConfig.Global.ProjectID,
 			PrivateKey: new(string(c.PrivateKey)),
 			PublicKey:  new(string(c.PublicKey)),
@@ -85,44 +86,62 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, ingressClass *net
 		}
 		response, err := r.CertificateClient.CreateCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, createCertificatePayload)
 		if err != nil {
+			// TODO: Gracefully deal with errors
 			return fmt.Errorf("failed to create certificate: %w", err)
 		}
-		// TODO: Check for nil-ness
+		// TODO: Check for nil-ness in response
 		ctrl.LoggerFrom(ctx).Info("Created certificate", "id", response.Id, "fingerprint", fingerprint)
 		ingressClassCertificates = append(ingressClassCertificates, *response)
 	}
 
 	certIDMap := map[spec.CertificateFingerprint]string{}
+	// deplicateCerts contains all certificates that are duplicates of others (in certIDMap) by fingerprint.
+	// Because they might still be used by the ALB the must only be removed after the ALB was updated.
+	// Which certificate is a duplicate and which is "original" depends on the order in ingressClassCertificates.
+	duplicateCerts := []string{}
 	for _, cert := range ingressClassCertificates {
+		if id, exists := certIDMap[spec.CertificateFingerprint(*cert.Data.FingerprintSha256)]; exists {
+			duplicateCerts = append(duplicateCerts, id)
+			continue
+		}
 		certIDMap[spec.CertificateFingerprint(*cert.Data.FingerprintSha256)] = *cert.Id
 	}
 
 	if existingALB == nil {
-		alb := tree.ToCreatePayload(certIDMap, r.ALBConfig.ApplicationLoadBalancer.NetworkID, r.ALBConfig.Global.Region)
-		_, err := r.ALBClient.CreateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, alb)
+		create := tree.ToCreatePayload(certIDMap, r.ALBConfig.ApplicationLoadBalancer.NetworkID, r.ALBConfig.Global.Region)
+		alb, err := r.ALBClient.CreateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, create)
 		if err != nil {
 			return fmt.Errorf("failed to create load balancer: %w", err)
 		}
-		ctrl.LoggerFrom(ctx).Info("Created application load balancer", "name", alb.Name)
-		return nil
+		ctrl.LoggerFrom(ctx).Info("Created application load balancer", "name", create.Name, "version", *alb.Version)
+		return nil // TODO: Early return here prevents certificate clean-up
 	}
 
-	alb := tree.ToUpdatePayload(certIDMap, r.ALBConfig.ApplicationLoadBalancer.NetworkID, r.ALBConfig.Global.Region)
-	if !updateNeeded(existingALB, alb) {
-		return nil
+	update := tree.ToUpdatePayload(certIDMap, r.ALBConfig.ApplicationLoadBalancer.NetworkID, r.ALBConfig.Global.Region)
+	if updateNeeded(existingALB, update) {
+		alb, err := r.ALBClient.UpdateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, *update.Name, update)
+		if err != nil {
+			return fmt.Errorf("failed to update load balancer: %w", err)
+		}
+		ctrl.LoggerFrom(ctx).Info("Updated application load balancer", "name", update.Name, "version", *alb.Version)
 	}
 
-	_, err = r.ALBClient.UpdateLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, *alb.Name, alb)
-	if err != nil {
-		return fmt.Errorf("failed to update load balancer: %w", err)
+	for _, cert := range duplicateCerts {
+		if err := r.CertificateClient.DeleteCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, cert); err != nil {
+			// TODO: fail gracefully
+			return fmt.Errorf("failed to delete duplicate certificate %q: %w", cert, err)
+		}
+		ctrl.LoggerFrom(ctx).Info("Deleted duplicate certificate", "id", cert)
 	}
-	ctrl.LoggerFrom(ctx).Info("Updated application load balancer", "name", alb.Name)
 
-	// TODO:
-	// Clean up orphaned certificates now that the ALB is successfully detached from them
-	// if cleanupErr := r.cleanupUnusedCertificates(ctx, ingressClass, activeCertIDs); cleanupErr != nil {
-	// 	log.Error(cleanupErr, "failed to cleanup unused certificates")
-	// }
+	unused := tree.GetUnusedCertificates(certIDMap)
+	for fingerprint, id := range unused {
+		if err := r.CertificateClient.DeleteCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, id); err != nil {
+			// TODO: fail gracefully
+			return fmt.Errorf("failed to delete unused certificate %q: %w", id, err)
+		}
+		ctrl.LoggerFrom(ctx).Info("Deleted unused certificate", "id", id, "fingerprint", fingerprint)
+	}
 
 	return nil
 }

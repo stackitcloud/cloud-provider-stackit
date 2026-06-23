@@ -6,6 +6,7 @@ import (
 	cryptotls "crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 
@@ -222,11 +223,11 @@ func BuildTree(
 					})
 					continue
 				}
-				if service.Spec.Type != corev1.ServiceTypeNodePort {
+				if service.Spec.Type != corev1.ServiceTypeNodePort && service.Spec.Type != corev1.ServiceTypeLoadBalancer {
 					errors = append(errors, errorEvent{
 						ingress:     &ingress,
 						fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
-						description: "Service is not of type NodePort",
+						description: "Service is not of type NodePort or LoadBalancer",
 					})
 					continue
 				}
@@ -237,13 +238,21 @@ func BuildTree(
 						if port.NodePort == 0 {
 							errors = append(errors, errorEvent{
 								ingress:     &ingress,
-								fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
+								fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
 								description: "Service port doesn't have a node port",
 							})
 							continue
 						}
 						nodePort = port.NodePort
 					}
+				}
+				if nodePort == 0 {
+					errors = append(errors, errorEvent{
+						ingress:     &ingress,
+						fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
+						description: "Port not found in service",
+					})
+					continue
 				}
 
 				targetPool.Name = new(ingressPathReference.toTargetPoolName())
@@ -254,8 +263,14 @@ func BuildTree(
 					targetPool.ActiveHealthCheck = &albsdk.ActiveHealthCheck{
 						AltPort: &service.Spec.HealthCheckNodePort,
 						HttpHealthChecks: &albsdk.HttpHealthChecks{
-							Path: new("/healthz"),
+							Path:       new("/healthz"),
+							OkStatuses: []string{"200"},
 						},
+						HealthyThreshold:   new(int32(1)),
+						Interval:           new("5s"),
+						IntervalJitter:     new("1s"),
+						Timeout:            new("1s"),
+						UnhealthyThreshold: new(int32(2)),
 						// TODO: Optimize interval etc.
 					}
 				}
@@ -320,6 +335,14 @@ func (t WorkingTreeALB) GetMissingCertificates(existingCerts []certsdk.GetCertif
 	return missingCerts
 }
 
+func (t WorkingTreeALB) GetUnusedCertificates(existingCerts map[CertificateFingerprint]string) map[CertificateFingerprint]string {
+	unused := maps.Clone(existingCerts)
+	for fingerprint := range t.certificates {
+		delete(unused, fingerprint)
+	}
+	return unused
+}
+
 // ToCreatePayload
 // Doesn't include certificates that are missing in certificateIDMap.
 func (t WorkingTreeALB) ToCreatePayload(
@@ -359,7 +382,9 @@ func (t WorkingTreeALB) ToCreatePayload(
 		}
 
 		var https *albsdk.ProtocolOptionsHTTPS
+		protocol := "PROTOCOL_HTTP"
 		if port == 443 {
+			protocol = "PROTOCOL_HTTPS"
 			https = &albsdk.ProtocolOptionsHTTPS{
 				CertificateConfig: &albsdk.CertificateConfig{
 					CertificateIds: []string{},
@@ -370,10 +395,16 @@ func (t WorkingTreeALB) ToCreatePayload(
 					https.CertificateConfig.CertificateIds = append(https.CertificateConfig.CertificateIds, id)
 				}
 			}
+			if len(https.CertificateConfig.CertificateIds) == 0 {
+				// The API doesn't allow an HTTPS port without certificate. So we drop the port if no certificate was provided.
+				continue
+			}
 		}
 
 		listeners = append(listeners, albsdk.Listener{
-			Port: new(int32(port)),
+			Name:     new(fmt.Sprintf("port-%d", port)),
+			Protocol: &protocol,
+			Port:     new(int32(port)),
 			Http: &albsdk.ProtocolOptionsHTTP{
 				Hosts: hosts,
 			},

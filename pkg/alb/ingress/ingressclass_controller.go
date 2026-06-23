@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/alb/ingress/spec"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -93,7 +94,7 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 // updateStatus updates the status of the Ingresses with the ALB IP address
 func (r *IngressClassReconciler) updateStatus(ctx context.Context, ingressClass *networkingv1.IngressClass) (ctrl.Result, error) {
-	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, string(ingressClass.UID))
+	alb, err := r.ALBClient.GetLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, spec.LoadBalancerName(ingressClass))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get load balancer: %w", err)
 	}
@@ -174,7 +175,7 @@ func (r *IngressClassReconciler) handleIngressClassDeletion(
 		}
 	}
 
-	err = r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, string(ingressClass.UID))
+	err = r.ALBClient.DeleteLoadBalancer(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region, spec.LoadBalancerName(ingressClass))
 	if err != nil {
 		return fmt.Errorf("failed to delete load balancer: %w", err)
 	}
