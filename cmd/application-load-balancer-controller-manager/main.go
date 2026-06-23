@@ -43,7 +43,7 @@ type options struct {
 // nolint:funlen // TODO: Refactor into smaller functions.
 func main() {
 	var opts options
-	
+
 	flag.StringVar(&opts.metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&opts.probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -55,7 +55,7 @@ func main() {
 	flag.StringVar(&opts.leaderElectionID, "leader-election-id", "d0fbe9c4.stackit.cloud", "The name of the resource that "+
 		"leader election will use for holding the leader lock.")
 	flag.StringVar(&opts.cloudConfig, "cloud-config", "cloud.yaml", "The path to the cloud config file.")
-	
+
 	zapOpts := zap.Options{
 		Development: true,
 	}
@@ -118,6 +118,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
 	if err = (&ingress.IngressClassReconciler{
 		Client:            mgr.GetClient(),
 		Recorder:          mgr.GetEventRecorderFor("ingressclass-controller"),
@@ -125,7 +127,7 @@ func main() {
 		CertificateClient: certificateClient,
 		Scheme:            mgr.GetScheme(),
 		ALBConfig:         config,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr, ""); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IngressClass")
 		os.Exit(1)
 	}
@@ -140,7 +142,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
