@@ -23,20 +23,21 @@ import (
 
 type CertificateFingerprint string
 
-// WorkingTreeALB
+// WorkTreeALB is a temporary structure to build up an ALB specification from ingresses.
+// It contains the relevant logic to merge multiple ingresses and report errors for invalid or conflicting ingresses.
 //
-// The zero value is invalid. Use BuildTree to create a working tree.
+// The zero value is invalid. Use BuildTree() to create a work tree.
 //
-// Look at the methods how a working tree can be used.
-type WorkingTreeALB struct {
+// Look at the methods how a work tree can be used.
+type WorkTreeALB struct {
 	ingressClass *networkingv1.IngressClass
 	planId       string
 
-	listeners map[int16]*workingTreeListener
+	listeners map[int16]*workTreeListener
 	// We can already create the real type because there is nothing to merge or track.
 	targetPools map[ingressPathReference]*albsdk.TargetPool
 	// We maintain certificates on ALB-level although we
-	certificates map[CertificateFingerprint]WorkingTreeCertificate
+	certificates map[CertificateFingerprint]WorkTreeCertificate
 
 	existingALB *albsdk.LoadBalancer
 }
@@ -48,8 +49,8 @@ const (
 	protocolHTTPS protocol = "PROTOCOL_HTTPS"
 )
 
-type workingTreeListener struct {
-	hosts    map[string]*workingTreeHost
+type workTreeListener struct {
+	hosts    map[string]*workTreeHost
 	protocol protocol
 }
 
@@ -58,8 +59,8 @@ type pathWithType struct {
 	path     string
 }
 
-type workingTreeHost struct {
-	paths map[pathWithType]*workingTreePath
+type workTreeHost struct {
+	paths map[pathWithType]*workTreePath
 }
 
 type ingressPathReference struct {
@@ -76,29 +77,28 @@ func (i ingressPathReference) toTargetPoolName() string {
 	return fmt.Sprintf("%s-%d-%d", i.uid, i.ruleIndex, i.pathIndex)
 }
 
-type workingTreePath struct {
+type workTreePath struct {
 	ingressPathReference ingressPathReference
 	websocket            bool
 }
 
-type WorkingTreeCertificate struct {
+type WorkTreeCertificate struct {
 	PublicKey  string
 	PrivateKey string
 }
 
-// BuildTree creates a new working tree.
+// BuildTree creates a new work tree.
+// It tries to fit as much ingresses into the work tree as possible, bound by the limits of the application load balancer.
 //
-// It tries to fit as much ingresses into the working tree as possible, bound by the limits of the application load balancer.
-//
-// Every ingress rule translates into 1 or 2 rules in the ALB.
+// Every ingress rule translates into 1 or 2 rules in the ALB, depending on the protocols used for that ingress.
 //
 // If existingALB is nil it is assumed that no load balancer exists yet.
-//
-// It must return all sorts of errors.
+// existingALB is used to to pick up fields that are already set, most notably the version for the update payload.
 //
 // The arguments must only contain data related to the ingress class.
+// I.e. all ingresses will be processed regardless of their ingress class reference.
 //
-// This function might change the of ingresses in the provided slice.
+// This function changes the order of the slice ingresses.
 func BuildTree(
 	ingressClass *networkingv1.IngressClass,
 	ingresses []networkingv1.Ingress,
@@ -106,7 +106,7 @@ func BuildTree(
 	services []corev1.Service,
 	nodes []corev1.Node,
 	existingALB *albsdk.LoadBalancer,
-) (*WorkingTreeALB, []errorEvent) {
+) (*WorkTreeALB, []errorEvent) {
 	errors := []errorEvent{}
 
 	servicesMap := map[types.NamespacedName]corev1.Service{}
@@ -120,14 +120,14 @@ func BuildTree(
 
 	targets := getTargetsOfNodes(nodes)
 
-	tree := &WorkingTreeALB{
+	tree := &WorkTreeALB{
 		ingressClass: ingressClass,
 		planId:       GetAnnotation(AnnotationPlanID, "", ingressClass),
 
-		listeners:    map[int16]*workingTreeListener{},
+		listeners:    map[int16]*workTreeListener{},
 		targetPools:  map[ingressPathReference]*albsdk.TargetPool{},
 		existingALB:  existingALB,
-		certificates: map[CertificateFingerprint]WorkingTreeCertificate{},
+		certificates: map[CertificateFingerprint]WorkTreeCertificate{},
 	}
 
 	// TODO: Explain sorting
@@ -172,7 +172,7 @@ func BuildTree(
 				continue
 			}
 
-			tree.certificates[CertificateFingerprint(fingerprint)] = WorkingTreeCertificate{
+			tree.certificates[CertificateFingerprint(fingerprint)] = WorkTreeCertificate{
 				PublicKey:  string(secret.Data[corev1.TLSCertKey]),
 				PrivateKey: string(secret.Data[corev1.TLSPrivateKeyKey]),
 			}
@@ -215,14 +215,14 @@ func BuildTree(
 
 // addPathToTree adds the given path to tree under the given port and protocol.
 // It implicitly creates listeners and hosts that don't exist yet in tree.
-func addPathToTree(tree *WorkingTreeALB, ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, port int16, protocol protocol) (added bool, errors []errorEvent) {
+func addPathToTree(tree *WorkTreeALB, ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, port int16, protocol protocol) (added bool, errors []errorEvent) {
 	_pathWithType := pathWithType{pathType: ptr.Deref(path.PathType, networkingv1.PathTypeExact), path: path.Path}
 	ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
 
 	listener, exists := tree.listeners[port]
 	if !exists {
-		listener = &workingTreeListener{
-			hosts:    map[string]*workingTreeHost{},
+		listener = &workTreeListener{
+			hosts:    map[string]*workTreeHost{},
 			protocol: protocol,
 		}
 	}
@@ -238,8 +238,8 @@ func addPathToTree(tree *WorkingTreeALB, ingressClass *networkingv1.IngressClass
 
 	host, exists := listener.hosts[rule.Host]
 	if !exists {
-		host = &workingTreeHost{
-			paths: map[pathWithType]*workingTreePath{},
+		host = &workTreeHost{
+			paths: map[pathWithType]*workTreePath{},
 		}
 	}
 
@@ -254,7 +254,7 @@ func addPathToTree(tree *WorkingTreeALB, ingressClass *networkingv1.IngressClass
 		return false, errors
 	}
 	if !exists {
-		albPath = &workingTreePath{
+		albPath = &workTreePath{
 			ingressPathReference: ingressPathReference,
 		}
 		// TODO: check limits
@@ -272,9 +272,9 @@ func addPathToTree(tree *WorkingTreeALB, ingressClass *networkingv1.IngressClass
 // buildTargetPool builds a target pool for the provided path.
 // It uses tree to validate the returned target pool against the existing state.
 //
-// This function doesn't mutate or any other arguments.
+// This function doesn't mutate tree or any other arguments.
 // If the target pool is not valid nil is returned together with a list of errors.
-func buildTargetPool(tree *WorkingTreeALB, targets []albsdk.Target, ingress networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, servicesMap map[types.NamespacedName]corev1.Service) (*albsdk.TargetPool, []errorEvent) {
+func buildTargetPool(tree *WorkTreeALB, targets []albsdk.Target, ingress networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, servicesMap map[types.NamespacedName]corev1.Service) (*albsdk.TargetPool, []errorEvent) {
 	errors := []errorEvent{}
 
 	ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
@@ -347,11 +347,12 @@ func buildTargetPool(tree *WorkingTreeALB, targets []albsdk.Target, ingress netw
 			// TODO: Optimize interval etc.
 		}
 	}
-	// TODO: Recommend the use of eTP=Local.
 
 	return targetPool, errors
 }
 
+// ValidateTLSCertAndFingerprint ensures that the private and public are parseable.
+// If they are parseable then the SHA256 hash of the public key is returned.
 func ValidateTLSCertAndFingerprint(publicKey, privateKey []byte) (string, error) {
 	cert, err := cryptotls.X509KeyPair(publicKey, privateKey)
 	if err != nil {
@@ -382,8 +383,8 @@ func getTargetsOfNodes(nodes []corev1.Node) []albsdk.Target {
 // It can be used to create all remaining certificates required to create the ALB.
 //
 // This function uses the SHA256 fingerprint from the response to match existing certificates.
-func (t WorkingTreeALB) GetMissingCertificates(existingCerts []certsdk.GetCertificateResponse) map[CertificateFingerprint]WorkingTreeCertificate {
-	missingCerts := map[CertificateFingerprint]WorkingTreeCertificate{}
+func (t WorkTreeALB) GetMissingCertificates(existingCerts []certsdk.GetCertificateResponse) map[CertificateFingerprint]WorkTreeCertificate {
+	missingCerts := map[CertificateFingerprint]WorkTreeCertificate{}
 	existingCertsMap := map[CertificateFingerprint]any{}
 	for _, cert := range existingCerts {
 		if cert.Data == nil || cert.Data.FingerprintSha256 == nil {
@@ -401,7 +402,8 @@ func (t WorkingTreeALB) GetMissingCertificates(existingCerts []certsdk.GetCertif
 	return missingCerts
 }
 
-func (t WorkingTreeALB) GetUnusedCertificates(existingCerts map[CertificateFingerprint]string) map[CertificateFingerprint]string {
+// GetUnusedCertificates return all certificates in existingCerts that are not referenced in t.
+func (t WorkTreeALB) GetUnusedCertificates(existingCerts map[CertificateFingerprint]string) map[CertificateFingerprint]string {
 	unused := maps.Clone(existingCerts)
 	for fingerprint := range t.certificates {
 		delete(unused, fingerprint)
@@ -409,9 +411,11 @@ func (t WorkingTreeALB) GetUnusedCertificates(existingCerts map[CertificateFinge
 	return unused
 }
 
-// ToCreatePayload
-// Doesn't include certificates that are missing in certificateIDMap.
-func (t WorkingTreeALB) ToCreatePayload(
+// ToCreatePayload return the payload to request the creation of the ALB in the API based on t.
+//
+// certificateIDMap must contain all certificates that exist in the API for this ALB.
+// Certificates that are referenced in t but missing in certificateIDMap are not included in the payload.
+func (t WorkTreeALB) ToCreatePayload(
 	certificateIDMap map[CertificateFingerprint]string,
 	networkID string,
 	region string,
@@ -479,6 +483,18 @@ func (t WorkingTreeALB) ToCreatePayload(
 		})
 	}
 
+	if len(listeners) == 0 {
+		// The ALB doesn't allow zero listeners. To already create it we create an empty listener on port 80.
+		listeners = append(listeners, albsdk.Listener{
+			Name:     new(fmt.Sprintf("port-%d", 80)),
+			Protocol: new(string(protocolHTTP)),
+			Port:     new(int32(80)),
+			Http: &albsdk.ProtocolOptionsHTTP{
+				Hosts: []albsdk.HostConfig{},
+			},
+		})
+	}
+
 	targetPools := []albsdk.TargetPool{}
 	for _, targetPool := range t.targetPools {
 		targetPools = append(targetPools, *targetPool)
@@ -511,13 +527,13 @@ func (t WorkingTreeALB) ToCreatePayload(
 	}
 }
 
-// ToUpdatePayload creates the payload to update a load balancer from the working tree.
+// ToUpdatePayload creates the payload to update a load balancer from the work tree.
 // It requires that existingALB was not nil when BuildTree was called.
-// certificateIDMap must contain all certificates that exist in the API for this ALB.
-// However, not all secrets must exist.
 //
-// The output is deterministic.
-func (t WorkingTreeALB) ToUpdatePayload(
+// See ToCreatePayload for more details.
+//
+// The output is deterministic for easier change detection. //TODO: Make sure this is actually the case.
+func (t WorkTreeALB) ToUpdatePayload(
 	certificateIDMap map[CertificateFingerprint]string,
 	networkID string,
 	region string,

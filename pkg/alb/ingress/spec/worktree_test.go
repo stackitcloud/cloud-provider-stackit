@@ -24,7 +24,7 @@ type testCase struct {
 	matcher types.GomegaMatcher
 }
 
-var _ = Describe("WorkingTreeALB.ToCreatePayload", func() {
+var _ = Describe("WorkTreeALB.ToCreatePayload", func() {
 	It("should sort rules from most to least-specific even if their priority is inversed", func() {
 		tree, _ := BuildTree(&networkingv1.IngressClass{}, []networkingv1.Ingress{
 			Ingress(
@@ -186,7 +186,7 @@ var _ = Describe("WorkingTreeALB.ToCreatePayload", func() {
 
 		Expect(errs).To(HaveLen(0))
 		Expect(tree.GetMissingCertificates(nil)).To(ConsistOf(
-			WorkingTreeCertificate{
+			WorkTreeCertificate{
 				PublicKey:  fixtureTLSPublicKey,
 				PrivateKey: fixtureTLSPrivateKey,
 			},
