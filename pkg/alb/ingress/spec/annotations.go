@@ -38,7 +38,8 @@ const (
 	// AnnotationHTTPSPort Specifies the HTTPS port.
 	// Can be set on IngressClass and Ingress.
 	AnnotationHTTPSPort = "alb.stackit.cloud/https-port"
-	// AnnotationHTTPSOnly if true, the ingress will not be reachable via HTTP. Does that mean all ingresses are always available via HTTPS?
+	// AnnotationHTTPSOnly if true, the ingress will not be reachable via HTTP.
+	// Setting this to true requires that the ingress has a TLS certificate.
 	// Can be set on IngressClass and Ingress.
 	AnnotationHTTPSOnly = "alb.stackit.cloud/https-only"
 
@@ -53,6 +54,9 @@ const (
 	// AnnotationPriority is used to set the priority of the Ingress. Can be only set on ingress objects.
 	// Can be set on IngressClass and Ingress.
 	AnnotationPriority = "alb.stackit.cloud/priority"
+
+	// TODO:
+	AnnotationIngressClassName = "kubernetes.io/ingress.class"
 
 	// TODO: source ACL
 )

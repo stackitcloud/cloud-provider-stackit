@@ -41,8 +41,16 @@ type WorkingTreeALB struct {
 	existingALB *albsdk.LoadBalancer
 }
 
+type protocol string
+
+const (
+	protocolHTTP  protocol = "PROTOCOL_HTTP"
+	protocolHTTPS protocol = "PROTOCOL_HTTPS"
+)
+
 type workingTreeListener struct {
-	hosts map[string]*workingTreeHost
+	hosts    map[string]*workingTreeHost
+	protocol protocol
 }
 
 type pathWithType struct {
@@ -62,6 +70,8 @@ type ingressPathReference struct {
 	pathIndex int
 }
 
+// toTargetPoolName returns the desired target pool name for this path reference.
+// It globally identifies this path via UID of the ingress.
 func (i ingressPathReference) toTargetPoolName() string {
 	return fmt.Sprintf("%s-%d-%d", i.uid, i.ruleIndex, i.pathIndex)
 }
@@ -114,14 +124,7 @@ func BuildTree(
 		ingressClass: ingressClass,
 		planId:       GetAnnotation(AnnotationPlanID, "", ingressClass),
 
-		listeners: map[int16]*workingTreeListener{
-			80: new(workingTreeListener{
-				hosts: map[string]*workingTreeHost{},
-			}),
-			443: new(workingTreeListener{
-				hosts: map[string]*workingTreeHost{},
-			}),
-		},
+		listeners:    map[int16]*workingTreeListener{},
 		targetPools:  map[ingressPathReference]*albsdk.TargetPool{},
 		existingALB:  existingALB,
 		certificates: map[CertificateFingerprint]WorkingTreeCertificate{},
@@ -177,113 +180,176 @@ func BuildTree(
 		for ruleIndex, rule := range ingress.Spec.Rules {
 			// TODO: support rules that don't have a path
 			for pathIndex, path := range rule.HTTP.Paths {
-				_pathWithType := pathWithType{pathType: ptr.Deref(path.PathType, networkingv1.PathTypeExact), path: path.Path}
 				ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
 
-				// TODO: What is the default port?
-				host, exists := tree.listeners[80].hosts[rule.Host]
-				if !exists {
-					host = &workingTreeHost{
-						paths: map[pathWithType]*workingTreePath{},
-					}
-					tree.listeners[80].hosts[rule.Host] = host
-				}
-				// TODO: Define a semantic for ImplementationSpecific path. According to spec it MUST be supported.
-				albPath, exists := host.paths[_pathWithType]
-				if exists && albPath.ingressPathReference == ingressPathReference {
-					errors = append(errors, errorEvent{
+				httpsOnly := GetAnnotation(AnnotationHTTPSOnly, false, ingressClass, &ingress)
+				httpPort := GetAnnotation(AnnotationHTTPPort, 80, ingressClass, &ingress)
+				httpsPort := GetAnnotation(AnnotationHTTPSPort, 443, ingressClass, &ingress)
 
-						fieldPath:   field.NewPath("spec", "rules", strconv.Itoa(ruleIndex), "path", strconv.Itoa(pathIndex)),
-						description: "Path already exists",
-					})
-					continue
-				}
-				if !exists {
-					albPath = &workingTreePath{
-						ingressPathReference: ingressPathReference,
-					}
-					// TODO: check limits
-				}
-				albPath.websocket = GetAnnotation(AnnotationWebSocket, false, ingressClass, &ingress)
-
-				targetPool, exists := tree.targetPools[ingressPathReference]
-				if !exists {
-					targetPool = &albsdk.TargetPool{}
-					// TODO: check limits. If the limit is breached here, we shouldn't have added the paths either. So adding the path to the tree must be delayed until all checks are completed.
+				targetPool, e := buildTargetPool(tree, targets, ingress, rule, ruleIndex, path, pathIndex, servicesMap)
+				errors = append(errors, e...)
+				if targetPool == nil {
+					continue // If the target pool is invalid we do not add any rules.
 				}
 
-				// TODO: Support other backends than services.
-
-				service, exists := servicesMap[types.NamespacedName{Namespace: ingress.Namespace, Name: path.Backend.Service.Name}]
-				if !exists {
-					errors = append(errors, errorEvent{
-						ingress:     &ingress,
-						fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
-						description: "Service doesn't exist",
-					})
-					continue
+				var httpAdded, httpsAdded bool
+				if !httpsOnly {
+					httpAdded, e = addPathToTree(tree, ingressClass, &ingress, rule, ruleIndex, path, pathIndex, int16(httpPort), protocolHTTP)
+					errors = append(errors, e...)
 				}
-				if service.Spec.Type != corev1.ServiceTypeNodePort && service.Spec.Type != corev1.ServiceTypeLoadBalancer {
-					errors = append(errors, errorEvent{
-						ingress:     &ingress,
-						fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
-						description: "Service is not of type NodePort or LoadBalancer",
-					})
-					continue
-				}
-				nodePort := int32(0)
-				for _, port := range service.Spec.Ports {
-					if port.Port == path.Backend.Service.Port.Number ||
-						port.Name == path.Backend.Service.Port.Name {
-						if port.NodePort == 0 {
-							errors = append(errors, errorEvent{
-								ingress:     &ingress,
-								fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
-								description: "Service port doesn't have a node port",
-							})
-							continue
-						}
-						nodePort = port.NodePort
-					}
-				}
-				if nodePort == 0 {
-					errors = append(errors, errorEvent{
-						ingress:     &ingress,
-						fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
-						description: "Port not found in service",
-					})
-					continue
+				if len(ingress.Spec.TLS) > 0 {
+					httpsAdded, e = addPathToTree(tree, ingressClass, &ingress, rule, ruleIndex, path, pathIndex, int16(httpsPort), protocolHTTPS)
+					errors = append(errors, e...)
 				}
 
-				targetPool.Name = new(ingressPathReference.toTargetPoolName())
-				targetPool.TargetPort = new(nodePort)
-				targetPool.Targets = targets
-				// TODO: Use TCP health checks for eTP=Cluster
-				if service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal {
-					targetPool.ActiveHealthCheck = &albsdk.ActiveHealthCheck{
-						AltPort: &service.Spec.HealthCheckNodePort,
-						HttpHealthChecks: &albsdk.HttpHealthChecks{
-							Path:       new("/healthz"),
-							OkStatuses: []string{"200"},
-						},
-						HealthyThreshold:   new(int32(1)),
-						Interval:           new("5s"),
-						IntervalJitter:     new("1s"),
-						Timeout:            new("1s"),
-						UnhealthyThreshold: new(int32(2)),
-						// TODO: Optimize interval etc.
-					}
+				// We only add the target pool if at least one rule was added that references the target pool.
+				if httpAdded || httpsAdded {
+					tree.targetPools[ingressPathReference] = targetPool
 				}
-				// TODO: Recommend the use of eTP=Local.
-
-				// We are committing to adding this here.
-				tree.listeners[80].hosts[rule.Host].paths[_pathWithType] = albPath
-				tree.targetPools[ingressPathReference] = targetPool
 			}
 		}
 	}
 
 	return tree, errors
+}
+
+// addPathToTree adds the given path to tree under the given port and protocol.
+// It implicitly creates listeners and hosts that don't exist yet in tree.
+func addPathToTree(tree *WorkingTreeALB, ingressClass *networkingv1.IngressClass, ingress *networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, port int16, protocol protocol) (added bool, errors []errorEvent) {
+	_pathWithType := pathWithType{pathType: ptr.Deref(path.PathType, networkingv1.PathTypeExact), path: path.Path}
+	ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
+
+	listener, exists := tree.listeners[port]
+	if !exists {
+		listener = &workingTreeListener{
+			hosts:    map[string]*workingTreeHost{},
+			protocol: protocol,
+		}
+	}
+	if listener.protocol != protocol {
+		// TODO: This error is redundant if the ingress contains multiple rules. Move this check "up".
+		errors = append(errors, errorEvent{
+			ingress:     ingress,
+			fieldPath:   field.NewPath("spec"),
+			description: fmt.Sprintf("Listener with port %d has protocol %s but ingress uses the port for %s", port, listener.protocol, protocol),
+		})
+		return false, errors
+	}
+
+	host, exists := listener.hosts[rule.Host]
+	if !exists {
+		host = &workingTreeHost{
+			paths: map[pathWithType]*workingTreePath{},
+		}
+	}
+
+	// TODO: Define a semantic for ImplementationSpecific path. According to spec it MUST be supported.
+	albPath, exists := host.paths[_pathWithType]
+	if exists && albPath.ingressPathReference == ingressPathReference {
+		errors = append(errors, errorEvent{
+			ingress:     ingress,
+			fieldPath:   field.NewPath("spec", "rules", strconv.Itoa(ruleIndex), "path", strconv.Itoa(pathIndex)),
+			description: "Path already exists",
+		})
+		return false, errors
+	}
+	if !exists {
+		albPath = &workingTreePath{
+			ingressPathReference: ingressPathReference,
+		}
+		// TODO: check limits
+	}
+	albPath.websocket = GetAnnotation(AnnotationWebSocket, false, ingressClass, ingress)
+
+	// We assign listener and host whether they exist or not. If they already exist we assign them to the same pointer.
+	tree.listeners[port] = listener
+	listener.hosts[rule.Host] = host
+
+	host.paths[_pathWithType] = albPath
+	return true, errors
+}
+
+// buildTargetPool builds a target pool for the provided path.
+// It uses tree to validate the returned target pool against the existing state.
+//
+// This function doesn't mutate or any other arguments.
+// If the target pool is not valid nil is returned together with a list of errors.
+func buildTargetPool(tree *WorkingTreeALB, targets []albsdk.Target, ingress networkingv1.Ingress, rule networkingv1.IngressRule, ruleIndex int, path networkingv1.HTTPIngressPath, pathIndex int, servicesMap map[types.NamespacedName]corev1.Service) (*albsdk.TargetPool, []errorEvent) {
+	errors := []errorEvent{}
+
+	ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
+
+	_, exists := tree.targetPools[ingressPathReference]
+	if !exists {
+		// TODO: check limits.
+	}
+	targetPool := &albsdk.TargetPool{}
+
+	// TODO: Support other backends than services.
+
+	service, exists := servicesMap[types.NamespacedName{Namespace: ingress.Namespace, Name: path.Backend.Service.Name}]
+	if !exists {
+		errors = append(errors, errorEvent{
+			ingress:     &ingress,
+			fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
+			description: "Service doesn't exist",
+		})
+		return nil, errors
+	}
+	if service.Spec.Type != corev1.ServiceTypeNodePort && service.Spec.Type != corev1.ServiceTypeLoadBalancer {
+		errors = append(errors, errorEvent{
+			ingress:     &ingress,
+			fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service", "name"),
+			description: "Service is not of type NodePort or LoadBalancer",
+		})
+		return nil, errors
+	}
+	nodePort := int32(0)
+	for _, port := range service.Spec.Ports {
+		if port.Port == path.Backend.Service.Port.Number ||
+			port.Name == path.Backend.Service.Port.Name {
+			if port.NodePort == 0 {
+				errors = append(errors, errorEvent{
+					ingress:     &ingress,
+					fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
+					description: "Service port doesn't have a node port",
+				})
+				continue
+			}
+			nodePort = port.NodePort
+		}
+	}
+	if nodePort == 0 {
+		errors = append(errors, errorEvent{
+			ingress:     &ingress,
+			fieldPath:   field.NewPath("spec", "rules").Index(ruleIndex).Child("paths").Index(pathIndex).Child("backend", "service"),
+			description: "Port not found in service",
+		})
+		return nil, errors
+	}
+
+	targetPool.Name = new(ingressPathReference.toTargetPoolName())
+	targetPool.TargetPort = new(nodePort)
+	targetPool.Targets = targets
+	// TODO: Use TCP health checks for eTP=Cluster
+	if service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal {
+		targetPool.ActiveHealthCheck = &albsdk.ActiveHealthCheck{
+			AltPort: &service.Spec.HealthCheckNodePort,
+			HttpHealthChecks: &albsdk.HttpHealthChecks{
+				Path:       new("/healthz"),
+				OkStatuses: []string{"200"},
+			},
+			HealthyThreshold:   new(int32(1)),
+			Interval:           new("5s"),
+			IntervalJitter:     new("1s"),
+			Timeout:            new("1s"),
+			UnhealthyThreshold: new(int32(2)),
+			// TODO: Optimize interval etc.
+		}
+	}
+	// TODO: Recommend the use of eTP=Local.
+
+	return targetPool, errors
 }
 
 func ValidateTLSCertAndFingerprint(publicKey, privateKey []byte) (string, error) {
@@ -383,13 +449,14 @@ func (t WorkingTreeALB) ToCreatePayload(
 
 		var https *albsdk.ProtocolOptionsHTTPS
 		protocol := "PROTOCOL_HTTP"
-		if port == 443 {
+		if listener.protocol == protocolHTTPS {
 			protocol = "PROTOCOL_HTTPS"
 			https = &albsdk.ProtocolOptionsHTTPS{
 				CertificateConfig: &albsdk.CertificateConfig{
 					CertificateIds: []string{},
 				},
 			}
+			// TODO: Only use the certificates used for this port.
 			for fingerprint := range t.certificates {
 				if id, exists := certificateIDMap[fingerprint]; exists {
 					https.CertificateConfig.CertificateIds = append(https.CertificateConfig.CertificateIds, id)
