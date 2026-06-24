@@ -294,6 +294,11 @@ func lbSpecFromService(
 		lb.Labels = new(opts.ExtraLabels)
 	}
 
+	// For new lb's always set DisableTargetSecurityGroupAssignment to true
+	// This function is also used by the LB UPDATE call, but for UPDATE we just
+	// use the value from the already created lb instead of this one.
+	lb.DisableTargetSecurityGroupAssignment = new(true)
+
 	// Add metric metricsRemoteWrite settings
 	lb.Options.Observability = observability
 
