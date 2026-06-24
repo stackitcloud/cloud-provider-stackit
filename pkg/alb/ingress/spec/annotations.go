@@ -62,7 +62,7 @@ const (
 )
 
 // GetAnnotation retrieves an annotation value from objects.
-// If multiple objects contain the annotation, the later object in the slice takes precedence.
+// If multiple objects contain the annotation, the first object in the slice containing the annotation takes precedence.
 // If no object contains the annotation then defaultValue is returned.
 //
 // GetAnnotation parses the value of the annotation and return type T.

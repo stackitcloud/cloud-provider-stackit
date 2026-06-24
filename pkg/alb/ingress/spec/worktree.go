@@ -78,6 +78,7 @@ func (i ingressPathReference) toTargetPoolName() string {
 }
 
 type workTreePath struct {
+	path                 pathWithType
 	ingressPathReference ingressPathReference
 	websocket            bool
 }
@@ -183,9 +184,9 @@ func BuildTree(
 			for pathIndex, path := range rule.HTTP.Paths {
 				ingressPathReference := ingressPathReference{namespace: ingress.Namespace, name: ingress.Name, uid: string(ingress.UID), ruleIndex: ruleIndex, pathIndex: pathIndex}
 
-				httpsOnly := GetAnnotation(AnnotationHTTPSOnly, false, ingressClass, &ingress)
-				httpPort := GetAnnotation(AnnotationHTTPPort, 80, ingressClass, &ingress)
-				httpsPort := GetAnnotation(AnnotationHTTPSPort, 443, ingressClass, &ingress)
+				httpsOnly := GetAnnotation(AnnotationHTTPSOnly, false, &ingress, ingressClass)
+				httpPort := GetAnnotation(AnnotationHTTPPort, 80, &ingress, ingressClass)
+				httpsPort := GetAnnotation(AnnotationHTTPSPort, 443, &ingress, ingressClass)
 
 				targetPool, e := buildTargetPool(tree, targets, ingress, rule, ruleIndex, path, pathIndex, servicesMap)
 				errors = append(errors, e...)
@@ -256,11 +257,12 @@ func addPathToTree(tree *WorkTreeALB, ingressClass *networkingv1.IngressClass, i
 	}
 	if !exists {
 		albPath = &workTreePath{
+			path:                 _pathWithType,
 			ingressPathReference: ingressPathReference,
 		}
 		// TODO: check limits
 	}
-	albPath.websocket = GetAnnotation(AnnotationWebSocket, false, ingressClass, ingress)
+	albPath.websocket = GetAnnotation(AnnotationWebSocket, false, ingress, ingressClass)
 
 	// We assign listener and host whether they exist or not. If they already exist we assign them to the same pointer.
 	tree.listeners[port] = listener
@@ -425,21 +427,35 @@ func (t WorkTreeALB) ToCreatePayload(
 	for port, listener := range t.listeners {
 		hosts := []albsdk.HostConfig{}
 		for hostname, host := range listener.hosts {
+			paths := slices.Collect(maps.Values(host.paths))
+			typeRank := map[networkingv1.PathType]int{
+				networkingv1.PathTypeExact:  1,
+				networkingv1.PathTypePrefix: 2,
+			}
+			slices.SortFunc(paths, func(a, b *workTreePath) int {
+				if x := cmp.Compare(typeRank[a.path.pathType], typeRank[b.path.pathType]); x != 0 {
+					return x
+				}
+				if x := cmp.Compare(len(b.path.path), len(a.path.path)); x != 0 {
+					return x
+				}
+				return cmp.Compare(a.path.path, b.path.path)
+			})
 			rules := []albsdk.Rule{}
-			for path, pathDetails := range host.paths {
+			for _, path := range paths {
 				rule := albsdk.Rule{
-					TargetPool: new(pathDetails.ingressPathReference.toTargetPoolName()),
-					WebSocket:  &pathDetails.websocket,
+					TargetPool: new(path.ingressPathReference.toTargetPoolName()),
+					WebSocket:  &path.websocket,
 				}
 
-				switch path.pathType {
+				switch path.path.pathType {
 				case networkingv1.PathTypeExact:
 					rule.Path = new(albsdk.Path{
-						ExactMatch: new(path.path),
+						ExactMatch: new(path.path.path),
 					})
 				default:
 					rule.Path = new(albsdk.Path{
-						Prefix: new(path.path),
+						Prefix: new(path.path.path),
 					})
 				}
 

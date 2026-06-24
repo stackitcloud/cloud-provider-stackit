@@ -24,24 +24,40 @@ type testCase struct {
 	matcher types.GomegaMatcher
 }
 
-var _ = Describe("WorkTreeALB.ToCreatePayload", func() {
+var _ = Describe("WorkTreeALB", func() {
 	It("should sort rules from most to least-specific even if their priority is inversed", func() {
-		tree, _ := BuildTree(&networkingv1.IngressClass{}, []networkingv1.Ingress{
+		tree, errs := BuildTree(&networkingv1.IngressClass{}, []networkingv1.Ingress{
 			Ingress(
 				"default", "ingress-with-higher-priority",
 				WithAnnotation(AnnotationPriority, "5"),
-				WithRule("my-host.local", WithPath("/", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 1337})),
+				WithRule("my-host.local",
+					WithPath("/prefix/b", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+					WithPath("/exact/b", new(networkingv1.PathTypeExact), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+					WithPath("/exact/b/b", new(networkingv1.PathTypeExact), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+				),
 			),
 			Ingress(
-				"default", "ingress-with-more-specific-path",
+				"default", "ingress-with-lower-priority",
 				WithAnnotation(AnnotationPriority, "4"),
-				WithRule("my-host.local", WithPath("/more-specific", new(networkingv1.PathTypePrefix), "other-service", networkingv1.ServiceBackendPort{Number: 1337})),
+				WithRule("my-host.local",
+					WithPath("/prefix/a", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+					WithPath("/exact/a", new(networkingv1.PathTypeExact), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+					WithPath("/exact/a/a", new(networkingv1.PathTypeExact), "my-service", networkingv1.ServiceBackendPort{Number: 1337}),
+				),
 			),
-		}, nil, nil, nil, nil)
+		}, nil, []corev1.Service{
+			Service(corev1.NamespaceDefault, "my-service", WithServiceType(corev1.ServiceTypeNodePort), WithPort("my-port", 1337, 30000, corev1.ProtocolTCP)),
+		}, nil, nil)
+		Expect(errs).To(HaveLen(0))
 		createPayload := tree.ToCreatePayload(nil, "", "")
 		Expect(createPayload.Listeners[0].Http.Hosts[0].Host).To(HaveValue(Equal("my-host.local")))
-		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[0].Path.Prefix).To(HaveValue(Equal("/more-specific")))
-		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[1].Path.Prefix).To(HaveValue(Equal("/")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules).To(HaveLen(6))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[0].Path.ExactMatch).To(HaveValue(Equal("/exact/a/a")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[1].Path.ExactMatch).To(HaveValue(Equal("/exact/b/b")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[2].Path.ExactMatch).To(HaveValue(Equal("/exact/a")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[3].Path.ExactMatch).To(HaveValue(Equal("/exact/b")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[4].Path.Prefix).To(HaveValue(Equal("/prefix/a")))
+		Expect(createPayload.Listeners[0].Http.Hosts[0].Rules[5].Path.Prefix).To(HaveValue(Equal("/prefix/b")))
 	})
 
 	It("should match rules against correct node ports", func() {
@@ -191,6 +207,98 @@ var _ = Describe("WorkTreeALB.ToCreatePayload", func() {
 				PrivateKey: fixtureTLSPrivateKey,
 			},
 		))
+	})
+
+	It("should enable websocket if enable on ingress class", func() {
+		tree, errs := BuildTree(
+			&networkingv1.IngressClass{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationWebSocket: "true",
+					},
+				},
+			},
+			[]networkingv1.Ingress{
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithRule("my-host.local",
+					WithPath("/a", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithAnnotation(AnnotationWebSocket, "false"), WithRule("my-host.local",
+					WithPath("/b", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+			},
+			nil,
+			[]corev1.Service{
+				Service(corev1.NamespaceDefault, "my-service", WithServiceType(corev1.ServiceTypeNodePort), WithPort("my-port", 80, 30000, corev1.ProtocolTCP)),
+			}, nil, nil,
+		)
+
+		Expect(errs).To(HaveLen(0))
+		create := tree.ToCreatePayload(nil, "network-id", "region")
+		Expect(create.Listeners).To(HaveLen(1))
+		Expect(create.Listeners[0].Http.Hosts).To(HaveLen(1))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules).To(HaveLen(2))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[0].Path.Prefix).To(HaveValue(Equal("/a")))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[0].WebSocket).To(HaveValue(BeTrue()))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[1].Path.Prefix).To(HaveValue(Equal("/b")))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[1].WebSocket).To(Or(BeNil(), HaveValue(BeFalse())))
+	})
+
+	It("should enable websocket if enable on ingress", func() {
+		tree, errs := BuildTree(
+			&networkingv1.IngressClass{},
+			[]networkingv1.Ingress{
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithRule("my-host.local",
+					WithPath("/a", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithAnnotation(AnnotationWebSocket, "true"), WithRule("my-host.local",
+					WithPath("/b", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+			},
+			nil,
+			[]corev1.Service{
+				Service(corev1.NamespaceDefault, "my-service", WithServiceType(corev1.ServiceTypeNodePort), WithPort("my-port", 80, 30000, corev1.ProtocolTCP)),
+			}, nil, nil,
+		)
+
+		Expect(errs).To(HaveLen(0))
+		create := tree.ToCreatePayload(nil, "network-id", "region")
+		Expect(create.Listeners).To(HaveLen(1))
+		Expect(create.Listeners[0].Http.Hosts).To(HaveLen(1))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules).To(HaveLen(2))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[0].Path.Prefix).To(HaveValue(Equal("/a")))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[0].WebSocket).To(HaveValue(Or(BeNil(), HaveValue(BeFalse()))))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[1].Path.Prefix).To(HaveValue(Equal("/b")))
+		Expect(create.Listeners[0].Http.Hosts[0].Rules[1].WebSocket).To(HaveValue(BeTrue()))
+	})
+
+	It("should set WAF on all ports if specified on ingress class", func() {
+		tree, errs := BuildTree(
+			&networkingv1.IngressClass{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationWAFName: "my-waf",
+					},
+				},
+			},
+			[]networkingv1.Ingress{
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithRule("my-host.local",
+					WithPath("/", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+				Ingress(corev1.NamespaceDefault, "ingress-1", WithAnnotation(AnnotationHTTPPort, "8080"), WithRule("my-host.local",
+					WithPath("/", new(networkingv1.PathTypePrefix), "my-service", networkingv1.ServiceBackendPort{Number: 80}),
+				)),
+			},
+			nil,
+			[]corev1.Service{
+				Service(corev1.NamespaceDefault, "my-service", WithServiceType(corev1.ServiceTypeNodePort), WithPort("my-port", 80, 30000, corev1.ProtocolTCP)),
+			}, nil, nil,
+		)
+
+		Expect(errs).To(HaveLen(0))
+		create := tree.ToCreatePayload(nil, "network-id", "region")
+		Expect(create.Listeners).To(HaveLen(2))
+		Expect(create.Listeners[0].WafConfigName).To(HaveValue(Equal("my-waf")))
+		Expect(create.Listeners[1].WafConfigName).To(HaveValue(Equal("my-waf")))
 	})
 })
 
