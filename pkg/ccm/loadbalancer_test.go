@@ -212,13 +212,65 @@ var _ = Describe("LoadBalancer", func() {
 						},
 					}, nil
 				})
-			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), gomock.Any()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
+			// isCreatedWithEnabledDisableTargetSecurityGroupAssignment ensures that DisableTargetSecurityGroupAssignment is set to true
+			mockClient.EXPECT().CreateLoadBalancer(gomock.Any(), isCreatedWithEnabledDisableTargetSecurityGroupAssignment()).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil)
 
 			_, err := lbInModeIgnoreAndObs.EnsureLoadBalancer(context.Background(), clusterName, minimalLoadBalancerService(), []*corev1.Node{})
 			Expect(err).To(MatchError(notYetReadyError))
 			// Expected CreateCredentials to have been called.
 			// Expected CreateLoadBalancer to have been called.
 		})
+
+		DescribeTable("LoadBalancer UPDATE behavior for DisableTargetSecurityGroupAssignment",
+			func(disableTargetSG bool, matcher gomock.Matcher) {
+				svc := minimalLoadBalancerService()
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
+				Expect(err).NotTo(HaveOccurred())
+
+				myLb := &loadbalancer.LoadBalancer{
+					Errors:                               []loadbalancer.LoadBalancerError{},
+					ExternalAddress:                      spec.ExternalAddress,
+					Listeners:                            spec.Listeners,
+					Name:                                 spec.Name,
+					Networks:                             spec.Networks,
+					Options:                              spec.Options,
+					PrivateAddress:                       spec.PrivateAddress,
+					Status:                               new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
+					TargetPools:                          spec.TargetPools,
+					DisableTargetSecurityGroupAssignment: &disableTargetSG,
+					Version:                              new("current-version"),
+					PlanId:                               new(p10),
+				}
+
+				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+
+				mockClient.EXPECT().UpdateLoadBalancer(
+					gomock.Any(),
+					loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
+					matcher,
+				).MinTimes(1).Return(myLb, nil)
+
+				// Trigger an update by changing the service
+				svc = svc.DeepCopy()
+				svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+					Name:     "a-port",
+					Protocol: corev1.ProtocolTCP,
+					Port:     80,
+					NodePort: 1234,
+				})
+
+				_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+				Expect(err).NotTo(HaveOccurred())
+			},
+			Entry("should not set DisableTargetSecurityGroupAssignment to true when it is initially false",
+				false,
+				hasNotEnabledDisableTargetSecurityGroupAssignment(),
+			),
+			Entry("should keep DisableTargetSecurityGroupAssignment as true when it is initially true",
+				true,
+				hasEnabledDisableTargetSecurityGroupAssignment(),
+			),
+		)
 
 		It("should update observability credential if credentials are specified in load balancer", func() {
 			svc := minimalLoadBalancerService()
@@ -712,6 +764,33 @@ func hasNoObservabilityConfigured() gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		return lb.Options == nil || lb.Options.Observability == nil
+	})
+}
+
+// hasNotEnabledDisableTargetSecurityGroupAssignment ensures that the given UpdateLoadBalancerPayload
+// has not set DisableTargetSecurityGroupAssignment to true.
+func hasNotEnabledDisableTargetSecurityGroupAssignment() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.DisableTargetSecurityGroupAssignment != nil && *lb.DisableTargetSecurityGroupAssignment != true
+	})
+}
+
+// hasEnabledDisableTargetSecurityGroupAssignment ensures that the given UpdateLoadBalancerPayload
+// has set DisableTargetSecurityGroupAssignment to true.
+func hasEnabledDisableTargetSecurityGroupAssignment() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.DisableTargetSecurityGroupAssignment != nil && *lb.DisableTargetSecurityGroupAssignment == true
+	})
+}
+
+// isCreatedWithEnabledDisableTargetSecurityGroupAssignment ensures that new lbs are always created
+// with DisableTargetSecurityGroupAssignment set to true.
+func isCreatedWithEnabledDisableTargetSecurityGroupAssignment() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.CreateLoadBalancerPayload)
+		return lb.DisableTargetSecurityGroupAssignment != nil && *lb.DisableTargetSecurityGroupAssignment == true
 	})
 }
 
