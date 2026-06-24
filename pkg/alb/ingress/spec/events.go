@@ -23,12 +23,11 @@ func (e *errorEvent) Error() string {
 	return e.description
 }
 
-// TODO: rethink this function
 func (e *errorEvent) RecordEvent(class *networkingv1.IngressClass, recorder record.EventRecorder) {
 	if e.ingress.GetName() == "" {
 		return
 	}
 
-	recorder.Eventf(class, corev1.EventTypeWarning, "ALB", "Error in %s in Namespace %s: %s", e.ingress.GetName(), e.ingress.GetNamespace(), e.Error())
-	recorder.Event(e.ingress, corev1.EventTypeWarning, "ALB", e.Error())
+	recorder.Eventf(class, corev1.EventTypeWarning, "IngressWarning", "Error in %s in Namespace %s: %s", e.ingress.GetName(), e.ingress.GetNamespace(), e.Error())
+	recorder.Event(e.ingress, corev1.EventTypeWarning, "IngressWarning", e.Error())
 }

@@ -48,7 +48,7 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, ingressClass *net
 		existingALB = nil
 	}
 
-	tree, _ := spec.BuildTree( // TODO: deal with errors
+	tree, errs := spec.BuildTree( // TODO: deal with errors
 		ingressClass,
 		ingresses,
 		secrets,
@@ -56,6 +56,11 @@ func (r *IngressClassReconciler) applyALB(ctx context.Context, ingressClass *net
 		nodes.Items,
 		existingALB,
 	)
+
+	for _, err := range errs {
+		ctrl.LoggerFrom(ctx).Info("Recorded ingress event", "event", err.Error())
+		err.RecordEvent(ingressClass, r.Recorder)
+	}
 
 	// TODO: Deal with paging.
 	projectCertificates, err := r.CertificateClient.ListCertificate(ctx, r.ALBConfig.Global.ProjectID, r.ALBConfig.Global.Region)

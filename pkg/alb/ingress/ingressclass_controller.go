@@ -72,16 +72,6 @@ func (r *IngressClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("failed to apply ALB: %w", err)
 	}
 
-	// for _, errItem := range errorList {
-	// 	var evtErr *errorEvent
-	// 	if errors.As(errItem, &evtErr) {
-	// 		log.Info(evtErr.Error(), "ingressRef", evtErr.ingressRef)
-	// 		evtErr.RecordEvent(ingressClass, r.Recorder)
-	// 	} else {
-	// 		log.Info(errItem.Error())
-	// 	}
-	// }
-
 	requeue, err := r.updateStatus(ctx, ingressClass)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update ingress status: %w", err)
