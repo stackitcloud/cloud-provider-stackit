@@ -43,7 +43,7 @@ const (
 	// Can be set on IngressClass and Ingress.
 	AnnotationHTTPSOnly = "alb.stackit.cloud/https-only"
 
-	// AnnotationWebSocket TODO
+	// AnnotationWebSocket accepts a bool to decide whether websocket support is enabled.
 	// Can be set on IngressClass and Ingress.
 	AnnotationWebSocket = "alb.stackit.cloud/websocket"
 
