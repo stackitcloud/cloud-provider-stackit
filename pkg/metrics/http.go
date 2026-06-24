@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,10 +11,6 @@ import (
 )
 
 func NewInstrumentedHTTPClient(api string) (*http.Client, error) {
-	if api == "" {
-		return nil, errors.New("api name is required")
-	}
-
 	return &http.Client{
 		Transport: &InstrumentedRoundTripper{
 			api:  api,
