@@ -47,8 +47,8 @@ const (
 	// Can be set on IngressClass and Ingress.
 	AnnotationWebSocket = "alb.stackit.cloud/websocket"
 
-	// AnnotationWAFName TODO
-	// Can be set on IngressClass and Ingress.
+	// AnnotationWAFName accepts a string and must reference a web application firewall that already exists.
+	// Can be set on IngressClass and applies to all ports.
 	AnnotationWAFName = "alb.stackit.cloud/web-application-firewall-name"
 
 	// AnnotationPriority is used to set the priority of the Ingress. Can be only set on ingress objects.

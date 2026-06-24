@@ -32,11 +32,11 @@ type CertificateFingerprint string
 type WorkTreeALB struct {
 	ingressClass *networkingv1.IngressClass
 	planId       string
+	waf          string
 
 	listeners map[int16]*workTreeListener
 	// We can already create the real type because there is nothing to merge or track.
-	targetPools map[ingressPathReference]*albsdk.TargetPool
-	// We maintain certificates on ALB-level although we
+	targetPools  map[ingressPathReference]*albsdk.TargetPool
 	certificates map[CertificateFingerprint]WorkTreeCertificate
 
 	existingALB *albsdk.LoadBalancer
@@ -123,6 +123,7 @@ func BuildTree(
 	tree := &WorkTreeALB{
 		ingressClass: ingressClass,
 		planId:       GetAnnotation(AnnotationPlanID, "", ingressClass),
+		waf:          GetAnnotation(AnnotationWAFName, "", ingressClass),
 
 		listeners:    map[int16]*workTreeListener{},
 		targetPools:  map[ingressPathReference]*albsdk.TargetPool{},
@@ -472,10 +473,15 @@ func (t WorkTreeALB) ToCreatePayload(
 			}
 		}
 
+		var waf *string
+		if t.waf != "" {
+			waf = new(t.waf)
+		}
 		listeners = append(listeners, albsdk.Listener{
-			Name:     new(fmt.Sprintf("port-%d", port)),
-			Protocol: &protocol,
-			Port:     new(int32(port)),
+			Name:          new(fmt.Sprintf("port-%d", port)),
+			WafConfigName: waf,
+			Protocol:      &protocol,
+			Port:          new(int32(port)),
 			Http: &albsdk.ProtocolOptionsHTTP{
 				Hosts: hosts,
 			},
