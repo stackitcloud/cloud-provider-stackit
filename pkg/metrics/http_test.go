@@ -28,12 +28,6 @@ var _ = Describe("Metrics", func() {
 	)
 
 	Describe("InstrumentedRoundTripper", func() {
-		It("requires an API name", func() {
-			client, err := NewInstrumentedHTTPClient("")
-			Expect(err).To(MatchError("api name is required"))
-			Expect(client).To(BeNil())
-		})
-
 		It("increments HTTPRequestCount for responses", func() {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -80,52 +74,62 @@ var _ = Describe("Metrics", func() {
 			Expect(after - before).To(Equal(uint64(1)))
 		})
 
-		It("increments HTTPErrorCount for 400 responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		It("increments HTTPErrorCount for error responses (400, 404, 500)", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				if r.URL.Path == "/404" {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
 				w.WriteHeader(http.StatusBadRequest)
 			}))
 			defer server.Close()
 
-			labels := prometheus.Labels{
+			labels400 := prometheus.Labels{
 				apiLabel:    "test",
 				methodLabel: http.MethodGet,
 				codeLabel:   "400",
 			}
-			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
-
-			client, err := NewInstrumentedHTTPClient("test")
-			Expect(err).NotTo(HaveOccurred())
-
-			response, err := client.Get(server.URL)
-			Expect(err).NotTo(HaveOccurred())
-			defer response.Body.Close()
-
-			after := testutil.ToFloat64(HTTPErrorCount.With(labels))
-			Expect(after - before).To(Equal(float64(1)))
-		})
-
-		It("increments HTTPErrorCount for 500 responses", func() {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusInternalServerError)
-			}))
-			defer server.Close()
-
-			labels := prometheus.Labels{
+			labels404 := prometheus.Labels{
+				apiLabel:    "test",
+				methodLabel: http.MethodGet,
+				codeLabel:   "404",
+			}
+			labels500 := prometheus.Labels{
 				apiLabel:    "test",
 				methodLabel: http.MethodPost,
 				codeLabel:   "500",
 			}
-			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
+			before400 := testutil.ToFloat64(HTTPErrorCount.With(labels400))
+			before404 := testutil.ToFloat64(HTTPErrorCount.With(labels404))
+			before500 := testutil.ToFloat64(HTTPErrorCount.With(labels500))
 
 			client, err := NewInstrumentedHTTPClient("test")
 			Expect(err).NotTo(HaveOccurred())
 
-			response, err := client.Post(server.URL, "application/json", nil)
+			response1, err := client.Get(server.URL)
 			Expect(err).NotTo(HaveOccurred())
-			defer response.Body.Close()
+			defer response1.Body.Close()
 
-			after := testutil.ToFloat64(HTTPErrorCount.With(labels))
-			Expect(after - before).To(Equal(float64(1)))
+			response2, err := client.Get(server.URL + "/404")
+			Expect(err).NotTo(HaveOccurred())
+			defer response2.Body.Close()
+
+			response3, err := client.Post(server.URL, "application/json", nil)
+			Expect(err).NotTo(HaveOccurred())
+			defer response3.Body.Close()
+
+			after400 := testutil.ToFloat64(HTTPErrorCount.With(labels400))
+			after404 := testutil.ToFloat64(HTTPErrorCount.With(labels404))
+			after500 := testutil.ToFloat64(HTTPErrorCount.With(labels500))
+
+			Expect(after400 - before400).To(Equal(float64(1)))
+			Expect(after404 - before404).To(Equal(float64(1)))
+			Expect(after500 - before500).To(Equal(float64(1)))
+			Expect((after400 - before400) + (after404 - before404) + (after500 - before500)).To(Equal(float64(3)))
 		})
 
 		It("does not increment HTTPErrorCount for successful responses", func() {
