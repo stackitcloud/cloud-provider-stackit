@@ -26,6 +26,7 @@ import (
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +50,7 @@ var _ = Describe("Node Controller", func() {
 		nodeMockClient = stackitclientmock.NewMockIaaSClient(ctrl)
 
 		var err error
-		instance, err = NewInstance(nodeMockClient, "eu01")
+		instance, err = NewInstance(nodeMockClient, "eu01", config.InstanceOpts{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -279,6 +280,39 @@ var _ = Describe("Node Controller", func() {
 			metadata, err := instance.InstanceMetadata(context.Background(), node)
 			Expect(err).To(HaveOccurred())
 			Expect(metadata).To(BeNil())
+		})
+	})
+
+	Describe("#sortNics", func() {
+		It("should return the nic of the default network as primary", func() {
+			nics := []iaas.ServerNetwork{
+				{
+					NetworkName: "abc",
+					Ipv4:        new("10.0.0.69"),
+				},
+				{
+					NetworkName: "default",
+					Ipv4:        new("192.168.0.123"),
+				},
+				{
+					NetworkName: "foo",
+					NetworkId:   "123",
+					Ipv4:        new("100.80.0.5"),
+				},
+			}
+			By("with network name")
+			newNics := sortNics(nics, "default")
+			Expect(newNics).To(HaveLen(3))
+			Expect(newNics[0].NetworkName).To(Equal("default"))
+			Expect(newNics[1].NetworkName).To(Equal("abc"))
+			Expect(newNics[2].NetworkName).To(Equal("foo"))
+
+			By("with network id")
+			newNics = sortNics(nics, "123")
+			Expect(newNics).To(HaveLen(3))
+			Expect(newNics[0].NetworkName).To(Equal("foo"))
+			Expect(newNics[1].NetworkName).To(Equal("abc"))
+			Expect(newNics[2].NetworkName).To(Equal("default"))
 		})
 	})
 })
