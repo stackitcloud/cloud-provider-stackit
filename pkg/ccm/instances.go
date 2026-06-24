@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/labels"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	corev1 "k8s.io/api/core/v1"
@@ -49,13 +51,15 @@ type Instances struct {
 	regionProviderID bool
 	iaasClient       stackitclient.IaaSClient
 	region           string
+	defaultNetwork   string
 }
 
-func NewInstance(client stackitclient.IaaSClient, region string) (*Instances, error) {
+func NewInstance(client stackitclient.IaaSClient, region string, opts config.InstanceOpts) (*Instances, error) {
 	return &Instances{
 		iaasClient:       client,
 		region:           region,
 		regionProviderID: false,
+		defaultNetwork:   opts.DefaultNetwork,
 	}, nil
 }
 
@@ -104,7 +108,7 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 		return nil, fmt.Errorf("server has no network interfaces")
 	}
 
-	nics := server.GetNics()
+	nics := sortNics(server.GetNics(), i.defaultNetwork)
 	for i := range nics {
 		nic := &nics[i]
 		if nic.HasIpv4() {
@@ -151,6 +155,31 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *corev1.Node) (*c
 
 func (i *Instances) makeInstanceID(server *iaas.Server) string {
 	return fmt.Sprintf("%s://%s", ProviderName, server.GetId())
+}
+
+func sortNics(nics []iaas.ServerNetwork, defaultNetwork string) []iaas.ServerNetwork {
+	// nics are returned by IaaS API in a non-deterministic order
+	// Sort by network name so that every time we use the same order for node addresses
+	slices.SortFunc(nics, func(a, b iaas.ServerNetwork) int {
+		return strings.Compare(a.NetworkName, b.NetworkName)
+	})
+
+	if defaultNetwork == "" {
+		return nics
+	}
+
+	idx := slices.IndexFunc(nics, func(nic iaas.ServerNetwork) bool {
+		return nic.NetworkName == defaultNetwork || nic.NetworkId == defaultNetwork
+	})
+	// network not found
+	if idx == -1 {
+		return nics
+	}
+	defaultNic := nics[idx]
+	nics = slices.Delete(nics, idx, idx+1)
+	// prepend default nic
+	nics = slices.Insert(nics, 0, defaultNic)
+	return nics
 }
 
 // addToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,

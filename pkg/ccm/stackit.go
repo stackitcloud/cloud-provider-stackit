@@ -151,7 +151,7 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		return nil, fmt.Errorf("failed to create IaaS client: %v", err)
 	}
 
-	instances, err := NewInstance(iaasClient, cfg.Global.Region)
+	instances, err := NewInstance(iaasClient, cfg.Global.Region, cfg.Instance)
 	if err != nil {
 		return nil, err
 	}
