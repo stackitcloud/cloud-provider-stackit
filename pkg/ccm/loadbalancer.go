@@ -146,16 +146,17 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		spec.Version = lb.Version
 		spec.Name = &name
 		updatePayload := &loadbalancer.UpdateLoadBalancerPayload{
-			ExternalAddress: spec.ExternalAddress,
-			Listeners:       spec.Listeners,
-			Name:            spec.Name,
-			Networks:        spec.Networks,
-			Options:         spec.Options,
-			PlanId:          spec.PlanId,
-			Region:          spec.Region,
-			Labels:          spec.Labels,
-			TargetPools:     spec.TargetPools,
-			Version:         spec.Version,
+			ExternalAddress:                      spec.ExternalAddress,
+			Listeners:                            spec.Listeners,
+			Name:                                 spec.Name,
+			Networks:                             spec.Networks,
+			Options:                              spec.Options,
+			PlanId:                               spec.PlanId,
+			Region:                               spec.Region,
+			Labels:                               spec.Labels,
+			TargetPools:                          spec.TargetPools,
+			DisableTargetSecurityGroupAssignment: lb.DisableTargetSecurityGroupAssignment,
+			Version:                              spec.Version,
 		}
 		lb, err = l.client.UpdateLoadBalancer(ctx, name, updatePayload)
 		if err != nil {
@@ -298,10 +299,11 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 				Observability:      nil,
 				PrivateNetworkOnly: lb.Options.PrivateNetworkOnly,
 			},
-			TargetPools: lb.TargetPools,
-			Version:     lb.Version,
-			PlanId:      lb.PlanId,
-			Labels:      lb.Labels,
+			TargetPools:                          lb.TargetPools,
+			DisableTargetSecurityGroupAssignment: lb.DisableTargetSecurityGroupAssignment,
+			Version:                              lb.Version,
+			PlanId:                               lb.PlanId,
+			Labels:                               lb.Labels,
 		}
 		_, err = l.client.UpdateLoadBalancer(ctx, name, payload)
 		if err != nil {
