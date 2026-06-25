@@ -121,7 +121,7 @@ func (c *MockIaaSClientCreateBackupCall) DoAndReturn(f func(context.Context, str
 }
 
 // CreateSnapshot mocks base method.
-func (m *MockIaaSClient) CreateSnapshot(ctx context.Context, payload *v2api.CreateSnapshotPayload) (*v2api.Snapshot, error) {
+func (m *MockIaaSClient) CreateSnapshot(ctx context.Context, payload v2api.CreateSnapshotPayload) (*v2api.Snapshot, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSnapshot", ctx, payload)
 	ret0, _ := ret[0].(*v2api.Snapshot)
@@ -148,19 +148,19 @@ func (c *MockIaaSClientCreateSnapshotCall) Return(arg0 *v2api.Snapshot, arg1 err
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientCreateSnapshotCall) Do(f func(context.Context, *v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
+func (c *MockIaaSClientCreateSnapshotCall) Do(f func(context.Context, v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientCreateSnapshotCall) DoAndReturn(f func(context.Context, *v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
+func (c *MockIaaSClientCreateSnapshotCall) DoAndReturn(f func(context.Context, v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // CreateVolume mocks base method.
-func (m *MockIaaSClient) CreateVolume(ctx context.Context, payload *v2api.CreateVolumePayload) (*v2api.Volume, error) {
+func (m *MockIaaSClient) CreateVolume(ctx context.Context, payload v2api.CreateVolumePayload) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateVolume", ctx, payload)
 	ret0, _ := ret[0].(*v2api.Volume)
@@ -187,13 +187,13 @@ func (c *MockIaaSClientCreateVolumeCall) Return(arg0 *v2api.Volume, arg1 error) 
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientCreateVolumeCall) Do(f func(context.Context, *v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
+func (c *MockIaaSClientCreateVolumeCall) Do(f func(context.Context, v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientCreateVolumeCall) DoAndReturn(f func(context.Context, *v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
+func (c *MockIaaSClientCreateVolumeCall) DoAndReturn(f func(context.Context, v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

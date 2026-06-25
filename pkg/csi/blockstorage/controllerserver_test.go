@@ -308,7 +308,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}, nil)
 				iaasClient.EXPECT().
 					CreateVolume(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					DoAndReturn(func(_ context.Context, opts iaas.CreateVolumePayload) (*iaas.Volume, error) {
 						Expect(opts.Source.Id).To(Equal("snapshot-id"))
 						Expect(opts.Source.Type).To(Equal("snapshot"))
 
@@ -384,7 +384,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}, nil)
 				iaasClient.EXPECT().
 					CreateVolume(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					DoAndReturn(func(_ context.Context, opts iaas.CreateVolumePayload) (*iaas.Volume, error) {
 						Expect(opts.Source.Id).To(Equal("snapshot-id"))
 						Expect(opts.Source.Type).To(Equal("backup"))
 
@@ -499,7 +499,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}, nil)
 				iaasClient.EXPECT().
 					CreateVolume(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					DoAndReturn(func(_ context.Context, opts iaas.CreateVolumePayload) (*iaas.Volume, error) {
 						Expect(opts.Source.Id).To(Equal("volume-source-id"))
 						Expect(opts.Source.Type).To(Equal("volume"))
 
@@ -945,7 +945,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+					DoAndReturn(func(_ context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 						Expect(payload.Labels).To(Equal(map[string]any{
 							sharedcsi.VolSnapshotNameKey:        "snapshot-name",
 							sharedcsi.VolSnapshotNamespaceKey:   "snapshot-namespace",
