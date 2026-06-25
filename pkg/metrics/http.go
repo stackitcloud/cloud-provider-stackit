@@ -10,13 +10,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func NewInstrumentedHTTPClient(api string) (*http.Client, error) {
+func NewInstrumentedHTTPClient(api string) *http.Client {
 	return &http.Client{
 		Transport: &InstrumentedRoundTripper{
 			api:  api,
 			base: http.DefaultTransport,
 		},
-	}, nil
+	}
 }
 
 type InstrumentedRoundTripper struct {
