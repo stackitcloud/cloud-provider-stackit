@@ -105,13 +105,17 @@ var _ = Describe("Mount helpers", func() {
 			Expect(count).To(Equal(int64(1)))
 		})
 
-		It("ignores block metadata for other CSI drivers", func() {
+		It("filters block metadata by CSI driver", func() {
 			csiPluginDir := GinkgoT().TempDir()
 			mustWriteVolumeMetadata(csiPluginDir, "block-volume-a", "other.csi.example")
 
 			count, err := countLocalCSIVolumesAt(csiPluginDir, "block-storage.csi.stackit.cloud")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(BeZero())
+
+			count, err = countLocalCSIVolumesAt(csiPluginDir, "other.csi.example")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(1)))
 		})
 
 		It("skips malformed or unreadable block metadata files", func() {

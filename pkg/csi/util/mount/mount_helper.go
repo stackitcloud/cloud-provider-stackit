@@ -58,7 +58,6 @@ func countFreePCIeSlotsAt(devicesPath string) (int64, error) {
 	return freePCIeSlots, nil
 }
 
-//nolint:unparam // driverName is always the same when running the linter on macOS but different on linux
 func countLocalCSIVolumesAt(csiPluginDir, driverName string) (int64, error) {
 	driverPluginDir := filepath.Join(csiPluginDir, driverName)
 
