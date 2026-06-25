@@ -59,6 +59,8 @@ type stackitParameterConfig struct {
 
 const (
 	blockStorageCSIClusterIDKey = "block-storage.csi.stackit.cloud/cluster" //nolint:unused // for later use
+	snapshotTypeSnapshot        = "snapshot"
+	snapshotTypeBackup          = "backup"
 )
 
 func (cs *controllerServer) validateVolumeCapabilities(req []*csi.VolumeCapability) error {
@@ -509,7 +511,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	// Set snapshot type to 'snapshot' by default
 	if snapshotType == "" {
-		snapshotType = "snapshot"
+		snapshotType = snapshotTypeSnapshot
 	}
 
 	if name == "" {
@@ -521,12 +523,12 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	// Verify snapshot type has a valid value
-	if snapshotType != "snapshot" && snapshotType != "backup" {
+	if snapshotType != snapshotTypeSnapshot && snapshotType != snapshotTypeBackup {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot type must be 'backup', 'snapshot' or not defined")
 	}
 
 	// Prechecks in case of a backup
-	if snapshotType == "backup" {
+	if snapshotType == snapshotTypeBackup {
 		// Get a list of backups with the provided name
 		backups, err = cloud.ListBackups(ctx, filters)
 		if err != nil {
@@ -584,7 +586,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	// Early exit
-	if snapshotType == "snapshot" {
+	if snapshotType == snapshotTypeSnapshot {
 		return &csi.CreateSnapshotResponse{
 			Snapshot: &csi.Snapshot{
 				SnapshotId:     *snap.Id,

@@ -124,6 +124,7 @@ func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	})
 }
 
+//nolint:gocritic // Payload is passed by value to match the shared IaaSClient interface.
 func (i *iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.
@@ -336,6 +337,7 @@ func (i *iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, 
 	return *backup.Status == backupReadyStatus, nil
 }
 
+//nolint:gocritic // Payload is passed by value to match the shared IaaSClient interface.
 func (i *iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
 
