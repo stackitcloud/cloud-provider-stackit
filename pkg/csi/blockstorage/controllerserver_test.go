@@ -10,7 +10,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
