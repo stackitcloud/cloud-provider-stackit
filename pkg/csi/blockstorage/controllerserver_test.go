@@ -10,6 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
@@ -672,6 +673,25 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should return resource exhausted when node cannot attach more disks", func() {
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "fake",
+				NodeId:           "fake",
+				VolumeCapability: stdVolCap,
+			}
+			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{}, nil)
+			iaasClient.EXPECT().GetServer(gomock.Any(), req.NodeId).Return(&iaas.Server{}, nil)
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return("", &oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusForbidden,
+				Body:       []byte("maximum allowed number of disk devices"),
+			})
+
+			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
+			Expect(err).To(HaveOccurred())
+			Expect(status.Code(err)).To(Equal(codes.ResourceExhausted))
+			Expect(status.Convert(err).Message()).To(ContainSubstring("Node can't accept any more volumes"))
 		})
 	})
 	Describe("ControllerUnpublishVolume", func() {
