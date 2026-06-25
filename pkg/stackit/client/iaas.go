@@ -23,6 +23,7 @@ type iaasClient struct {
 
 type IaaSClient interface {
 	GetServer(ctx context.Context, serverID string) (*iaas.Server, error)
+	GetServerWithDetails(ctx context.Context, serverID string) (*iaas.Server, error)
 	ListServers(ctx context.Context) (*[]iaas.Server, error)
 
 	CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
@@ -108,6 +109,12 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 }
 
 func (i *iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
+	return withResponseID(ctx, func(ctx context.Context) (*iaas.Server, error) {
+		return i.Client.GetServer(ctx, i.projectID, i.region, serverID).Execute()
+	})
+}
+
+func (i *iaasClient) GetServerWithDetails(ctx context.Context, serverID string) (*iaas.Server, error) {
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.Server, error) {
 		return i.Client.GetServer(ctx, i.projectID, i.region, serverID).Details(true).Execute()
 	})
