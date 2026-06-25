@@ -58,7 +58,7 @@ type stackitParameterConfig struct {
 }
 
 const (
-	blockStorageCSIClusterIDKey = "block-storage.csi.stackit.cloud/cluster" //nolint:unused // for later use
+	blockStorageCSIClusterIDKey = "block-storage.csi.stackit.cloud/cluster"
 	snapshotTypeSnapshot        = "snapshot"
 	snapshotTypeBackup          = "backup"
 )
