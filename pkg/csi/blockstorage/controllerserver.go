@@ -372,6 +372,9 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 	_, err = cloud.AttachVolume(ctx, instanceID, volumeID, payload)
 	if err != nil {
+		if stackiterrors.IsTooManyDevicesError(err) {
+			return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
+		}
 		klog.Errorf("Failed to AttachVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error %v", err)
 	}
