@@ -466,6 +466,45 @@ func (c *MockIaaSClientGetServerCall) DoAndReturn(f func(context.Context, string
 	return c
 }
 
+// GetServerWithDetails mocks base method.
+func (m *MockIaaSClient) GetServerWithDetails(ctx context.Context, serverID string) (*v2api.Server, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerWithDetails", ctx, serverID)
+	ret0, _ := ret[0].(*v2api.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServerWithDetails indicates an expected call of GetServerWithDetails.
+func (mr *MockIaaSClientMockRecorder) GetServerWithDetails(ctx, serverID any) *MockIaaSClientGetServerWithDetailsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerWithDetails", reflect.TypeOf((*MockIaaSClient)(nil).GetServerWithDetails), ctx, serverID)
+	return &MockIaaSClientGetServerWithDetailsCall{Call: call}
+}
+
+// MockIaaSClientGetServerWithDetailsCall wrap *gomock.Call
+type MockIaaSClientGetServerWithDetailsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetServerWithDetailsCall) Return(arg0 *v2api.Server, arg1 error) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetServerWithDetailsCall) Do(f func(context.Context, string) (*v2api.Server, error)) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetServerWithDetailsCall) DoAndReturn(f func(context.Context, string) (*v2api.Server, error)) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetSnapshot mocks base method.
 func (m *MockIaaSClient) GetSnapshot(ctx context.Context, snapshotID string) (*v2api.Snapshot, error) {
 	m.ctrl.T.Helper()
