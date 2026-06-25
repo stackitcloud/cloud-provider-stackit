@@ -4,6 +4,15 @@ import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 )
 
+func LabelsFromTags(tags map[string]string) map[string]any {
+	l := make(map[string]any, len(tags))
+	for key, value := range tags {
+		l[key] = value
+	}
+
+	return l
+}
+
 func FilterVolumes(volumes []iaas.Volume, filters map[string]string) []iaas.Volume {
 	filteredVolumes := make([]iaas.Volume, 0)
 
