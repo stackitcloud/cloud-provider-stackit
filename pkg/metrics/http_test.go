@@ -40,8 +40,7 @@ var _ = Describe("Metrics", func() {
 			}
 			before := testutil.ToFloat64(HTTPRequestCount.With(labels))
 
-			client, err := NewInstrumentedHTTPClient("test")
-			Expect(err).NotTo(HaveOccurred())
+			client := NewInstrumentedHTTPClient("test")
 
 			response, err := client.Get(server.URL + "/request-count-test")
 			Expect(err).NotTo(HaveOccurred())
@@ -63,8 +62,7 @@ var _ = Describe("Metrics", func() {
 			}
 			before := histogramSampleCount(HTTPRequestDurationHistogram.With(labels))
 
-			client, err := NewInstrumentedHTTPClient("test")
-			Expect(err).NotTo(HaveOccurred())
+			client := NewInstrumentedHTTPClient("test")
 
 			response, err := client.Get(server.URL + "/request-duration-test")
 			Expect(err).NotTo(HaveOccurred())
@@ -107,8 +105,7 @@ var _ = Describe("Metrics", func() {
 			before404 := testutil.ToFloat64(HTTPErrorCount.With(labels404))
 			before500 := testutil.ToFloat64(HTTPErrorCount.With(labels500))
 
-			client, err := NewInstrumentedHTTPClient("test")
-			Expect(err).NotTo(HaveOccurred())
+			client := NewInstrumentedHTTPClient("test")
 
 			response1, err := client.Get(server.URL)
 			Expect(err).NotTo(HaveOccurred())
@@ -145,8 +142,7 @@ var _ = Describe("Metrics", func() {
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
-			client, err := NewInstrumentedHTTPClient("test")
-			Expect(err).NotTo(HaveOccurred())
+			client := NewInstrumentedHTTPClient("test")
 
 			response, err := client.Get(server.URL)
 			Expect(err).NotTo(HaveOccurred())
