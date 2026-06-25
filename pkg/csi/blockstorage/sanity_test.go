@@ -81,7 +81,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(
 				gomock.Any(), // context
 				gomock.Any(), // create options
-			).DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, opts iaas.CreateVolumePayload) (*iaas.Volume, error) {
 				size := opts.Size
 				if size == nil {
 					size = new(int64(10)) // Default to 10GiB
@@ -162,7 +162,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().CreateSnapshot(
 				gomock.Any(), // context
 				gomock.Any(), // payload
-			).DoAndReturn(func(_ context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+			).DoAndReturn(func(_ context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
 					Id:        new(uuid.New().String()),
 					Name:      payload.Name,

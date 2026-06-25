@@ -25,7 +25,7 @@ type IaaSClient interface {
 	GetServer(ctx context.Context, serverID string) (*iaas.Server, error)
 	ListServers(ctx context.Context) (*[]iaas.Server, error)
 
-	CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
+	CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error)
 	ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error)
 	DeleteSnapshot(ctx context.Context, snapshotID string) error
 	GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error)
@@ -37,7 +37,7 @@ type IaaSClient interface {
 	GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error)
 	WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error)
 
-	CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error)
+	CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error)
 	DeleteVolume(ctx context.Context, volumeID string) error
 	AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error)
 	DetachVolume(ctx context.Context, serverID, volumeID string) error
@@ -124,11 +124,11 @@ func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 	})
 }
 
-func (i *iaasClient) CreateSnapshot(ctx context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+func (i *iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.
 			CreateSnapshot(ctx, i.projectID, i.region).
-			CreateSnapshotPayload(*payload).
+			CreateSnapshotPayload(payload).
 			Execute()
 	})
 }
@@ -336,11 +336,11 @@ func (i *iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, 
 	return *backup.Status == backupReadyStatus, nil
 }
 
-func (i *iaasClient) CreateVolume(ctx context.Context, payload *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+func (i *iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
 
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.Volume, error) {
-		return i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(*payload).Execute()
+		return i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(payload).Execute()
 	})
 }
 

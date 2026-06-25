@@ -260,7 +260,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	vol, err := cloud.CreateVolume(ctx, opts)
+	vol, err := cloud.CreateVolume(ctx, *opts)
 	if err != nil {
 		klog.Errorf("Failed to CreateVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "CreateVolume failed with error %v", err)
@@ -691,7 +691,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 		payload.Labels = stackitclient.LabelsFromTags(properties)
 	}
 
-	snap, err := cs.Instance.CreateSnapshot(ctx, payload)
+	snap, err := cs.Instance.CreateSnapshot(ctx, *payload)
 	if err != nil {
 		klog.Errorf("Failed to Create snapshot: %v", err)
 		return nil, status.Errorf(codes.Internal, "CreateSnapshot failed with error %v", err)
