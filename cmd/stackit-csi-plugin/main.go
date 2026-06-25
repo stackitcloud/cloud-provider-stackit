@@ -25,7 +25,7 @@ var (
 	provideControllerService bool
 	provideNodeService       bool
 	legacyStorageMode        bool
-	blockVolumeCreation      bool
+	legacyVolumeCreation     bool
 )
 
 func main() {
@@ -76,7 +76,7 @@ func main() {
 		"If set to true then the CSI driver does provide the node service (default: true)")
 	cmd.PersistentFlags().BoolVar(&legacyStorageMode, "legacy-storage-mode", false,
 		"Configures the CSI to listen to the legacy storage driverName cinder.csi.openstack.org instead")
-	cmd.PersistentFlags().BoolVar(&blockVolumeCreation, "block-volume-creation", false, "Block volume creation")
+	cmd.PersistentFlags().BoolVar(&legacyVolumeCreation, "legacy-volume-creation", true, "Enable or disable support for creating volumes with the old driverName (cinder.csi.openstack.org)")
 
 	stackit.AddExtraFlags(pflag.CommandLine)
 
@@ -96,7 +96,7 @@ func handle() {
 		driverOpts.LegacyDriverName = true
 	}
 
-	if blockVolumeCreation {
+	if !legacyVolumeCreation {
 		driverOpts.BlockVolumeCreation = true
 	}
 
