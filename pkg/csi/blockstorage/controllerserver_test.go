@@ -10,6 +10,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	sharedcsi "github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util"
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
@@ -921,6 +922,39 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
 				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).Return(expectedSnap, nil)
 				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
+				_, err := fakeCs.CreateSnapshot(context.Background(), req)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			It("should pass recognized snapshotter metadata when creating snapshots", func() {
+				req.Parameters = map[string]string{
+					stackitclient.SnapshotType:          "snapshot",
+					sharedcsi.VolSnapshotNameKey:        "snapshot-name",
+					sharedcsi.VolSnapshotNamespaceKey:   "snapshot-namespace",
+					sharedcsi.VolSnapshotContentNameKey: "snapshot-content",
+					"ignored":                           "value",
+				}
+
+				expectedSnap := &iaas.Snapshot{
+					Id:        new("fake-snapshot"),
+					Name:      new("fake-snapshot45"),
+					VolumeId:  "fake",
+					Status:    new("AVAILABLE"),
+					Size:      new(int64(10)),
+					CreatedAt: new(time.Now()),
+				}
+
+				iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{}, "", nil)
+				iaasClient.EXPECT().CreateSnapshot(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, payload *iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
+						Expect(payload.Labels).To(Equal(map[string]any{
+							sharedcsi.VolSnapshotNameKey:        "snapshot-name",
+							sharedcsi.VolSnapshotNamespaceKey:   "snapshot-namespace",
+							sharedcsi.VolSnapshotContentNameKey: "snapshot-content",
+						}))
+						return expectedSnap, nil
+					})
+				iaasClient.EXPECT().WaitSnapshotReady(gomock.Any(), "fake-snapshot").Return(expectedSnap.Status, nil)
+
 				_, err := fakeCs.CreateSnapshot(context.Background(), req)
 				Expect(err).ToNot(HaveOccurred())
 			})

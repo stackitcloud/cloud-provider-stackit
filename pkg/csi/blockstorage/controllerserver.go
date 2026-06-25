@@ -380,6 +380,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 	_, err = cloud.AttachVolume(ctx, instanceID, volumeID, payload)
 	if err != nil {
+		// Trigger's an immediate `NodeGetInfo` RPC call when MutableCSINodeAllocatableCount is enabled
 		if stackiterrors.IsTooManyDevicesError(err) {
 			return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
 		}
@@ -563,7 +564,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	// Create the snapshot if the backup does not already exist and wait for it to be ready
 	if !backupAlreadyExists {
-		snap, err = cs.createSnapshot(ctx, name, volumeID)
+		snap, err = cs.createSnapshot(ctx, name, volumeID, req.Parameters)
 		if err != nil {
 			return nil, err
 		}
@@ -639,7 +640,7 @@ func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}, nil
 }
 
-func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string) (*iaas.Snapshot, error) { //nolint:lll // looks weird when shortened
+func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID string, parameters map[string]string) (*iaas.Snapshot, error) {
 	filters := map[string]string{}
 	filters["Name"] = name
 
@@ -674,7 +675,14 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
 	properties := map[string]string{}
 
-	// TODO: Add support for sharedcsi.RecognizedCSISnapshotterParams later.
+	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
+	// Also, we don't want to tag every param, but we do honor the RecognizedCSISnapshotterParams
+	for _, mKey := range sharedcsi.RecognizedCSISnapshotterParams {
+		if v, ok := parameters[mKey]; ok {
+			properties[mKey] = v
+		}
+	}
+
 	payload := &iaas.CreateSnapshotPayload{
 		Name:     new(name),
 		VolumeId: volumeID,
