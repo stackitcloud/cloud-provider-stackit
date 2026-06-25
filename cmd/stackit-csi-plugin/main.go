@@ -127,10 +127,7 @@ func handle(ctx context.Context) {
 			klog.Fatal(err)
 		}
 
-		iaasHTTPClient, err := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
-		if err != nil {
-			klog.Fatalf("create IaaS metrics HTTP client: %v", err)
-		}
+		iaasHTTPClient := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
 		iaasOpts := []sdkconfig.ConfigurationOption{
 			sdkconfig.WithHTTPClient(iaasHTTPClient),
 		}
