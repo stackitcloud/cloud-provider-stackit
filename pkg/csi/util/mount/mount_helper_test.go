@@ -114,6 +114,20 @@ var _ = Describe("Mount helpers", func() {
 			Expect(count).To(BeZero())
 		})
 
+		It("counts volumes for a non-default CSI driver name", func() {
+			csiPluginDir := GinkgoT().TempDir()
+			driverName := "other.csi.example"
+			driverPluginDir := filepath.Join(csiPluginDir, driverName)
+
+			mustMkdirAll(filepath.Join(driverPluginDir, "volume-a", globalMountDir))
+			mustWriteVolumeMetadata(csiPluginDir, "block-volume-a", driverName)
+			mustWriteVolumeMetadata(csiPluginDir, "block-volume-b", "block-storage.csi.stackit.cloud")
+
+			count, err := countLocalCSIVolumesAt(csiPluginDir, driverName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(int64(2)))
+		})
+
 		It("skips malformed or unreadable block metadata files", func() {
 			csiPluginDir := GinkgoT().TempDir()
 			mustWriteVolumeMetadata(csiPluginDir, "good-volume", "block-storage.csi.stackit.cloud")
