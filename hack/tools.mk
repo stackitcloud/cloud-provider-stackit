@@ -13,7 +13,7 @@ MOCKGEN_VERSION ?= v0.6.0
 # renovate: datasource=github-releases depName=chainguard-dev/apko
 APKO_VERSION ?= v1.2.19
 # renovate: datasource=github-releases depName=ko-build/ko
-KO_VERSION ?= v0.18.1
+KO_VERSION ?= v0.19.0
 
 KUBERNETES_TEST_VERSION ?= v1.33.5
 
