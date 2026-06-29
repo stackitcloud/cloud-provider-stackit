@@ -32,7 +32,7 @@ require (
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 )
 
-replace k8s.io/cloud-provider => github.com/stackitcloud/cloud-provider v0.36.0-ske-1
+replace k8s.io/cloud-provider => github.com/stackitcloud/cloud-provider v0.36.0-ske-2
 
 require (
 	cel.dev/expr v0.25.1 // indirect
