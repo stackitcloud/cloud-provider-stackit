@@ -31,12 +31,17 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	response, err := rt.base.RoundTrip(request)
 	duration := time.Since(startTime)
 
+	statusCode := ""
+	if response != nil {
+		statusCode = strconv.Itoa(response.StatusCode)
+	}
+
 	HTTPRequestDurationHistogram.
 		With(prometheus.Labels{
 			apiLabel:       rt.api,
 			methodLabel:    request.Method,
 			operationLabel: operation,
-			codeLabel:      strconv.Itoa(response.StatusCode),
+			codeLabel:      statusCode,
 		}).
 		Observe(float64(duration.Seconds()))
 	HTTPRequestCount.
@@ -44,7 +49,7 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 			apiLabel:       rt.api,
 			methodLabel:    request.Method,
 			operationLabel: operation,
-			codeLabel:      strconv.Itoa(response.StatusCode),
+			codeLabel:      statusCode,
 		}).
 		Inc()
 
@@ -53,7 +58,7 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 			apiLabel:       rt.api,
 			methodLabel:    request.Method,
 			operationLabel: operation,
-			codeLabel:      strconv.Itoa(response.StatusCode),
+			codeLabel:      statusCode,
 		}).Inc()
 	}
 
