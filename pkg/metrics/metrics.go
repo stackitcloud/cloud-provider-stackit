@@ -8,7 +8,7 @@ const (
 	cloudProviderMetricPrefix = "cloud_provider_stackit"
 	apiLabel                  = "api"
 	methodLabel               = "method"
-	codeLabel                 = "code"
+	codeLabel                 = "status_code"
 	operationLabel            = "op"
 
 	APINameLoadBalancer = "loadbalancer"
