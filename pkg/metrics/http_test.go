@@ -36,7 +36,9 @@ var _ = Describe("Metrics", func() {
 
 			labels := prometheus.Labels{
 				apiLabel:       "test",
+				methodLabel:    "GET",
 				operationLabel: "get_request-count-test",
+				codeLabel:      "200",
 			}
 			before := testutil.ToFloat64(HTTPRequestCount.With(labels))
 
@@ -58,7 +60,9 @@ var _ = Describe("Metrics", func() {
 
 			labels := prometheus.Labels{
 				apiLabel:       "test",
+				methodLabel:    "GET",
 				operationLabel: "get_request-duration-test",
+				codeLabel:      "200",
 			}
 			before := histogramSampleCount(HTTPRequestDurationHistogram.With(labels))
 
@@ -87,19 +91,22 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels400 := prometheus.Labels{
-				apiLabel:    "test",
-				methodLabel: http.MethodGet,
-				codeLabel:   "400",
+				apiLabel:       "test",
+				methodLabel:    http.MethodGet,
+				operationLabel: "get_",
+				codeLabel:      "400",
 			}
 			labels404 := prometheus.Labels{
-				apiLabel:    "test",
-				methodLabel: http.MethodGet,
-				codeLabel:   "404",
+				apiLabel:       "test",
+				methodLabel:    http.MethodGet,
+				operationLabel: "get_404",
+				codeLabel:      "404",
 			}
 			labels500 := prometheus.Labels{
-				apiLabel:    "test",
-				methodLabel: http.MethodPost,
-				codeLabel:   "500",
+				apiLabel:       "test",
+				methodLabel:    http.MethodPost,
+				operationLabel: "post_",
+				codeLabel:      "500",
 			}
 			before400 := testutil.ToFloat64(HTTPErrorCount.With(labels400))
 			before404 := testutil.ToFloat64(HTTPErrorCount.With(labels404))
@@ -136,9 +143,10 @@ var _ = Describe("Metrics", func() {
 			defer server.Close()
 
 			labels := prometheus.Labels{
-				apiLabel:    "test",
-				methodLabel: http.MethodGet,
-				codeLabel:   "200",
+				apiLabel:       "test",
+				methodLabel:    http.MethodGet,
+				operationLabel: "get_",
+				codeLabel:      "200",
 			}
 			before := testutil.ToFloat64(HTTPErrorCount.With(labels))
 
