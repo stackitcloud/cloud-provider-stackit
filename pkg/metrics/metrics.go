@@ -21,14 +21,14 @@ var (
 		Name:        "http_requests_total",
 		Help:        "The number of requests to external APIs",
 		ConstLabels: nil,
-	}, []string{apiLabel, operationLabel})
+	}, []string{apiLabel, methodLabel, operationLabel, codeLabel})
 
 	HTTPErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   cloudProviderMetricPrefix,
 		Name:        "http_errors_total",
 		Help:        "Number of HTTP errors returned by external APIs",
 		ConstLabels: nil,
-	}, []string{apiLabel, methodLabel, codeLabel})
+	}, []string{apiLabel, methodLabel, operationLabel, codeLabel})
 
 	HTTPRequestDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   cloudProviderMetricPrefix,
@@ -36,7 +36,7 @@ var (
 		Help:        "The response times of external API requests",
 		ConstLabels: nil,
 		Buckets:     nil,
-	}, []string{apiLabel, operationLabel})
+	}, []string{apiLabel, methodLabel, operationLabel, codeLabel})
 )
 
 type Exporter struct {
