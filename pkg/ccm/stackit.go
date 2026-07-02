@@ -117,8 +117,9 @@ func BuildObservability() (*MetricsRemoteWrite, error) {
 
 // NewCloudControllerManager creates a new instance of the stackit struct from a stackitconfig struct
 func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteWrite) (*CloudControllerManager, error) {
+	lbHTTPClient := metrics.NewInstrumentedHTTPClient(metrics.APINameLoadBalancer)
 	lbOpts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
+		sdkconfig.WithHTTPClient(lbHTTPClient),
 	}
 
 	if cfg.Global.APIEndpoints.LoadBalancerAPI != "" {
@@ -138,8 +139,9 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 		return nil, fmt.Errorf("failed to create lb client: %v", err)
 	}
 
+	iaasHTTPClient := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
 	iaasOpts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
+		sdkconfig.WithHTTPClient(iaasHTTPClient),
 	}
 
 	if cfg.Global.APIEndpoints.IaasAPI != "" {

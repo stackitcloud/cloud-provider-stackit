@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
 
@@ -21,7 +27,7 @@ var (
 	endpoint                 string
 	cloudConfig              string
 	cluster                  string
-	httpEndpoint             string
+	metricsAddress           string
 	provideControllerService bool
 	provideNodeService       bool
 	legacyStorageMode        bool
@@ -33,7 +39,10 @@ func main() {
 		Use:   "stackit-csi-plugin",
 		Short: "STACKIT block-storage CSI plugin",
 		Run: func(_ *cobra.Command, _ []string) {
-			handle()
+			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+			defer cancel()
+
+			handle(ctx)
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			f := cmd.Flags()
@@ -66,7 +75,7 @@ func main() {
 	cmd.Flags().StringVar(&cloudConfig, "cloud-config", "", "CSI driver cloud config. This option can be given multiple times")
 
 	cmd.PersistentFlags().StringVar(&cluster, "cluster", "", "The identifier of the cluster that the plugin is running in.")
-	cmd.PersistentFlags().StringVar(&httpEndpoint, "http-endpoint", "",
+	cmd.PersistentFlags().StringVar(&metricsAddress, "metrics-address", "",
 		"The TCP network address where the HTTP server for providing metrics for diagnostics, will listen (example: `:8080`)."+
 			"The default is empty string, which means the server is disabled.")
 
@@ -84,7 +93,16 @@ func main() {
 	os.Exit(code)
 }
 
-func handle() {
+func handle(ctx context.Context) {
+	if metricsAddress != "" {
+		metricsExporter := metrics.NewExporter()
+		prometheus.MustRegister(metricsExporter)
+		go func() {
+			if err := metrics.Run(ctx, metricsAddress); err != nil {
+				klog.Fatalf("Run metrics returned an error: %v", err)
+			}
+		}()
+	}
 	// Initialize cloud
 	driverOpts := &blockstorage.DriverOpts{
 		Endpoint:  endpoint,
@@ -109,7 +127,12 @@ func handle() {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIaaSClient(&cfg)
+		iaasHTTPClient := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
+		iaasOpts := []sdkconfig.ConfigurationOption{
+			sdkconfig.WithHTTPClient(iaasHTTPClient),
+		}
+
+		iaasClient, err := stackit.CreateIaaSClient(&cfg, iaasOpts...)
 		if err != nil {
 			klog.Fatalf("Failed to create IaaS client: %v", err)
 		}
