@@ -31,35 +31,26 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	response, err := rt.base.RoundTrip(request)
 	duration := time.Since(startTime)
 
-	statusCode := ""
+	statusCode := "network_error"
 	if response != nil {
 		statusCode = strconv.Itoa(response.StatusCode)
 	}
 
-	HTTPRequestDurationHistogram.
-		With(prometheus.Labels{
-			apiLabel:       rt.api,
-			methodLabel:    request.Method,
-			operationLabel: operation,
-			codeLabel:      statusCode,
-		}).
-		Observe(float64(duration.Seconds()))
-	HTTPRequestCount.
-		With(prometheus.Labels{
-			apiLabel:       rt.api,
-			methodLabel:    request.Method,
-			operationLabel: operation,
-			codeLabel:      statusCode,
-		}).
-		Inc()
+	labels := prometheus.Labels{
+		apiLabel:       rt.api,
+		methodLabel:    request.Method,
+		operationLabel: operation,
+		codeLabel:      statusCode,
+	}
 
-	if response != nil && response.StatusCode >= 400 {
-		HTTPErrorCount.With(prometheus.Labels{
-			apiLabel:       rt.api,
-			methodLabel:    request.Method,
-			operationLabel: operation,
-			codeLabel:      statusCode,
-		}).Inc()
+	HTTPRequestDurationHistogram.With(labels).Observe(duration.Seconds())
+	HTTPRequestCount.With(labels).Inc()
+
+	isHTTPError := response != nil && response.StatusCode >= 400
+	isNetworkError := err != nil
+
+	if isHTTPError || isNetworkError {
+		HTTPErrorCount.With(labels).Inc()
 	}
 
 	return response, err
