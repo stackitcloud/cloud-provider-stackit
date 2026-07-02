@@ -12,16 +12,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	. "github.com/onsi/ginkgo/v2"
-	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
-	mountutils "k8s.io/mount-utils"
-	exec "k8s.io/utils/exec/testing"
-
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	stackitclientmock "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client/mock"
+	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
+	mountutils "k8s.io/mount-utils"
+	exec "k8s.io/utils/exec/testing"
 )
 
 var _ = Describe("CSI sanity test", Ordered, func() {
@@ -29,7 +29,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 		var (
 			driver         *Driver
 			opts           *DriverOpts
-			iaasClient     *stackit.MockIaasClient
+			iaasClient     *stackitclientmock.MockIaaSClient
 			mountMock      *mount.MockIMount
 			metadataMock   *metadata.MockIMetadata
 			FakeEndpoint   string
@@ -57,7 +57,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				})
 
 			// --- Initialize Mocks ---
-			iaasClient = stackit.NewMockIaasClient(ctrl)
+			iaasClient = stackitclientmock.NewMockIaaSClient(ctrl)
 			mountMock = mount.NewMockIMount(ctrl)
 			metadataMock = metadata.NewMockIMetadata(ctrl)
 
@@ -81,7 +81,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			iaasClient.EXPECT().CreateVolume(
 				gomock.Any(), // context
 				gomock.Any(), // create options
-			).DoAndReturn(func(_ context.Context, opts *iaas.CreateVolumePayload) (*iaas.Volume, error) {
+			).DoAndReturn(func(_ context.Context, opts iaas.CreateVolumePayload) (*iaas.Volume, error) {
 				size := opts.Size
 				if size == nil {
 					size = new(int64(10)) // Default to 10GiB
@@ -90,7 +90,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					Id:               new(uuid.New().String()), // Create a random ID
 					Name:             opts.Name,
 					Size:             size,
-					Status:           new(stackit.VolumeAvailableStatus),
+					Status:           new(stackitclient.VolumeAvailableStatus),
 					AvailabilityZone: opts.AvailabilityZone,
 					Source:           opts.Source,
 				}
@@ -161,23 +161,21 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			iaasClient.EXPECT().CreateSnapshot(
 				gomock.Any(), // context
-				gomock.Any(), // name
-				gomock.Any(), // volID
-				gomock.Any(), // tags
-			).DoAndReturn(func(_ context.Context, name string, volID string, _ map[string]string) (*iaas.Snapshot, error) {
+				gomock.Any(), // payload
+			).DoAndReturn(func(_ context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
 				newSnap := &iaas.Snapshot{
 					Id:        new(uuid.New().String()),
-					Name:      new(name),
-					Status:    new(stackit.SnapshotReadyStatus),
+					Name:      payload.Name,
+					Status:    new(stackitclient.SnapshotReadyStatus),
 					CreatedAt: new(time.Now()),
 					Size:      new(int64(10)), // 10 GiB
-					VolumeId:  volID,
+					VolumeId:  payload.VolumeId,
 				}
 				createdSnapshots[*newSnap.Id] = newSnap
 				return newSnap, nil
 			}).AnyTimes()
 
-			iaasClient.EXPECT().GetSnapshotByID(
+			iaasClient.EXPECT().GetSnapshot(
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
 			).DoAndReturn(func(_ context.Context, snapshotID string) (*iaas.Snapshot, error) {
@@ -249,7 +247,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // snapshotID
 			).Return(
-				new(string(stackit.SnapshotReadyStatus)),
+				new(stackitclient.SnapshotReadyStatus),
 				nil,
 			).AnyTimes()
 
@@ -274,7 +272,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				return newBackup, nil
 			}).AnyTimes()
 
-			iaasClient.EXPECT().GetBackupByID(
+			iaasClient.EXPECT().GetBackup(
 				gomock.Any(), // context
 				gomock.Any(), // backupID
 			).DoAndReturn(func(_ context.Context, backupID string) (*iaas.Backup, error) {
@@ -306,7 +304,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			// --- 4. Mock IaaS Client (Instances & Attach/Detach) ---
 
-			iaasClient.EXPECT().GetInstanceByID(
+			iaasClient.EXPECT().GetServer(
 				gomock.Any(), // context
 				gomock.Any(), // instanceID
 			).DoAndReturn(func(_ context.Context, instanceID string) (*iaas.Server, error) {
@@ -324,7 +322,8 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // instanceID
 				gomock.Any(), // volumeID
-			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string) (string, error) {
+				gomock.Any(), // payload
+			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string, _ iaas.AddVolumeToServerPayload) (string, error) {
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
 					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
