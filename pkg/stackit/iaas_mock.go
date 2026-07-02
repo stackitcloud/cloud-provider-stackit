@@ -383,7 +383,7 @@ func (mr *MockIaasClientMockRecorder) WaitSnapshotReady(ctx, snapshotID any) *go
 }
 
 // WaitVolumeTargetStatus mocks base method.
-func (m *MockIaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+func (m *MockIaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string, tSize int64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitVolumeTargetStatus", ctx, volumeID, tStatus)
 	ret0, _ := ret[0].(error)

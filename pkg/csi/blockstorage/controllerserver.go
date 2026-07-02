@@ -963,10 +963,10 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	// we need wait for the volume to be available or InUse, it might be error_extending in some scenario
 	targetStatus := []string{stackit.VolumeAvailableStatus, stackit.VolumeAttachedStatus}
-	err = cloud.WaitVolumeTargetStatus(ctx, volumeID, targetStatus)
+	err = cloud.WaitVolumeTargetStatus(ctx, volumeID, targetStatus, volSizeGB)
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", volumeID, err)
-		return nil, status.Errorf(codes.Internal, "[ControllerExpandVolume] Volume %s not in target state after resize operation: %v", volumeID, err)
+		return nil, status.Errorf(codes.Internal, "[ControllerExpandVolume] Volume %s not in target state or size after resize operation: %v", volumeID, err)
 	}
 
 	klog.V(4).Infof("ControllerExpandVolume resized volume %v to size %v", volumeID, volSizeGB)
