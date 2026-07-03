@@ -1,0 +1,19 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        image-credential-provider-bin-dir: "/opt/credential-providers" 
+        image-credential-provider-config: "/etc/credential-provider-config.yaml"
+  extraMounts:
+  - hostPath: ../bin
+    containerPath: /opt/credential-providers
+  - hostPath: ./credential-provider-config.yaml
+    containerPath: /etc/credential-provider-config.yaml
+  - hostPath: ../../../secrets
+    containerPath: /stackit
+

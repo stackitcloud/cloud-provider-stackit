@@ -1,0 +1,10 @@
+# https://kubernetes.io/docs/concepts/workloads/pods/
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "nginx"
+spec:
+  containers:
+  - name: nginx
+    image: "registry.onstackit.cloud/credential-provider/nginx"
+
