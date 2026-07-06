@@ -766,32 +766,50 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	cloud := cs.Instance
 
 	snapshotID := req.GetSnapshotId()
+
 	if snapshotID != "" {
+		// 1. Try Snapshot
 		snap, err := cloud.GetSnapshot(ctx, snapshotID)
-		if err != nil {
-			if stackiterrors.IsNotFound(err) {
-				klog.V(3).Infof("Snapshot %s not found", snapshotID)
+		if err != nil && !stackiterrors.IsNotFound(err) {
+			return nil, status.Errorf(codes.Internal, "Failed to ListSnapshots() with ID:%s and type=snapshot err: %v", snapshotID, err)
+		}
+
+		// 2. If found as Snapshot, process and return
+		if err == nil {
+			entries := convertToCSIPointers([]*iaas.Snapshot{snap},
+				func(s *iaas.Snapshot) *string { return s.Id },
+				func(s *iaas.Snapshot) *int64 { return s.Size },
+				func(s *iaas.Snapshot) string { return s.VolumeId },
+				func(s *iaas.Snapshot) *time.Time { return s.CreatedAt },
+			)
+			return &csi.ListSnapshotsResponse{Entries: entries}, entries[0].Snapshot.CreationTime.CheckValid()
+		}
+
+		// 3. Fallback to Backup
+		klog.V(3).Infof("ID %s not found as Snapshot, checking Backups...", snapshotID)
+		backup, bErr := cloud.GetBackup(ctx, snapshotID)
+
+		if bErr != nil {
+			if stackiterrors.IsNotFound(bErr) {
+				klog.V(3).Infof("ID %s not found as Backup either", snapshotID)
 				return &csi.ListSnapshotsResponse{}, nil
 			}
-			return nil, status.Errorf(codes.Internal, "Failed to GetSnapshot %s: %v", snapshotID, err)
+			return nil, status.Errorf(codes.Internal, "Failed to ListSnapshots() with ID:%s and type=backup err: %v", snapshotID, err)
 		}
 
-		ctime := timestamppb.New(*snap.CreatedAt)
-
-		entry := &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      *snap.Size * util.GIBIBYTE,
-				SnapshotId:     *snap.Id,
-				SourceVolumeId: snap.VolumeId,
-				CreationTime:   ctime,
-				ReadyToUse:     true,
+		// 4. If found as Backup, process and return
+		entries := convertToCSIPointers([]*iaas.Backup{backup},
+			func(b *iaas.Backup) *string { return b.Id },
+			func(b *iaas.Backup) *int64 { return b.Size },
+			func(b *iaas.Backup) string {
+				if b.VolumeId == nil {
+					return ""
+				}
+				return *b.VolumeId
 			},
-		}
-
-		entries := []*csi.ListSnapshotsResponse_Entry{entry}
-		return &csi.ListSnapshotsResponse{
-			Entries: entries,
-		}, ctime.CheckValid()
+			func(b *iaas.Backup) *time.Time { return b.CreatedAt },
+		)
+		return &csi.ListSnapshotsResponse{Entries: entries}, entries[0].Snapshot.CreationTime.CheckValid()
 	}
 
 	filters := map[string]string{}
@@ -816,25 +834,34 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		return nil, status.Errorf(codes.Internal, "ListSnapshots failed with error %v", err)
 	}
 
-	sentries := make([]*csi.ListSnapshotsResponse_Entry, 0, len(slist))
-	for _, v := range slist {
-		ctime := timestamppb.New(*v.CreatedAt)
-		if err := ctime.CheckValid(); err != nil {
-			klog.Errorf("Error to convert time to timestamp: %v", err)
-		}
-		sentry := csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      *v.Size * util.GIBIBYTE,
-				SnapshotId:     *v.Id,
-				SourceVolumeId: v.VolumeId,
-				CreationTime:   ctime,
-				ReadyToUse:     true,
-			},
-		}
-		sentries = append(sentries, &sentry)
+	// Also list k8s object as type "backup"
+	backups, err := cloud.ListBackups(ctx, filters)
+	if err != nil {
+		klog.Errorf("Failed to ListBackups: %v", err)
+		return nil, status.Errorf(codes.Internal, "ListBackups failed with error %v", err)
 	}
+
+	// 5. Process and Combine both slices using the generic helper
+	snapshotEntries := convertToCSIPointers(slist,
+		func(s iaas.Snapshot) *string { return s.Id },
+		func(s iaas.Snapshot) *int64 { return s.Size },
+		func(s iaas.Snapshot) string { return s.VolumeId }, // Direct string
+		func(s iaas.Snapshot) *time.Time { return s.CreatedAt },
+	)
+
+	backupEntries := convertToCSIPointers(backups,
+		func(b iaas.Backup) *string { return b.Id },
+		func(b iaas.Backup) *int64 { return b.Size },
+		func(b iaas.Backup) string { // Safely handle *string
+			if b.VolumeId == nil {
+				return ""
+			}
+			return *b.VolumeId
+		},
+		func(b iaas.Backup) *time.Time { return b.CreatedAt },
+	)
 	return &csi.ListSnapshotsResponse{
-		Entries:   sentries,
+		Entries:   append(snapshotEntries, backupEntries...),
 		NextToken: nextPageToken,
 	}, nil
 }
@@ -1114,4 +1141,43 @@ func validateEncryptionConfig(volParams *stackitParameterConfig) error {
 		return errors.New("parameter kmsKeyVersion must be set for encrypted volumes")
 	}
 	return nil
+}
+
+// Helper function to convert a slice of items into CSI response entries
+// Generic helper that accepts a slice of any type T, and a mapper function
+// that extracts the necessary fields from T.
+func convertToCSIPointers[T any](
+	items []T,
+	getID func(T) *string,
+	getSize func(T) *int64,
+	getVolumeID func(T) string,
+	getCreatedAt func(T) *time.Time,
+) []*csi.ListSnapshotsResponse_Entry {
+	entries := make([]*csi.ListSnapshotsResponse_Entry, 0, len(items))
+	for _, v := range items {
+		idPtr := getID(v)
+		sizePtr := getSize(v)
+		createdPtr := getCreatedAt(v)
+
+		if idPtr == nil || sizePtr == nil || createdPtr == nil {
+			klog.Warning("Skipping malformed entry: missing required fields")
+			continue
+		}
+
+		ctime := timestamppb.New(*createdPtr)
+		if err := ctime.CheckValid(); err != nil {
+			klog.Errorf("Error converting time to timestamp for ID %s: %v", *idPtr, err)
+		}
+
+		entries = append(entries, &csi.ListSnapshotsResponse_Entry{
+			Snapshot: &csi.Snapshot{
+				SizeBytes:      *sizePtr * util.GIBIBYTE,
+				SnapshotId:     *idPtr,
+				SourceVolumeId: getVolumeID(v),
+				CreationTime:   ctime,
+				ReadyToUse:     true,
+			},
+		})
+	}
+	return entries
 }
