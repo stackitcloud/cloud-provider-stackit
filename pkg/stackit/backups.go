@@ -9,7 +9,7 @@ import (
 
 	"github.com/stackitcloud/stackit-sdk-go/core/runtime"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-	wait "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
+	"github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api/wait"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 )
@@ -99,7 +99,7 @@ func (os *iaasClient) ListBackups(ctx context.Context, filters map[string]string
 func (os *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
 	var httpResp *http.Response
 	ctxWithHTTPResp := runtime.WithCaptureHTTPResponse(ctx, &httpResp)
-	err := os.iaas.DeleteBackup(ctxWithHTTPResp, os.projectID, backupID, os.region).Execute()
+	err := os.iaas.DeleteBackup(ctxWithHTTPResp, os.projectID, os.region, backupID).Execute()
 	if err != nil {
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(wait.XRequestIDHeader)
