@@ -173,6 +173,7 @@ func sortNics(nics []iaas.ServerNetwork, defaultNetwork string) []iaas.ServerNet
 	})
 	// network not found
 	if idx == -1 {
+		klog.Infof("no NIC found for default network %s", defaultNetwork)
 		return nics
 	}
 	defaultNic := nics[idx]
