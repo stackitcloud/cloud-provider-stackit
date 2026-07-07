@@ -776,7 +776,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 		// 2. If found as Snapshot, process and return
 		if err == nil {
-			entries := convertToCSIPointers([]*iaas.Snapshot{snap},
+			entries := createListSnapshotResponseEntries([]*iaas.Snapshot{snap},
 				func(s *iaas.Snapshot) *string { return s.Id },
 				func(s *iaas.Snapshot) *int64 { return s.Size },
 				func(s *iaas.Snapshot) string { return s.VolumeId },
@@ -798,7 +798,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 
 		// 4. If found as Backup, process and return
-		entries := convertToCSIPointers([]*iaas.Backup{backup},
+		entries := createListSnapshotResponseEntries([]*iaas.Backup{backup},
 			func(b *iaas.Backup) *string { return b.Id },
 			func(b *iaas.Backup) *int64 { return b.Size },
 			func(b *iaas.Backup) string {
@@ -842,14 +842,14 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}
 
 	// 5. Process and Combine both slices using the generic helper
-	snapshotEntries := convertToCSIPointers(slist,
+	snapshotEntries := createListSnapshotResponseEntries(slist,
 		func(s iaas.Snapshot) *string { return s.Id },
 		func(s iaas.Snapshot) *int64 { return s.Size },
 		func(s iaas.Snapshot) string { return s.VolumeId }, // Direct string
 		func(s iaas.Snapshot) *time.Time { return s.CreatedAt },
 	)
 
-	backupEntries := convertToCSIPointers(backups,
+	backupEntries := createListSnapshotResponseEntries(backups,
 		func(b iaas.Backup) *string { return b.Id },
 		func(b iaas.Backup) *int64 { return b.Size },
 		func(b iaas.Backup) string { // Safely handle *string
@@ -1146,7 +1146,7 @@ func validateEncryptionConfig(volParams *stackitParameterConfig) error {
 // Helper function to convert a slice of items into CSI response entries
 // Generic helper that accepts a slice of any type T, and a mapper function
 // that extracts the necessary fields from T.
-func convertToCSIPointers[T any](
+func createListSnapshotResponseEntries[T any](
 	items []T,
 	getID func(T) *string,
 	getSize func(T) *int64,
