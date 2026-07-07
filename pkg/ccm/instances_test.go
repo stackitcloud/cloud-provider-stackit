@@ -95,7 +95,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get the instance when provider ID is there", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServerWithDetails(gomock.Any(), serverID).Return(&iaas.Server{
 				Name: "foo",
 			}, nil)
 
@@ -112,7 +112,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get the instance when old provider ID is there", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServerWithDetails(gomock.Any(), serverID).Return(&iaas.Server{
 				Name: "foo",
 			}, nil)
 
@@ -129,7 +129,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully get the instance when old regional provider ID is there", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServerWithDetails(gomock.Any(), serverID).Return(&iaas.Server{
 				Name: "foo",
 			}, nil)
 
@@ -157,7 +157,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("does not error when get server instance not found", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
+			nodeMockClient.EXPECT().GetServerWithDetails(gomock.Any(), serverID).Return(nil, &oapiError.GenericOpenAPIError{StatusCode: http.StatusNotFound})
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -191,7 +191,7 @@ var _ = Describe("Node Controller", func() {
 		})
 
 		It("successfully gets the instance status without provider ID", func() {
-			nodeMockClient.EXPECT().GetServer(gomock.Any(), serverID).Return(&iaas.Server{
+			nodeMockClient.EXPECT().GetServerWithDetails(gomock.Any(), serverID).Return(&iaas.Server{
 				Name:   "foo",
 				Status: new("ACTIVE"),
 			}, nil)

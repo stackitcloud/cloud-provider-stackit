@@ -237,7 +237,7 @@ func (i *Instances) getInstance(ctx context.Context, node *corev1.Node) (*iaas.S
 		return nil, fmt.Errorf("ProviderID \"%s\" didn't match supported region \"%s\"", node.Spec.ProviderID, i.region)
 	}
 
-	server, err := i.iaasClient.GetServer(ctx, instanceID)
+	server, err := i.iaasClient.GetServerWithDetails(ctx, instanceID)
 	if stackiterrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
