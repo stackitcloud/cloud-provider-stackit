@@ -15,6 +15,7 @@ import (
 
 	v2api "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	gomock "go.uber.org/mock/gomock"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 // MockIaaSClient is a mock of IaaSClient interface.
@@ -39,6 +40,391 @@ func NewMockIaaSClient(ctrl *gomock.Controller) *MockIaaSClient {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockIaaSClient) EXPECT() *MockIaaSClientMockRecorder {
 	return m.recorder
+}
+
+// AttachVolume mocks base method.
+func (m *MockIaaSClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload v2api.AddVolumeToServerPayload) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AttachVolume", ctx, serverID, volumeID, payload)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AttachVolume indicates an expected call of AttachVolume.
+func (mr *MockIaaSClientMockRecorder) AttachVolume(ctx, serverID, volumeID, payload any) *MockIaaSClientAttachVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachVolume", reflect.TypeOf((*MockIaaSClient)(nil).AttachVolume), ctx, serverID, volumeID, payload)
+	return &MockIaaSClientAttachVolumeCall{Call: call}
+}
+
+// MockIaaSClientAttachVolumeCall wrap *gomock.Call
+type MockIaaSClientAttachVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientAttachVolumeCall) Return(arg0 string, arg1 error) *MockIaaSClientAttachVolumeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientAttachVolumeCall) Do(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) (string, error)) *MockIaaSClientAttachVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientAttachVolumeCall) DoAndReturn(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) (string, error)) *MockIaaSClientAttachVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// CreateBackup mocks base method.
+func (m *MockIaaSClient) CreateBackup(ctx context.Context, name, volID, snapshotID string, tags map[string]string) (*v2api.Backup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBackup", ctx, name, volID, snapshotID, tags)
+	ret0, _ := ret[0].(*v2api.Backup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBackup indicates an expected call of CreateBackup.
+func (mr *MockIaaSClientMockRecorder) CreateBackup(ctx, name, volID, snapshotID, tags any) *MockIaaSClientCreateBackupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockIaaSClient)(nil).CreateBackup), ctx, name, volID, snapshotID, tags)
+	return &MockIaaSClientCreateBackupCall{Call: call}
+}
+
+// MockIaaSClientCreateBackupCall wrap *gomock.Call
+type MockIaaSClientCreateBackupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientCreateBackupCall) Return(arg0 *v2api.Backup, arg1 error) *MockIaaSClientCreateBackupCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientCreateBackupCall) Do(f func(context.Context, string, string, string, map[string]string) (*v2api.Backup, error)) *MockIaaSClientCreateBackupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientCreateBackupCall) DoAndReturn(f func(context.Context, string, string, string, map[string]string) (*v2api.Backup, error)) *MockIaaSClientCreateBackupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// CreateSnapshot mocks base method.
+func (m *MockIaaSClient) CreateSnapshot(ctx context.Context, payload v2api.CreateSnapshotPayload) (*v2api.Snapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSnapshot", ctx, payload)
+	ret0, _ := ret[0].(*v2api.Snapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSnapshot indicates an expected call of CreateSnapshot.
+func (mr *MockIaaSClientMockRecorder) CreateSnapshot(ctx, payload any) *MockIaaSClientCreateSnapshotCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSnapshot", reflect.TypeOf((*MockIaaSClient)(nil).CreateSnapshot), ctx, payload)
+	return &MockIaaSClientCreateSnapshotCall{Call: call}
+}
+
+// MockIaaSClientCreateSnapshotCall wrap *gomock.Call
+type MockIaaSClientCreateSnapshotCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientCreateSnapshotCall) Return(arg0 *v2api.Snapshot, arg1 error) *MockIaaSClientCreateSnapshotCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientCreateSnapshotCall) Do(f func(context.Context, v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientCreateSnapshotCall) DoAndReturn(f func(context.Context, v2api.CreateSnapshotPayload) (*v2api.Snapshot, error)) *MockIaaSClientCreateSnapshotCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// CreateVolume mocks base method.
+func (m *MockIaaSClient) CreateVolume(ctx context.Context, payload v2api.CreateVolumePayload) (*v2api.Volume, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateVolume", ctx, payload)
+	ret0, _ := ret[0].(*v2api.Volume)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateVolume indicates an expected call of CreateVolume.
+func (mr *MockIaaSClientMockRecorder) CreateVolume(ctx, payload any) *MockIaaSClientCreateVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockIaaSClient)(nil).CreateVolume), ctx, payload)
+	return &MockIaaSClientCreateVolumeCall{Call: call}
+}
+
+// MockIaaSClientCreateVolumeCall wrap *gomock.Call
+type MockIaaSClientCreateVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientCreateVolumeCall) Return(arg0 *v2api.Volume, arg1 error) *MockIaaSClientCreateVolumeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientCreateVolumeCall) Do(f func(context.Context, v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientCreateVolumeCall) DoAndReturn(f func(context.Context, v2api.CreateVolumePayload) (*v2api.Volume, error)) *MockIaaSClientCreateVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteBackup mocks base method.
+func (m *MockIaaSClient) DeleteBackup(ctx context.Context, backupID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBackup", ctx, backupID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBackup indicates an expected call of DeleteBackup.
+func (mr *MockIaaSClientMockRecorder) DeleteBackup(ctx, backupID any) *MockIaaSClientDeleteBackupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBackup", reflect.TypeOf((*MockIaaSClient)(nil).DeleteBackup), ctx, backupID)
+	return &MockIaaSClientDeleteBackupCall{Call: call}
+}
+
+// MockIaaSClientDeleteBackupCall wrap *gomock.Call
+type MockIaaSClientDeleteBackupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientDeleteBackupCall) Return(arg0 error) *MockIaaSClientDeleteBackupCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientDeleteBackupCall) Do(f func(context.Context, string) error) *MockIaaSClientDeleteBackupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientDeleteBackupCall) DoAndReturn(f func(context.Context, string) error) *MockIaaSClientDeleteBackupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteSnapshot mocks base method.
+func (m *MockIaaSClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSnapshot", ctx, snapshotID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSnapshot indicates an expected call of DeleteSnapshot.
+func (mr *MockIaaSClientMockRecorder) DeleteSnapshot(ctx, snapshotID any) *MockIaaSClientDeleteSnapshotCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSnapshot", reflect.TypeOf((*MockIaaSClient)(nil).DeleteSnapshot), ctx, snapshotID)
+	return &MockIaaSClientDeleteSnapshotCall{Call: call}
+}
+
+// MockIaaSClientDeleteSnapshotCall wrap *gomock.Call
+type MockIaaSClientDeleteSnapshotCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientDeleteSnapshotCall) Return(arg0 error) *MockIaaSClientDeleteSnapshotCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientDeleteSnapshotCall) Do(f func(context.Context, string) error) *MockIaaSClientDeleteSnapshotCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientDeleteSnapshotCall) DoAndReturn(f func(context.Context, string) error) *MockIaaSClientDeleteSnapshotCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteVolume mocks base method.
+func (m *MockIaaSClient) DeleteVolume(ctx context.Context, volumeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteVolume", ctx, volumeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteVolume indicates an expected call of DeleteVolume.
+func (mr *MockIaaSClientMockRecorder) DeleteVolume(ctx, volumeID any) *MockIaaSClientDeleteVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockIaaSClient)(nil).DeleteVolume), ctx, volumeID)
+	return &MockIaaSClientDeleteVolumeCall{Call: call}
+}
+
+// MockIaaSClientDeleteVolumeCall wrap *gomock.Call
+type MockIaaSClientDeleteVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientDeleteVolumeCall) Return(arg0 error) *MockIaaSClientDeleteVolumeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientDeleteVolumeCall) Do(f func(context.Context, string) error) *MockIaaSClientDeleteVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientDeleteVolumeCall) DoAndReturn(f func(context.Context, string) error) *MockIaaSClientDeleteVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DetachVolume mocks base method.
+func (m *MockIaaSClient) DetachVolume(ctx context.Context, serverID, volumeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DetachVolume", ctx, serverID, volumeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DetachVolume indicates an expected call of DetachVolume.
+func (mr *MockIaaSClientMockRecorder) DetachVolume(ctx, serverID, volumeID any) *MockIaaSClientDetachVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetachVolume", reflect.TypeOf((*MockIaaSClient)(nil).DetachVolume), ctx, serverID, volumeID)
+	return &MockIaaSClientDetachVolumeCall{Call: call}
+}
+
+// MockIaaSClientDetachVolumeCall wrap *gomock.Call
+type MockIaaSClientDetachVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientDetachVolumeCall) Return(arg0 error) *MockIaaSClientDetachVolumeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientDetachVolumeCall) Do(f func(context.Context, string, string) error) *MockIaaSClientDetachVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientDetachVolumeCall) DoAndReturn(f func(context.Context, string, string) error) *MockIaaSClientDetachVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ExpandVolume mocks base method.
+func (m *MockIaaSClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload v2api.ResizeVolumePayload) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExpandVolume", ctx, volumeID, volumeStatus, payload)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExpandVolume indicates an expected call of ExpandVolume.
+func (mr *MockIaaSClientMockRecorder) ExpandVolume(ctx, volumeID, volumeStatus, payload any) *MockIaaSClientExpandVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpandVolume", reflect.TypeOf((*MockIaaSClient)(nil).ExpandVolume), ctx, volumeID, volumeStatus, payload)
+	return &MockIaaSClientExpandVolumeCall{Call: call}
+}
+
+// MockIaaSClientExpandVolumeCall wrap *gomock.Call
+type MockIaaSClientExpandVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientExpandVolumeCall) Return(arg0 error) *MockIaaSClientExpandVolumeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientExpandVolumeCall) Do(f func(context.Context, string, string, v2api.ResizeVolumePayload) error) *MockIaaSClientExpandVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientExpandVolumeCall) DoAndReturn(f func(context.Context, string, string, v2api.ResizeVolumePayload) error) *MockIaaSClientExpandVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetBackup mocks base method.
+func (m *MockIaaSClient) GetBackup(ctx context.Context, backupID string) (*v2api.Backup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBackup", ctx, backupID)
+	ret0, _ := ret[0].(*v2api.Backup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBackup indicates an expected call of GetBackup.
+func (mr *MockIaaSClientMockRecorder) GetBackup(ctx, backupID any) *MockIaaSClientGetBackupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackup", reflect.TypeOf((*MockIaaSClient)(nil).GetBackup), ctx, backupID)
+	return &MockIaaSClientGetBackupCall{Call: call}
+}
+
+// MockIaaSClientGetBackupCall wrap *gomock.Call
+type MockIaaSClientGetBackupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetBackupCall) Return(arg0 *v2api.Backup, arg1 error) *MockIaaSClientGetBackupCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetBackupCall) Do(f func(context.Context, string) (*v2api.Backup, error)) *MockIaaSClientGetBackupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetBackupCall) DoAndReturn(f func(context.Context, string) (*v2api.Backup, error)) *MockIaaSClientGetBackupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // GetServer mocks base method.
@@ -80,6 +466,201 @@ func (c *MockIaaSClientGetServerCall) DoAndReturn(f func(context.Context, string
 	return c
 }
 
+// GetServerWithDetails mocks base method.
+func (m *MockIaaSClient) GetServerWithDetails(ctx context.Context, serverID string) (*v2api.Server, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerWithDetails", ctx, serverID)
+	ret0, _ := ret[0].(*v2api.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServerWithDetails indicates an expected call of GetServerWithDetails.
+func (mr *MockIaaSClientMockRecorder) GetServerWithDetails(ctx, serverID any) *MockIaaSClientGetServerWithDetailsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerWithDetails", reflect.TypeOf((*MockIaaSClient)(nil).GetServerWithDetails), ctx, serverID)
+	return &MockIaaSClientGetServerWithDetailsCall{Call: call}
+}
+
+// MockIaaSClientGetServerWithDetailsCall wrap *gomock.Call
+type MockIaaSClientGetServerWithDetailsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetServerWithDetailsCall) Return(arg0 *v2api.Server, arg1 error) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetServerWithDetailsCall) Do(f func(context.Context, string) (*v2api.Server, error)) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetServerWithDetailsCall) DoAndReturn(f func(context.Context, string) (*v2api.Server, error)) *MockIaaSClientGetServerWithDetailsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetSnapshot mocks base method.
+func (m *MockIaaSClient) GetSnapshot(ctx context.Context, snapshotID string) (*v2api.Snapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSnapshot", ctx, snapshotID)
+	ret0, _ := ret[0].(*v2api.Snapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSnapshot indicates an expected call of GetSnapshot.
+func (mr *MockIaaSClientMockRecorder) GetSnapshot(ctx, snapshotID any) *MockIaaSClientGetSnapshotCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSnapshot", reflect.TypeOf((*MockIaaSClient)(nil).GetSnapshot), ctx, snapshotID)
+	return &MockIaaSClientGetSnapshotCall{Call: call}
+}
+
+// MockIaaSClientGetSnapshotCall wrap *gomock.Call
+type MockIaaSClientGetSnapshotCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetSnapshotCall) Return(arg0 *v2api.Snapshot, arg1 error) *MockIaaSClientGetSnapshotCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetSnapshotCall) Do(f func(context.Context, string) (*v2api.Snapshot, error)) *MockIaaSClientGetSnapshotCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetSnapshotCall) DoAndReturn(f func(context.Context, string) (*v2api.Snapshot, error)) *MockIaaSClientGetSnapshotCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetVolume mocks base method.
+func (m *MockIaaSClient) GetVolume(ctx context.Context, volumeID string) (*v2api.Volume, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVolume", ctx, volumeID)
+	ret0, _ := ret[0].(*v2api.Volume)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVolume indicates an expected call of GetVolume.
+func (mr *MockIaaSClientMockRecorder) GetVolume(ctx, volumeID any) *MockIaaSClientGetVolumeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolume", reflect.TypeOf((*MockIaaSClient)(nil).GetVolume), ctx, volumeID)
+	return &MockIaaSClientGetVolumeCall{Call: call}
+}
+
+// MockIaaSClientGetVolumeCall wrap *gomock.Call
+type MockIaaSClientGetVolumeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetVolumeCall) Return(arg0 *v2api.Volume, arg1 error) *MockIaaSClientGetVolumeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetVolumeCall) Do(f func(context.Context, string) (*v2api.Volume, error)) *MockIaaSClientGetVolumeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetVolumeCall) DoAndReturn(f func(context.Context, string) (*v2api.Volume, error)) *MockIaaSClientGetVolumeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetVolumesByName mocks base method.
+func (m *MockIaaSClient) GetVolumesByName(ctx context.Context, volName string) ([]v2api.Volume, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVolumesByName", ctx, volName)
+	ret0, _ := ret[0].([]v2api.Volume)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVolumesByName indicates an expected call of GetVolumesByName.
+func (mr *MockIaaSClientMockRecorder) GetVolumesByName(ctx, volName any) *MockIaaSClientGetVolumesByNameCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumesByName", reflect.TypeOf((*MockIaaSClient)(nil).GetVolumesByName), ctx, volName)
+	return &MockIaaSClientGetVolumesByNameCall{Call: call}
+}
+
+// MockIaaSClientGetVolumesByNameCall wrap *gomock.Call
+type MockIaaSClientGetVolumesByNameCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientGetVolumesByNameCall) Return(arg0 []v2api.Volume, arg1 error) *MockIaaSClientGetVolumesByNameCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientGetVolumesByNameCall) Do(f func(context.Context, string) ([]v2api.Volume, error)) *MockIaaSClientGetVolumesByNameCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientGetVolumesByNameCall) DoAndReturn(f func(context.Context, string) ([]v2api.Volume, error)) *MockIaaSClientGetVolumesByNameCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListBackups mocks base method.
+func (m *MockIaaSClient) ListBackups(ctx context.Context, filters map[string]string) ([]v2api.Backup, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBackups", ctx, filters)
+	ret0, _ := ret[0].([]v2api.Backup)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBackups indicates an expected call of ListBackups.
+func (mr *MockIaaSClientMockRecorder) ListBackups(ctx, filters any) *MockIaaSClientListBackupsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBackups", reflect.TypeOf((*MockIaaSClient)(nil).ListBackups), ctx, filters)
+	return &MockIaaSClientListBackupsCall{Call: call}
+}
+
+// MockIaaSClientListBackupsCall wrap *gomock.Call
+type MockIaaSClientListBackupsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientListBackupsCall) Return(arg0 []v2api.Backup, arg1 error) *MockIaaSClientListBackupsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientListBackupsCall) Do(f func(context.Context, map[string]string) ([]v2api.Backup, error)) *MockIaaSClientListBackupsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientListBackupsCall) DoAndReturn(f func(context.Context, map[string]string) ([]v2api.Backup, error)) *MockIaaSClientListBackupsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListServers mocks base method.
 func (m *MockIaaSClient) ListServers(ctx context.Context) (*[]v2api.Server, error) {
 	m.ctrl.T.Helper()
@@ -115,6 +696,316 @@ func (c *MockIaaSClientListServersCall) Do(f func(context.Context) (*[]v2api.Ser
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockIaaSClientListServersCall) DoAndReturn(f func(context.Context) (*[]v2api.Server, error)) *MockIaaSClientListServersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListSnapshots mocks base method.
+func (m *MockIaaSClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]v2api.Snapshot, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSnapshots", ctx, filters)
+	ret0, _ := ret[0].([]v2api.Snapshot)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListSnapshots indicates an expected call of ListSnapshots.
+func (mr *MockIaaSClientMockRecorder) ListSnapshots(ctx, filters any) *MockIaaSClientListSnapshotsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSnapshots", reflect.TypeOf((*MockIaaSClient)(nil).ListSnapshots), ctx, filters)
+	return &MockIaaSClientListSnapshotsCall{Call: call}
+}
+
+// MockIaaSClientListSnapshotsCall wrap *gomock.Call
+type MockIaaSClientListSnapshotsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientListSnapshotsCall) Return(arg0 []v2api.Snapshot, arg1 string, arg2 error) *MockIaaSClientListSnapshotsCall {
+	c.Call = c.Call.Return(arg0, arg1, arg2)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientListSnapshotsCall) Do(f func(context.Context, map[string]string) ([]v2api.Snapshot, string, error)) *MockIaaSClientListSnapshotsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientListSnapshotsCall) DoAndReturn(f func(context.Context, map[string]string) ([]v2api.Snapshot, string, error)) *MockIaaSClientListSnapshotsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListVolumes mocks base method.
+func (m *MockIaaSClient) ListVolumes(ctx context.Context, arg1 int, arg2 string) ([]v2api.Volume, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVolumes", ctx, arg1, arg2)
+	ret0, _ := ret[0].([]v2api.Volume)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListVolumes indicates an expected call of ListVolumes.
+func (mr *MockIaaSClientMockRecorder) ListVolumes(ctx, arg1, arg2 any) *MockIaaSClientListVolumesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumes", reflect.TypeOf((*MockIaaSClient)(nil).ListVolumes), ctx, arg1, arg2)
+	return &MockIaaSClientListVolumesCall{Call: call}
+}
+
+// MockIaaSClientListVolumesCall wrap *gomock.Call
+type MockIaaSClientListVolumesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientListVolumesCall) Return(arg0 []v2api.Volume, arg1 string, arg2 error) *MockIaaSClientListVolumesCall {
+	c.Call = c.Call.Return(arg0, arg1, arg2)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientListVolumesCall) Do(f func(context.Context, int, string) ([]v2api.Volume, string, error)) *MockIaaSClientListVolumesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientListVolumesCall) DoAndReturn(f func(context.Context, int, string) ([]v2api.Volume, string, error)) *MockIaaSClientListVolumesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitBackupReady mocks base method.
+func (m *MockIaaSClient) WaitBackupReady(ctx context.Context, backupID string, snapshotSize int64, backupMaxDurationSecondsPerGB int) (*string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitBackupReady", ctx, backupID, snapshotSize, backupMaxDurationSecondsPerGB)
+	ret0, _ := ret[0].(*string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitBackupReady indicates an expected call of WaitBackupReady.
+func (mr *MockIaaSClientMockRecorder) WaitBackupReady(ctx, backupID, snapshotSize, backupMaxDurationSecondsPerGB any) *MockIaaSClientWaitBackupReadyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitBackupReady", reflect.TypeOf((*MockIaaSClient)(nil).WaitBackupReady), ctx, backupID, snapshotSize, backupMaxDurationSecondsPerGB)
+	return &MockIaaSClientWaitBackupReadyCall{Call: call}
+}
+
+// MockIaaSClientWaitBackupReadyCall wrap *gomock.Call
+type MockIaaSClientWaitBackupReadyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitBackupReadyCall) Return(arg0 *string, arg1 error) *MockIaaSClientWaitBackupReadyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitBackupReadyCall) Do(f func(context.Context, string, int64, int) (*string, error)) *MockIaaSClientWaitBackupReadyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitBackupReadyCall) DoAndReturn(f func(context.Context, string, int64, int) (*string, error)) *MockIaaSClientWaitBackupReadyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitDiskAttached mocks base method.
+func (m *MockIaaSClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitDiskAttached", ctx, instanceID, volumeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitDiskAttached indicates an expected call of WaitDiskAttached.
+func (mr *MockIaaSClientMockRecorder) WaitDiskAttached(ctx, instanceID, volumeID any) *MockIaaSClientWaitDiskAttachedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitDiskAttached", reflect.TypeOf((*MockIaaSClient)(nil).WaitDiskAttached), ctx, instanceID, volumeID)
+	return &MockIaaSClientWaitDiskAttachedCall{Call: call}
+}
+
+// MockIaaSClientWaitDiskAttachedCall wrap *gomock.Call
+type MockIaaSClientWaitDiskAttachedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitDiskAttachedCall) Return(arg0 error) *MockIaaSClientWaitDiskAttachedCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitDiskAttachedCall) Do(f func(context.Context, string, string) error) *MockIaaSClientWaitDiskAttachedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitDiskAttachedCall) DoAndReturn(f func(context.Context, string, string) error) *MockIaaSClientWaitDiskAttachedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitDiskDetached mocks base method.
+func (m *MockIaaSClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitDiskDetached", ctx, instanceID, volumeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitDiskDetached indicates an expected call of WaitDiskDetached.
+func (mr *MockIaaSClientMockRecorder) WaitDiskDetached(ctx, instanceID, volumeID any) *MockIaaSClientWaitDiskDetachedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitDiskDetached", reflect.TypeOf((*MockIaaSClient)(nil).WaitDiskDetached), ctx, instanceID, volumeID)
+	return &MockIaaSClientWaitDiskDetachedCall{Call: call}
+}
+
+// MockIaaSClientWaitDiskDetachedCall wrap *gomock.Call
+type MockIaaSClientWaitDiskDetachedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitDiskDetachedCall) Return(arg0 error) *MockIaaSClientWaitDiskDetachedCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitDiskDetachedCall) Do(f func(context.Context, string, string) error) *MockIaaSClientWaitDiskDetachedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitDiskDetachedCall) DoAndReturn(f func(context.Context, string, string) error) *MockIaaSClientWaitDiskDetachedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitSnapshotReady mocks base method.
+func (m *MockIaaSClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (*string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitSnapshotReady", ctx, snapshotID)
+	ret0, _ := ret[0].(*string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitSnapshotReady indicates an expected call of WaitSnapshotReady.
+func (mr *MockIaaSClientMockRecorder) WaitSnapshotReady(ctx, snapshotID any) *MockIaaSClientWaitSnapshotReadyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitSnapshotReady", reflect.TypeOf((*MockIaaSClient)(nil).WaitSnapshotReady), ctx, snapshotID)
+	return &MockIaaSClientWaitSnapshotReadyCall{Call: call}
+}
+
+// MockIaaSClientWaitSnapshotReadyCall wrap *gomock.Call
+type MockIaaSClientWaitSnapshotReadyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitSnapshotReadyCall) Return(arg0 *string, arg1 error) *MockIaaSClientWaitSnapshotReadyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitSnapshotReadyCall) Do(f func(context.Context, string) (*string, error)) *MockIaaSClientWaitSnapshotReadyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitSnapshotReadyCall) DoAndReturn(f func(context.Context, string) (*string, error)) *MockIaaSClientWaitSnapshotReadyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitVolumeTargetStatus mocks base method.
+func (m *MockIaaSClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitVolumeTargetStatus", ctx, volumeID, tStatus)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitVolumeTargetStatus indicates an expected call of WaitVolumeTargetStatus.
+func (mr *MockIaaSClientMockRecorder) WaitVolumeTargetStatus(ctx, volumeID, tStatus any) *MockIaaSClientWaitVolumeTargetStatusCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitVolumeTargetStatus", reflect.TypeOf((*MockIaaSClient)(nil).WaitVolumeTargetStatus), ctx, volumeID, tStatus)
+	return &MockIaaSClientWaitVolumeTargetStatusCall{Call: call}
+}
+
+// MockIaaSClientWaitVolumeTargetStatusCall wrap *gomock.Call
+type MockIaaSClientWaitVolumeTargetStatusCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitVolumeTargetStatusCall) Return(arg0 error) *MockIaaSClientWaitVolumeTargetStatusCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitVolumeTargetStatusCall) Do(f func(context.Context, string, []string) error) *MockIaaSClientWaitVolumeTargetStatusCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitVolumeTargetStatusCall) DoAndReturn(f func(context.Context, string, []string) error) *MockIaaSClientWaitVolumeTargetStatusCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// WaitVolumeTargetStatusWithCustomBackoff mocks base method.
+func (m *MockIaaSClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitVolumeTargetStatusWithCustomBackoff", ctx, volumeID, tStatus, backoff)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitVolumeTargetStatusWithCustomBackoff indicates an expected call of WaitVolumeTargetStatusWithCustomBackoff.
+func (mr *MockIaaSClientMockRecorder) WaitVolumeTargetStatusWithCustomBackoff(ctx, volumeID, tStatus, backoff any) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitVolumeTargetStatusWithCustomBackoff", reflect.TypeOf((*MockIaaSClient)(nil).WaitVolumeTargetStatusWithCustomBackoff), ctx, volumeID, tStatus, backoff)
+	return &MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall{Call: call}
+}
+
+// MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall wrap *gomock.Call
+type MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Return(arg0 error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Do(f func(context.Context, string, []string, *wait.Backoff) error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) DoAndReturn(f func(context.Context, string, []string, *wait.Backoff) error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

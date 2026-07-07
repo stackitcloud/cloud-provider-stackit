@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	stackitconfig "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/config"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
@@ -149,7 +149,7 @@ func (d *Driver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_T
 	return nil
 }
 
-func (d *Driver) SetupControllerService(instance stackit.IaasClient) {
+func (d *Driver) SetupControllerService(instance stackitclient.IaaSClient) {
 	klog.Info("Providing controller service")
 	d.cs = NewControllerServer(d, instance)
 }
