@@ -6,15 +6,16 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/component-base/cli"
-	"k8s.io/klog/v2"
-
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi/util/mount"
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit"
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"k8s.io/component-base/cli"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -78,7 +79,7 @@ func main() {
 		"Configures the CSI to listen to the legacy storage driverName cinder.csi.openstack.org instead")
 	cmd.PersistentFlags().BoolVar(&legacyVolumeCreation, "legacy-volume-creation", true, "Enable or disable support for creating volumes with the old driverName (cinder.csi.openstack.org)")
 
-	stackit.AddExtraFlags(pflag.CommandLine)
+	stackitclient.AddExtraFlags(pflag.CommandLine)
 
 	code := cli.Run(cmd)
 	os.Exit(code)
@@ -104,29 +105,32 @@ func handle() {
 
 	if provideControllerService {
 		var err error
-		cfg, err := stackit.GetConfigFromFile(cloudConfig)
+		cfg, err := stackitclient.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
 
-		iaasClient, err := stackit.CreateIaaSClient(&cfg)
-		if err != nil {
-			klog.Fatalf("Failed to create IaaS client: %v", err)
+		iaasOpts := []sdkconfig.ConfigurationOption{
+			sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient()),
 		}
 
-		stackitProvider, err := stackit.CreateSTACKITProvider(iaasClient, &cfg)
+		if cfg.Global.APIEndpoints.IaasAPI != "" {
+			iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
+		}
+
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
 		if err != nil {
 			klog.Fatalf("Failed to create STACKIT provider: %v", err)
 		}
 
-		d.SetupControllerService(stackitProvider)
+		d.SetupControllerService(iaasClient)
 	}
 
 	if provideNodeService {
 		// Initialize mount
 		mountProvider := mount.GetMountProvider()
 
-		cfg, err := stackit.GetConfigFromFile(cloudConfig)
+		cfg, err := stackitclient.GetConfigFromFile(cloudConfig)
 		if err != nil {
 			klog.Fatal(err)
 		}
