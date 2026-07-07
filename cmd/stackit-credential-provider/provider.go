@@ -15,6 +15,8 @@ import (
 	v1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 )
 
+const AnnotationServiceAccountEmail = "workload-identity.stackit.cloud/service-account-email"
+
 type tokenGetter interface {
 	GetAccessToken() (string, error)
 }
@@ -50,6 +52,17 @@ func (p *provider) GetCredentials(ctx context.Context, request *v1.CredentialPro
 		return nil, err
 	}
 
+	if request.ServiceAccountToken != "" {
+		workloadIdentityTokenGetter, err := setupWorkloadIdentityFlow(request)
+		if err == nil {
+			klog.Info("using workload identity to retrieve credentials")
+			p.tokenGetter = &fallbackTokenGetter{
+				primary:  workloadIdentityTokenGetter,
+				fallback: p.tokenGetter,
+			}
+		}
+	}
+
 	token, err := p.tokenGetter.GetAccessToken()
 	if err != nil {
 		return nil, err
@@ -69,6 +82,30 @@ func (p *provider) GetCredentials(ctx context.Context, request *v1.CredentialPro
 		// service accounts in registry are project based, therefore we cannot cache by registry
 		CacheKeyType: v1.ImagePluginCacheKeyType,
 	}, nil
+}
+
+func setupWorkloadIdentityFlow(request *v1.CredentialProviderRequest) (tokenGetter, error) {
+	email, ok := request.ServiceAccountAnnotations[AnnotationServiceAccountEmail]
+	if !ok {
+		return nil, errors.New("kubernetes service account is not setup with workload-identity")
+	}
+
+	rt, err := auth.WorkloadIdentityFederationAuth(&config.Configuration{
+		ServiceAccountFederatedTokenFunc: func(_ context.Context) (string, error) {
+			return request.ServiceAccountToken, nil
+		},
+		ServiceAccountEmail: email,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	flow, ok := rt.(*clients.WorkloadIdentityFederationFlow)
+	if !ok {
+		return nil, fmt.Errorf("workload-identity setup function did not return a workload identity flow, got %T", rt)
+	}
+
+	return flow, nil
 }
 
 func emailFromToken(tokenStr string) (string, error) {
@@ -91,4 +128,17 @@ func parseHostFromImageReference(image string) (string, error) {
 		return "", fmt.Errorf("error parsing image reference %s: %v", image, err)
 	}
 	return parsed.Hostname(), nil
+}
+
+type fallbackTokenGetter struct {
+	primary  tokenGetter
+	fallback tokenGetter
+}
+
+func (t *fallbackTokenGetter) GetAccessToken() (string, error) {
+	token, err := t.primary.GetAccessToken()
+	if err != nil {
+		return t.fallback.GetAccessToken()
+	}
+	return token, nil
 }
