@@ -7,7 +7,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-lib-utils v0.22.0
-	github.com/kubernetes-csi/csi-test/v5 v5.4.0
+	github.com/kubernetes-csi/csi-test/v5 v5.5.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
 	github.com/prometheus/client_golang v1.23.2
@@ -27,7 +27,7 @@ require (
 	k8s.io/client-go v0.33.13
 	k8s.io/cloud-provider v0.33.13
 	k8s.io/component-base v0.33.13
-	k8s.io/klog/v2 v2.130.1
+	k8s.io/klog/v2 v2.140.0
 	k8s.io/mount-utils v0.33.13
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 )
@@ -70,7 +70,6 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/cel-go v0.23.2 // indirect
