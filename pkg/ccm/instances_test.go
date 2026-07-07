@@ -288,10 +288,12 @@ var _ = Describe("Node Controller", func() {
 			nics := []iaas.ServerNetwork{
 				{
 					NetworkName: "abc",
+					NetworkId:   "69",
 					Ipv4:        new("10.0.0.69"),
 				},
 				{
 					NetworkName: "default",
+					NetworkId:   "69",
 					Ipv4:        new("192.168.0.123"),
 				},
 				{
@@ -310,9 +312,9 @@ var _ = Describe("Node Controller", func() {
 			By("with network id")
 			newNics = sortNics(nics, "123")
 			Expect(newNics).To(HaveLen(3))
-			Expect(newNics[0].NetworkName).To(Equal("foo"))
-			Expect(newNics[1].NetworkName).To(Equal("abc"))
-			Expect(newNics[2].NetworkName).To(Equal("default"))
+			Expect(newNics[0].NetworkId).To(Equal("123"))
+			Expect(newNics[1].NetworkId).To(Equal("69"))
+			Expect(newNics[2].NetworkId).To(Equal("69"))
 		})
 	})
 })
