@@ -292,11 +292,23 @@ func (os *iaasClient) GetVolumeByName(ctx context.Context, name string) (*iaas.V
 	return &vols[0], nil
 }
 
-func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string, tSize int64) error {
 	backoff := wait.Backoff{
 		Duration: operationFinishInitDelay,
 		Factor:   operationFinishFactor,
 		Steps:    operationFinishSteps,
+	}
+
+	// volResizeSuccess checks if the volume is an "GOOD" State and the target Size has
+	// been met.
+	volResizeSuccess := func(vol *iaas.Volume, tSize int64, tStatus []string) bool {
+		if slices.Contains(tStatus, *vol.Status) {
+			if tSize == vol.GetSize() {
+				return true
+			}
+			return false
+		}
+		return false
 	}
 
 	waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
@@ -304,7 +316,8 @@ func (os *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID strin
 		if err != nil {
 			return false, err
 		}
-		if slices.Contains(tStatus, *vol.Status) {
+		// Check status
+		if volResizeSuccess(vol, tSize, tStatus) {
 			return true, nil
 		}
 		for _, eState := range volumeErrorStates {
