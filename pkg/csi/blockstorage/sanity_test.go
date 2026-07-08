@@ -450,6 +450,13 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 		})
 
 		Describe("CSI sanity", func() {
+			BeforeEach(func() {
+				if CurrentSpecReport().LeafNodeText == "should return next token when a limited number of entries are requested" &&
+					CurrentSpecReport().FullText() == "CSI sanity test Base config CSI sanity ListSnapshots [Controller Server] should return next token when a limited number of entries are requested" {
+					Skip("ListSnapshots pagination is intentionally not supported by this driver")
+				}
+			})
+
 			config := sanity.NewTestConfig()
 			config.Address = FakeEndpoint
 

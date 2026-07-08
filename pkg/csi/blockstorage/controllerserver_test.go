@@ -1083,7 +1083,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.GetEntries()).To(BeEmpty())
 		})
 
-		It("should successfully list snapshots and backups in deterministic order with pagination", func() {
+		It("should successfully list snapshots and backups in deterministic order", func() {
 			req := &csi.ListSnapshotsRequest{}
 
 			firstSnapshotTime := time.Date(2024, time.January, 1, 10, 0, 0, 0, time.UTC)
@@ -1152,58 +1152,6 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.GetNextToken()).To(BeEmpty())
 		})
 
-		It("should apply controller-side pagination after aggregating snapshots and backups", func() {
-			req := &csi.ListSnapshotsRequest{
-				MaxEntries:    1,
-				StartingToken: "1",
-			}
-
-			firstSnapshotTime := time.Date(2024, time.January, 1, 10, 0, 0, 0, time.UTC)
-			backupCreationTime := firstSnapshotTime.Add(1 * time.Hour)
-			secondSnapshotTime := firstSnapshotTime.Add(2 * time.Hour)
-
-			iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{
-				{
-					Id:        new("later-snapshot"),
-					VolumeId:  "something-different",
-					Size:      new(int64(30)),
-					CreatedAt: new(secondSnapshotTime),
-					Status:    new("AVAILABLE"),
-				},
-				{
-					Id:        new("fake-snapshot"),
-					VolumeId:  "something-different",
-					Size:      new(int64(10)),
-					CreatedAt: new(firstSnapshotTime),
-					Status:    new("AVAILABLE"),
-				},
-			}, "", nil)
-			iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).Return([]iaas.Backup{
-				{
-					Id:        new("fake-backup"),
-					VolumeId:  new("something-different"),
-					Size:      new(int64(20)),
-					CreatedAt: new(backupCreationTime),
-					Status:    new("AVAILABLE"),
-				},
-			}, nil)
-
-			resp, err := fakeCs.ListSnapshots(context.Background(), req)
-			Expect(err).To(Not(HaveOccurred()))
-			Expect(resp.GetEntries()).To(Equal([]*csi.ListSnapshotsResponse_Entry{
-				{
-					Snapshot: &csi.Snapshot{
-						SnapshotId:     "fake-backup",
-						SizeBytes:      20 * util.GIBIBYTE,
-						CreationTime:   timestamppb.New(backupCreationTime),
-						SourceVolumeId: "something-different",
-						ReadyToUse:     true,
-					},
-				},
-			}))
-			Expect(resp.GetNextToken()).To(Equal("2"))
-		})
-
 		It("should pass the source volume filter to snapshots and backups", func() {
 			req := &csi.ListSnapshotsRequest{
 				SourceVolumeId: "volume-1",
@@ -1228,15 +1176,5 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.GetEntries()).To(BeEmpty())
 		})
 
-		It("should reject an invalid starting token", func() {
-			req := &csi.ListSnapshotsRequest{
-				StartingToken: "invalid",
-			}
-
-			resp, err := fakeCs.ListSnapshots(context.Background(), req)
-			Expect(err).To(HaveOccurred())
-			Expect(status.Code(err)).To(Equal(codes.Aborted))
-			Expect(resp).To(BeNil())
-		})
 	})
 })

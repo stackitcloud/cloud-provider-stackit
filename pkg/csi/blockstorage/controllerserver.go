@@ -794,15 +794,6 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}, timestamppb.New(*snap.CreatedAt).CheckValid()
 	}
 
-	startOffset := 0
-	if req.GetStartingToken() != "" {
-		var err error
-		startOffset, err = strconv.Atoi(req.GetStartingToken())
-		if err != nil || startOffset < 0 {
-			return nil, status.Error(codes.Aborted, "starting_token is invalid")
-		}
-	}
-
 	filters := map[string]string{
 		"Status": stackitclient.SnapshotReadyStatus,
 	}
@@ -840,20 +831,9 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		return left.CreationTime.AsTime().Before(right.CreationTime.AsTime())
 	})
 
-	if startOffset > len(entries) {
-		return nil, status.Error(codes.Aborted, "starting_token is invalid")
-	}
-
-	nextPageToken := ""
-	entries = entries[startOffset:]
-	if req.MaxEntries > 0 && int(req.MaxEntries) < len(entries) {
-		nextPageToken = strconv.Itoa(startOffset + int(req.MaxEntries))
-		entries = entries[:req.MaxEntries]
-	}
-
 	return &csi.ListSnapshotsResponse{
 		Entries:   entries,
-		NextToken: nextPageToken,
+		NextToken: "",
 	}, nil
 }
 
