@@ -139,6 +139,83 @@ var _ = Describe("Snapshot", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp).To(HaveLen(2))
 		})
+
+		snapShotListResponse := iaas.SnapshotListResponse{
+			Items: []iaas.Snapshot{
+				{
+					Id:       new("fake-snapshot"),
+					Name:     new("fake-snapshot"),
+					VolumeId: "some-special-volume",
+					Status:   new("ERROR"),
+				},
+				{
+					Id:       new("fake-snapshot2"),
+					Name:     new("fake-snapshot2"),
+					VolumeId: "some-special-volume",
+					Status:   new("AVAILABLE"),
+				},
+				{
+					Id:       new("wrong snapshot"),
+					Name:     new("wrong snapshot"),
+					VolumeId: "another-special-volume",
+					Status:   new("AVAILABLE"),
+				},
+			},
+		}
+
+		DescribeTable("should return a filtered list of snapshots",
+			func(filters map[string]string, expectedSnaps []iaas.Snapshot) {
+				mockIaaSClient.EXPECT().ListSnapshotsInProject(gomock.Any(), gomock.Any(), gomock.Any()).Return(iaas.ApiListSnapshotsInProjectRequest{ApiService: mockIaaSClient})
+				mockIaaSClient.EXPECT().ListSnapshotsInProjectExecute(gomock.Any()).Return(&snapShotListResponse, nil)
+
+				snaps, _, err := client.ListSnapshots(context.Background(), filters)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(snaps).To(Equal(expectedSnaps))
+			},
+			Entry("filter by VolumeID",
+				map[string]string{"VolumeID": "some-special-volume"},
+				[]iaas.Snapshot{
+					{
+						Id:       new("fake-snapshot"),
+						Name:     new("fake-snapshot"),
+						VolumeId: "some-special-volume",
+						Status:   new("ERROR"),
+					},
+					{
+						Id:       new("fake-snapshot2"),
+						Name:     new("fake-snapshot2"),
+						VolumeId: "some-special-volume",
+						Status:   new("AVAILABLE"),
+					},
+				},
+			),
+			Entry("filter by name",
+				map[string]string{"Name": "fake-snapshot"},
+				[]iaas.Snapshot{
+					{
+						Id:       new("fake-snapshot"),
+						Name:     new("fake-snapshot"),
+						VolumeId: "some-special-volume",
+						Status:   new("ERROR"),
+					},
+				},
+			),
+			Entry("filter by status and name",
+				map[string]string{"Name": "fake-snapshot2", "Status": "AVAILABLE"},
+				[]iaas.Snapshot{
+					{
+						Id:       new("fake-snapshot2"),
+						Name:     new("fake-snapshot2"),
+						VolumeId: "some-special-volume",
+						Status:   new("AVAILABLE"),
+					},
+				},
+			),
+			Entry("no filters",
+				map[string]string{},
+				snapShotListResponse.Items,
+			),
+		)
 	})
 
 	Context("GetSnapshot", func() {
@@ -219,16 +296,54 @@ var _ = Describe("Backup", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(actualPayload).To(Equal(expectedPayload))
 			},
-			Entry("with volume source", "expected-name", "volume-id", "", nil, iaas.CreateBackupPayload{
+			Entry("with volume source and nil tags", "expected-name", "volume-id", "", nil, iaas.CreateBackupPayload{
 				Name:        new("expected-name"),
 				Description: new(BackupDescription),
 				Source:      iaas.BackupSource{Type: "volume", Id: "volume-id"},
+				Labels:      nil,
 			}),
-			Entry("with snapshot source", "expected-name", "", "snapshot-id", nil, iaas.CreateBackupPayload{
+			Entry("with snapshot source and special characters in tags", "expected-name", "", "snapshot-id",
+				map[string]string{
+					"special": "tag with spaces and !@#$%^&*()",
+					"normal":  "value",
+				},
+				iaas.CreateBackupPayload{
+					Name:        new("expected-name"),
+					Description: new(BackupDescription),
+					Source:      iaas.BackupSource{Type: "snapshot", Id: "snapshot-id"},
+					Labels: map[string]any{
+						"special": "tag with spaces and !@#$%^&*()",
+						"normal":  "value",
+					},
+				},
+			),
+			Entry("with empty tags map", "expected-name", "volume-id", "", map[string]string{}, iaas.CreateBackupPayload{
+				Name:        new("expected-name"),
+				Description: new(BackupDescription),
+				Source:      iaas.BackupSource{Type: "volume", Id: "volume-id"},
+				Labels:      map[string]any{},
+			}),
+			Entry("with long backup name", "very-long-backup-name-"+string(make([]byte, 200)), "volume-id", "", nil, iaas.CreateBackupPayload{
+				Name:        new("very-long-backup-name-" + string(make([]byte, 200))),
+				Description: new(BackupDescription),
+				Source:      iaas.BackupSource{Type: "volume", Id: "volume-id"},
+			}),
+			Entry("when both volume and snapshot are provided snapshot wins", "expected-name", "volume-id", "snapshot-id", nil, iaas.CreateBackupPayload{
 				Name:        new("expected-name"),
 				Description: new(BackupDescription),
 				Source:      iaas.BackupSource{Type: "snapshot", Id: "snapshot-id"},
 			}),
+		)
+
+		DescribeTable("validation error variants",
+			func(name, volID, snapshotID, expectedError string) {
+				actualPayload, err := BuildCreateBackupPayload(name, volID, snapshotID, nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(expectedError))
+				Expect(actualPayload).To(Equal(iaas.CreateBackupPayload{}))
+			},
+			Entry("empty name", "", "volume-id", "", "backup name cannot be empty"),
+			Entry("missing volume and snapshot IDs", "expected-name", "", "", "either volID or snapshotID must be provided"),
 		)
 	})
 
@@ -255,6 +370,20 @@ var _ = Describe("Backup", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("API error"))
 		})
+
+		DescribeTable("returns error when payload is invalid",
+			func(name, volID, snapshotID, expectedError string) {
+				mockIaaSClient.EXPECT().CreateBackup(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				mockIaaSClient.EXPECT().CreateBackupExecute(gomock.Any()).Times(0)
+
+				backup, err := client.CreateBackup(context.Background(), name, volID, snapshotID, nil)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal(expectedError))
+				Expect(backup).To(BeNil())
+			},
+			Entry("empty name", "", "volume-id", "", "backup name cannot be empty"),
+			Entry("missing volume and snapshot IDs", "expected-name", "", "", "either volID or snapshotID must be provided"),
+		)
 	})
 
 	Context("ListBackups", func() {
