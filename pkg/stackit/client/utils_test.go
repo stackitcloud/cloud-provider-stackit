@@ -1,4 +1,4 @@
-package stackit
+package client
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -7,7 +7,7 @@ import (
 )
 
 var _ = Describe("Filter", func() {
-	Describe("filterBackups", func() {
+	Describe("FilterBackups", func() {
 		var (
 			backups []iaas.Backup
 			filters map[string]string
@@ -23,13 +23,13 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all backups when filters is nil", func() {
-			result := filterBackups(backups, nil)
+			result := FilterBackups(backups, nil)
 			Expect(result).To(Equal(backups))
 		})
 
 		It("should filter by Status", func() {
 			filters["Status"] = "available"
-			result := filterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 			Expect(*result[1].Name).To(Equal("backup-3"))
@@ -37,14 +37,14 @@ var _ = Describe("Filter", func() {
 
 		It("should filter by VolumeID", func() {
 			filters["VolumeID"] = "vol-2"
-			result := filterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("backup-2"))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "backup-1"
-			result := filterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 		})
@@ -52,14 +52,14 @@ var _ = Describe("Filter", func() {
 		It("should filter by multiple criteria", func() {
 			filters["Status"] = "available"
 			filters["VolumeID"] = "vol-1"
-			result := filterBackups(backups, filters)
+			result := FilterBackups(backups, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("backup-1"))
 			Expect(*result[1].Name).To(Equal("backup-3"))
 		})
 	})
 
-	Describe("filterVolumes", func() {
+	Describe("FilterVolumes", func() {
 		var (
 			volumes []iaas.Volume
 			filters map[string]string
@@ -75,20 +75,20 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all volumes when filters is nil", func() {
-			result := filterVolumes(volumes, nil)
+			result := FilterVolumes(volumes, nil)
 			Expect(result).To(Equal(volumes))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "volume-1"
-			result := filterVolumes(volumes, filters)
+			result := FilterVolumes(volumes, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("volume-1"))
 			Expect(*result[1].Name).To(Equal("volume-1"))
 		})
 	})
 
-	Describe("filterSnapshots", func() {
+	Describe("FilterSnapshots", func() {
 		var (
 			snapshots []iaas.Snapshot
 			filters   map[string]string
@@ -104,13 +104,13 @@ var _ = Describe("Filter", func() {
 		})
 
 		It("should return all snapshots when filters is nil", func() {
-			result := filterSnapshots(snapshots, nil)
+			result := FilterSnapshots(snapshots, nil)
 			Expect(result).To(Equal(snapshots))
 		})
 
 		It("should filter by Status", func() {
 			filters["Status"] = "available"
-			result := filterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 			Expect(*result[1].Name).To(Equal("snapshot-3"))
@@ -118,14 +118,14 @@ var _ = Describe("Filter", func() {
 
 		It("should filter by VolumeID", func() {
 			filters["VolumeID"] = "vol-2"
-			result := filterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("snapshot-2"))
 		})
 
 		It("should filter by Name", func() {
 			filters["Name"] = "snapshot-1"
-			result := filterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(1))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 		})
@@ -133,10 +133,42 @@ var _ = Describe("Filter", func() {
 		It("should filter by multiple criteria", func() {
 			filters["Status"] = "available"
 			filters["VolumeID"] = "vol-1"
-			result := filterSnapshots(snapshots, filters)
+			result := FilterSnapshots(snapshots, filters)
 			Expect(result).To(HaveLen(2))
 			Expect(*result[0].Name).To(Equal("snapshot-1"))
 			Expect(*result[1].Name).To(Equal("snapshot-3"))
+		})
+	})
+})
+
+var _ = Describe("Labels", func() {
+	Describe("labelsFromTags", func() {
+		It("should convert tags to labels", func() {
+			tags := map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			}
+
+			labels := LabelsFromTags(tags)
+
+			Expect(labels).To(HaveKeyWithValue("key1", "value1"))
+			Expect(labels).To(HaveKeyWithValue("key2", "value2"))
+		})
+
+		It("should handle empty tags", func() {
+			tags := map[string]string{}
+
+			labels := LabelsFromTags(tags)
+
+			Expect(labels).To(BeEmpty())
+		})
+
+		It("should handle nil tags", func() {
+			var tags map[string]string
+
+			labels := LabelsFromTags(tags)
+
+			Expect(labels).To(BeEmpty())
 		})
 	})
 })
