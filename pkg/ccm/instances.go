@@ -158,8 +158,8 @@ func (i *Instances) makeInstanceID(server *iaas.Server) string {
 }
 
 // sortNics sorts a slice of server network interfaces alphabetically by their network name
-// to ensure a deterministic order. If a non-empty defaultNetwork is provided (matching either 
-// the NetworkName or NetworkId), that specific network interface is moved to the front (index 0) 
+// to ensure a deterministic order. If a non-empty defaultNetwork is provided (matching either
+// the NetworkName or NetworkId), that specific network interface is moved to the front (index 0)
 // of the returned slice.
 func sortNics(nics []iaas.ServerNetwork, defaultNetwork string) []iaas.ServerNetwork {
 	// nics are returned by IaaS API in a non-deterministic order
