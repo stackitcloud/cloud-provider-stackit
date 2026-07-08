@@ -134,11 +134,6 @@ mocks: $(MOCKGEN)
 	@$(MOCKGEN) -destination ./pkg/mock/iaas/iaas.go -package iaas github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api DefaultAPI
 
 	# client mocks
-	# TODO: delete later for cleanup old stackit client PR
-	@$(MOCKGEN) -destination ./pkg/stackit/iaas_mock.go -package stackit ./pkg/stackit IaasClient
-	@$(MOCKGEN) -destination ./pkg/stackit/loadbalancer_mock.go -package stackit ./pkg/stackit LoadbalancerClient
-	@$(MOCKGEN) -destination ./pkg/stackit/server_mock.go -package stackit ./pkg/stackit NodeClient
-
 	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
 	@$(MOCKGEN) -destination ./pkg/csi/util/mount/mount_mock.go -package mount ./pkg/csi/util/mount IMount
 
