@@ -79,6 +79,8 @@ loadBalancer:
   extraLabels:
     key1: value1
     key2: value2
+instance: {}
+  # defaultNetwork: # used for multi-network nodes
 ```
 
 ### CSI Configuration
