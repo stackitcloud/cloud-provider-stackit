@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -769,74 +770,125 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	if snapshotID != "" {
 		snap, err := cloud.GetSnapshot(ctx, snapshotID)
 		if err != nil {
-			if stackiterrors.IsNotFound(err) {
-				klog.V(3).Infof("Snapshot %s not found", snapshotID)
-				return &csi.ListSnapshotsResponse{}, nil
+			if !stackiterrors.IsNotFound(err) {
+				return nil, status.Errorf(codes.Internal, "Failed to GetSnapshot %s: %v", snapshotID, err)
 			}
-			return nil, status.Errorf(codes.Internal, "Failed to GetSnapshot %s: %v", snapshotID, err)
+
+			backup, backupErr := cloud.GetBackup(ctx, snapshotID)
+			if backupErr != nil {
+				if stackiterrors.IsNotFound(backupErr) {
+					klog.V(3).Infof("Snapshot or backup %s not found", snapshotID)
+					return &csi.ListSnapshotsResponse{}, nil
+				}
+				return nil, status.Errorf(codes.Internal, "Failed to GetBackup %s: %v", snapshotID, backupErr)
+			}
+
+			entry := backupSnapshotEntry(*backup)
+			return &csi.ListSnapshotsResponse{
+				Entries: []*csi.ListSnapshotsResponse_Entry{entry},
+			}, entry.Snapshot.CreationTime.CheckValid()
 		}
 
-		ctime := timestamppb.New(*snap.CreatedAt)
-
-		entry := &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      *snap.Size * util.GIBIBYTE,
-				SnapshotId:     *snap.Id,
-				SourceVolumeId: snap.VolumeId,
-				CreationTime:   ctime,
-				ReadyToUse:     true,
-			},
-		}
-
-		entries := []*csi.ListSnapshotsResponse_Entry{entry}
 		return &csi.ListSnapshotsResponse{
-			Entries: entries,
-		}, ctime.CheckValid()
+			Entries: []*csi.ListSnapshotsResponse_Entry{snapshotEntry(*snap)},
+		}, timestamppb.New(*snap.CreatedAt).CheckValid()
 	}
 
-	filters := map[string]string{}
+	startOffset := 0
+	if req.GetStartingToken() != "" {
+		var err error
+		startOffset, err = strconv.Atoi(req.GetStartingToken())
+		if err != nil || startOffset < 0 {
+			return nil, status.Error(codes.Aborted, "starting_token is invalid")
+		}
+	}
 
-	var slist []iaas.Snapshot
-	var err error
-	var nextPageToken string
-
-	// Add the filters
+	filters := map[string]string{
+		"Status": stackitclient.SnapshotReadyStatus,
+	}
 	if req.GetSourceVolumeId() != "" {
 		filters["VolumeID"] = req.GetSourceVolumeId()
-	} else {
-		filters["Limit"] = strconv.Itoa(int(req.MaxEntries))
-		filters["Marker"] = req.StartingToken
 	}
 
-	// Only retrieve snapshots that are available
-	filters["Status"] = stackitclient.SnapshotReadyStatus
-	slist, nextPageToken, err = cloud.ListSnapshots(ctx, filters)
+	snapshotList, _, err := cloud.ListSnapshots(ctx, filters)
 	if err != nil {
 		klog.Errorf("Failed to ListSnapshots: %v", err)
 		return nil, status.Errorf(codes.Internal, "ListSnapshots failed with error %v", err)
 	}
 
-	sentries := make([]*csi.ListSnapshotsResponse_Entry, 0, len(slist))
-	for _, v := range slist {
-		ctime := timestamppb.New(*v.CreatedAt)
-		if err := ctime.CheckValid(); err != nil {
-			klog.Errorf("Error to convert time to timestamp: %v", err)
-		}
-		sentry := csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      *v.Size * util.GIBIBYTE,
-				SnapshotId:     *v.Id,
-				SourceVolumeId: v.VolumeId,
-				CreationTime:   ctime,
-				ReadyToUse:     true,
-			},
-		}
-		sentries = append(sentries, &sentry)
+	backupList, err := cloud.ListBackups(ctx, filters)
+	if err != nil {
+		klog.Errorf("Failed to ListBackups: %v", err)
+		return nil, status.Errorf(codes.Internal, "ListBackups failed with error %v", err)
 	}
+
+	entries := make([]*csi.ListSnapshotsResponse_Entry, 0, len(snapshotList)+len(backupList))
+	for _, v := range snapshotList {
+		entries = append(entries, snapshotEntry(v))
+	}
+	for _, v := range backupList {
+		entries = append(entries, backupSnapshotEntry(v))
+	}
+
+	// sort by creation time and by id (fallback)
+	sort.Slice(entries, func(i, j int) bool {
+		left := entries[i].Snapshot
+		right := entries[j].Snapshot
+		if left.CreationTime.AsTime().Equal(right.CreationTime.AsTime()) {
+			return left.SnapshotId < right.SnapshotId
+		}
+		return left.CreationTime.AsTime().Before(right.CreationTime.AsTime())
+	})
+
+	if startOffset > len(entries) {
+		return nil, status.Error(codes.Aborted, "starting_token is invalid")
+	}
+
+	nextPageToken := ""
+	entries = entries[startOffset:]
+	if req.MaxEntries > 0 && int(req.MaxEntries) < len(entries) {
+		nextPageToken = strconv.Itoa(startOffset + int(req.MaxEntries))
+		entries = entries[:req.MaxEntries]
+	}
+
 	return &csi.ListSnapshotsResponse{
-		Entries:   sentries,
+		Entries:   entries,
 		NextToken: nextPageToken,
 	}, nil
+}
+
+func snapshotEntry(snapshot iaas.Snapshot) *csi.ListSnapshotsResponse_Entry {
+	ctime := timestamppb.New(*snapshot.CreatedAt)
+	if err := ctime.CheckValid(); err != nil {
+		klog.Errorf("Error to convert time to timestamp: %v", err)
+	}
+
+	return &csi.ListSnapshotsResponse_Entry{
+		Snapshot: &csi.Snapshot{
+			SizeBytes:      *snapshot.Size * util.GIBIBYTE,
+			SnapshotId:     *snapshot.Id,
+			SourceVolumeId: snapshot.VolumeId,
+			CreationTime:   ctime,
+			ReadyToUse:     true,
+		},
+	}
+}
+
+func backupSnapshotEntry(backup iaas.Backup) *csi.ListSnapshotsResponse_Entry {
+	ctime := timestamppb.New(*backup.CreatedAt)
+	if err := ctime.CheckValid(); err != nil {
+		klog.Errorf("Error to convert time to timestamp: %v", err)
+	}
+
+	return &csi.ListSnapshotsResponse_Entry{
+		Snapshot: &csi.Snapshot{
+			SizeBytes:      *backup.Size * util.GIBIBYTE,
+			SnapshotId:     *backup.Id,
+			SourceVolumeId: *backup.VolumeId,
+			CreationTime:   ctime,
+			ReadyToUse:     true,
+		},
+	}
 }
 
 // ControllerGetCapabilities implements the default GRPC callout.
