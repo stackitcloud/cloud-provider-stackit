@@ -19,6 +19,14 @@ type CCMConfig struct {
 	Global       GlobalOpts       `yaml:"global"`
 	Metadata     metadata.Opts    `yaml:"metadata"`
 	LoadBalancer LoadBalancerOpts `yaml:"loadBalancer"`
+	Instance     InstanceOpts     `yaml:"instance"`
+}
+
+type InstanceOpts struct {
+	// DefaultNetwork contains the default network to use for a node.
+	// It can contain either the network name or ID.
+	// Can be used in mulit-network scenario to indicate which NIC is the primary one.
+	DefaultNetwork string `yaml:"defaultNetwork"`
 }
 
 type LoadBalancerOpts struct {
