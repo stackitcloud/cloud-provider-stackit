@@ -783,14 +783,14 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 				return nil, status.Errorf(codes.Internal, "Failed to GetBackup %s: %v", snapshotID, backupErr)
 			}
 
-			entry := backupSnapshotEntry(*backup)
+			entry := backupSnapshotEntry(backup)
 			return &csi.ListSnapshotsResponse{
 				Entries: []*csi.ListSnapshotsResponse_Entry{entry},
 			}, entry.Snapshot.CreationTime.CheckValid()
 		}
 
 		return &csi.ListSnapshotsResponse{
-			Entries: []*csi.ListSnapshotsResponse_Entry{snapshotEntry(*snap)},
+			Entries: []*csi.ListSnapshotsResponse_Entry{snapshotEntry(snap)},
 		}, timestamppb.New(*snap.CreatedAt).CheckValid()
 	}
 
@@ -814,11 +814,11 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}
 
 	entries := make([]*csi.ListSnapshotsResponse_Entry, 0, len(snapshotList)+len(backupList))
-	for _, v := range snapshotList {
-		entries = append(entries, snapshotEntry(v))
+	for i := range snapshotList {
+		entries = append(entries, snapshotEntry(&snapshotList[i]))
 	}
-	for _, v := range backupList {
-		entries = append(entries, backupSnapshotEntry(v))
+	for i := range backupList {
+		entries = append(entries, backupSnapshotEntry(&backupList[i]))
 	}
 
 	// sort by creation time and by id (fallback)
@@ -837,7 +837,7 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}, nil
 }
 
-func snapshotEntry(snapshot iaas.Snapshot) *csi.ListSnapshotsResponse_Entry {
+func snapshotEntry(snapshot *iaas.Snapshot) *csi.ListSnapshotsResponse_Entry {
 	ctime := timestamppb.New(*snapshot.CreatedAt)
 	if err := ctime.CheckValid(); err != nil {
 		klog.Errorf("Error to convert time to timestamp: %v", err)
@@ -854,7 +854,7 @@ func snapshotEntry(snapshot iaas.Snapshot) *csi.ListSnapshotsResponse_Entry {
 	}
 }
 
-func backupSnapshotEntry(backup iaas.Backup) *csi.ListSnapshotsResponse_Entry {
+func backupSnapshotEntry(backup *iaas.Backup) *csi.ListSnapshotsResponse_Entry {
 	ctime := timestamppb.New(*backup.CreatedAt)
 	if err := ctime.CheckValid(); err != nil {
 		klog.Errorf("Error to convert time to timestamp: %v", err)
