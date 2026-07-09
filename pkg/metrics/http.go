@@ -3,19 +3,24 @@ package metrics
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func NewInstrumentedHTTPClient() *http.Client {
+func NewInstrumentedHTTPClient(api string) *http.Client {
 	return &http.Client{
-		Transport: &InstrumentedRoundTripper{http.DefaultTransport},
+		Transport: &InstrumentedRoundTripper{
+			api:  api,
+			base: http.DefaultTransport,
+		},
 	}
 }
 
 type InstrumentedRoundTripper struct {
+	api  string
 	base http.RoundTripper
 }
 
@@ -26,15 +31,26 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	response, err := rt.base.RoundTrip(request)
 	duration := time.Since(startTime)
 
-	LoadBalancerResponseTimeHistogram.
-		With(prometheus.Labels{operationLabel: operation}).
-		Observe(float64(duration.Seconds()))
-	LoadBalancerRequestCount.
-		With(prometheus.Labels{operationLabel: operation}).
-		Inc()
+	statusCode := "network_error"
+	if response != nil {
+		statusCode = strconv.Itoa(response.StatusCode)
+	}
 
-	if response != nil && response.StatusCode >= http.StatusInternalServerError {
-		LoadBalancerErrorCount.Inc()
+	labels := prometheus.Labels{
+		apiLabel:       rt.api,
+		methodLabel:    request.Method,
+		operationLabel: operation,
+		codeLabel:      statusCode,
+	}
+
+	HTTPRequestDurationHistogram.With(labels).Observe(duration.Seconds())
+	HTTPRequestCount.With(labels).Inc()
+
+	isHTTPError := response != nil && response.StatusCode >= 400
+	isNetworkError := err != nil
+
+	if isHTTPError || isNetworkError {
+		HTTPErrorCount.With(labels).Inc()
 	}
 
 	return response, err
