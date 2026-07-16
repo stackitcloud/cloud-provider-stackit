@@ -179,13 +179,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 		// Only continue checking if the Snapshot is found
 		if !stackiterrors.IsNotFound(err) {
-			// TODO: Remove cloud.GetVolume() once IaaS adds the AZ field in the response of GetSnapshotByID()
-			snapshotVolSrc, err := cloud.GetVolume(ctx, snap.GetVolumeId())
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Failed to retrieve the source volume of snapshot %s: %v", sourceSnapshotID, err)
-			}
-			if snapshotVolSrc.AvailabilityZone != volAvailability {
-				return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Snapshot. Got %s Required: %s", volAvailability, snapshotVolSrc.AvailabilityZone)
+			if snap.GetAvailabilityZone() != volAvailability {
+				return nil, status.Errorf(codes.ResourceExhausted, "Volume must be in the same availability zone as source Snapshot. Got %s Required: %s", volAvailability, snap.GetAvailabilityZone())
 			}
 		}
 
