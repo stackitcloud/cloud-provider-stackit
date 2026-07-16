@@ -94,7 +94,7 @@ const (
 	BackupSource   VolumeSourceTypes = "backup"
 )
 
-var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
+var volumeErrorStates = [...]string{"ERROR", "ERROR_BACKING-UP", "ERROR_DELETING", "ERROR_RESIZING", "ERROR_RESTORING-BACKUP", "ERROR_KMS-ENCRYPTION-PARAMS"}
 
 func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	apiClient, err := iaas.NewAPIClient(options...)
