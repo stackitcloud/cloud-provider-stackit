@@ -25,7 +25,6 @@ The minor versions of `cloud-provider-stackit` are specifically aligned with the
 
 **Currently Supported Kubernetes Versions:**
 
-* `v1.33.x`
 * `v1.34.x`
 * `v1.35.x`
 
