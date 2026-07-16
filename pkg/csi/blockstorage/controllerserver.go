@@ -356,7 +356,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Error(codes.InvalidArgument, "[ControllerPublishVolume] Volume capability must be provided")
 	}
 
-	_, err := cloud.GetVolume(ctx, volumeID)
+	vol, err := cloud.GetVolume(ctx, volumeID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Volume %s not found", volumeID)
@@ -370,6 +370,15 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
 		}
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
+	}
+
+	// If Volume is already mounted to target instanceID, return OK
+	if vol.ServerId != nil && *vol.ServerId == instanceID {
+		return &csi.ControllerPublishVolumeResponse{}, nil
+	}
+
+	if vol.GetStatus() != stackitclient.VolumeAvailableStatus {
+		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Volume %s is not in an READY state. Got:%s Want:%s", volumeID, vol.GetStatus(), stackitclient.VolumeAvailableStatus)
 	}
 
 	payload := iaas.AddVolumeToServerPayload{
