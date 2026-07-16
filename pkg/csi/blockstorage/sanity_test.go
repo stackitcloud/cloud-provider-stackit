@@ -263,7 +263,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				newBackup := &iaas.Backup{
 					Id:         new(uuid.New().String()),
 					Name:       new(name),
-					Status:     new("available"),
+					Status:     new("AVAILABLE"),
 					VolumeId:   new(volID),
 					SnapshotId: new(snapshotID),
 					CreatedAt:  new(time.Now()),
@@ -329,7 +329,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
 				}
 				vol.ServerId = new(instanceID)
-				vol.Status = new("attached")
+				vol.Status = new("ATTACHED")
 				return *vol.Id, nil
 			}).AnyTimes()
 
@@ -343,7 +343,15 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // context
 				gomock.Any(), // instanceID
 				gomock.Any(), // volumeID
-			).Return(nil).AnyTimes()
+			).DoAndReturn(func(_ context.Context, _, volumeID string) error {
+				vol, ok := createdVolumes[volumeID]
+				if !ok {
+					return &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
+				}
+				vol.ServerId = nil
+				vol.Status = new("AVAILABLE")
+				return nil
+			}).AnyTimes()
 
 			iaasClient.EXPECT().WaitDiskDetached(
 				gomock.Any(), // context
