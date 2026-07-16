@@ -298,13 +298,10 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}
 
 				iaasClient.EXPECT().GetSnapshot(gomock.Any(), "snapshot-id").Return(&iaas.Snapshot{
-					Id:       new("snapshot-id"),
-					Status:   new("AVAILABLE"),
-					VolumeId: "snapshot-volume-id",
-				}, nil)
-				iaasClient.EXPECT().GetVolume(gomock.Any(), "snapshot-volume-id").Return(&iaas.Volume{
-					Id:               new("snapshot-volume-id"),
-					AvailabilityZone: "eu01",
+					Id:               new("snapshot-id"),
+					Status:           new("AVAILABLE"),
+					VolumeId:         "snapshot-volume-id",
+					AvailabilityZone: new("eu01"),
 				}, nil)
 				iaasClient.EXPECT().
 					CreateVolume(gomock.Any(), gomock.Any()).
@@ -420,14 +417,10 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}
 
 				iaasClient.EXPECT().GetSnapshot(gomock.Any(), "snapshot-id").Return(&iaas.Snapshot{
-					Id:       new("snapshot-id"),
-					VolumeId: "volume-id",
-					Status:   new("AVAILABLE"),
-				}, nil)
-				iaasClient.EXPECT().GetVolume(gomock.Any(), "volume-id").Return(&iaas.Volume{
+					Id:               new("snapshot-id"),
+					VolumeId:         "volume-id",
 					Status:           new("AVAILABLE"),
-					AvailabilityZone: "eu01",
-					Id:               new("volume-id"),
+					AvailabilityZone: new("eu01"),
 				}, nil)
 
 				_, err := fakeCs.CreateVolume(context.Background(), req)
