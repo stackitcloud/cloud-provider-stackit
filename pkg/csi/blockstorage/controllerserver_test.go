@@ -1076,7 +1076,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.GetEntries()).To(BeEmpty())
 		})
 
-		It("should successfully list snapshots and backups in deterministic order", func() {
+		It("should successfully list snapshots and backups without imposing an order", func() {
 			req := &csi.ListSnapshotsRequest{}
 
 			firstSnapshotTime := time.Date(2024, time.January, 1, 10, 0, 0, 0, time.UTC)
@@ -1141,7 +1141,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 
 			resp, err := fakeCs.ListSnapshots(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
-			Expect(resp.GetEntries()).Should(Equal(expectedSnapshotListResponse))
+			Expect(resp.GetEntries()).Should(ConsistOf(expectedSnapshotListResponse))
 			Expect(resp.GetNextToken()).To(BeEmpty())
 		})
 

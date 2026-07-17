@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"time"
 
@@ -824,16 +823,6 @@ func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	for i := range backupList {
 		entries = append(entries, backupSnapshotEntry(&backupList[i]))
 	}
-
-	// sort by creation time and by id (fallback)
-	sort.Slice(entries, func(i, j int) bool {
-		left := entries[i].Snapshot
-		right := entries[j].Snapshot
-		if left.CreationTime.AsTime().Equal(right.CreationTime.AsTime()) {
-			return left.SnapshotId < right.SnapshotId
-		}
-		return left.CreationTime.AsTime().Before(right.CreationTime.AsTime())
-	})
 
 	return &csi.ListSnapshotsResponse{
 		Entries:   entries,
