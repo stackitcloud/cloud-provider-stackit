@@ -1025,32 +1025,149 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.GetEntries()).Should(Equal(expectedSnapshotListResponse))
 			Expect(resp.GetEntries()).To(HaveLen(1))
 		})
-		It("should successfully list snapshots", func() {
+
+		It("should fall back to a backup when the snapshot ID resolves to a backup", func() {
+			req := &csi.ListSnapshotsRequest{
+				SnapshotId: "special-backup",
+			}
+			backupCreationTime := time.Now()
+			expectedSnapshotListResponse := []*csi.ListSnapshotsResponse_Entry{
+				{
+					Snapshot: &csi.Snapshot{
+						SnapshotId:     "special-backup",
+						SizeBytes:      10 * util.GIBIBYTE,
+						CreationTime:   timestamppb.New(backupCreationTime),
+						SourceVolumeId: "fake-volume",
+						ReadyToUse:     true,
+					},
+				},
+			}
+
+			iaasClient.EXPECT().GetSnapshot(gomock.Any(), "special-backup").Return(nil, &oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
+			iaasClient.EXPECT().GetBackup(gomock.Any(), "special-backup").Return(&iaas.Backup{
+				Id:        new("special-backup"),
+				VolumeId:  new("fake-volume"),
+				Size:      new(int64(10)),
+				CreatedAt: new(backupCreationTime),
+			}, nil)
+
+			resp, err := fakeCs.ListSnapshots(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(resp.GetEntries()).Should(Equal(expectedSnapshotListResponse))
+			Expect(resp.GetEntries()).To(HaveLen(1))
+		})
+
+		It("should return an empty response when neither snapshot nor backup can be found", func() {
+			req := &csi.ListSnapshotsRequest{
+				SnapshotId: "missing-snapshot",
+			}
+
+			iaasClient.EXPECT().GetSnapshot(gomock.Any(), "missing-snapshot").Return(nil, &oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
+			iaasClient.EXPECT().GetBackup(gomock.Any(), "missing-snapshot").Return(nil, &oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
+
+			resp, err := fakeCs.ListSnapshots(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(resp.GetEntries()).To(BeEmpty())
+		})
+
+		It("should successfully list snapshots and backups without imposing an order", func() {
 			req := &csi.ListSnapshotsRequest{}
 
-			snapShotCreationTime := time.Now()
+			firstSnapshotTime := time.Date(2024, time.January, 1, 10, 0, 0, 0, time.UTC)
+			backupCreationTime := firstSnapshotTime.Add(1 * time.Hour)
+			secondSnapshotTime := firstSnapshotTime.Add(2 * time.Hour)
 
 			expectedSnapshotListResponse := []*csi.ListSnapshotsResponse_Entry{
 				{
 					Snapshot: &csi.Snapshot{
 						SnapshotId:     "fake-snapshot",
 						SizeBytes:      10 * util.GIBIBYTE,
-						CreationTime:   timestamppb.New(snapShotCreationTime),
+						CreationTime:   timestamppb.New(firstSnapshotTime),
+						SourceVolumeId: "something-different",
+						ReadyToUse:     true,
+					},
+				},
+				{
+					Snapshot: &csi.Snapshot{
+						SnapshotId:     "fake-backup",
+						SizeBytes:      20 * util.GIBIBYTE,
+						CreationTime:   timestamppb.New(backupCreationTime),
+						SourceVolumeId: "something-different",
+						ReadyToUse:     true,
+					},
+				},
+				{
+					Snapshot: &csi.Snapshot{
+						SnapshotId:     "later-snapshot",
+						SizeBytes:      30 * util.GIBIBYTE,
+						CreationTime:   timestamppb.New(secondSnapshotTime),
 						SourceVolumeId: "something-different",
 						ReadyToUse:     true,
 					},
 				},
 			}
 
-			iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{{
-				Id:        new("fake-snapshot"),
-				VolumeId:  "something-different",
-				Size:      new(int64(10)),
-				CreatedAt: new(snapShotCreationTime),
-			}}, "", nil)
+			iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).Return([]iaas.Snapshot{
+				{
+					Id:        new("later-snapshot"),
+					VolumeId:  "something-different",
+					Size:      new(int64(30)),
+					CreatedAt: new(secondSnapshotTime),
+					Status:    new("AVAILABLE"),
+				},
+				{
+					Id:        new("fake-snapshot"),
+					VolumeId:  "something-different",
+					Size:      new(int64(10)),
+					CreatedAt: new(firstSnapshotTime),
+					Status:    new("AVAILABLE"),
+				},
+			}, "", nil)
+			iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).Return([]iaas.Backup{
+				{
+					Id:        new("fake-backup"),
+					VolumeId:  new("something-different"),
+					Size:      new(int64(20)),
+					CreatedAt: new(backupCreationTime),
+					Status:    new("AVAILABLE"),
+				},
+			}, nil)
+
 			resp, err := fakeCs.ListSnapshots(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
-			Expect(resp.GetEntries()).Should(Equal(expectedSnapshotListResponse))
+			Expect(resp.GetEntries()).Should(ConsistOf(expectedSnapshotListResponse))
+			Expect(resp.GetNextToken()).To(BeEmpty())
 		})
+
+		It("should pass the source volume filter to snapshots and backups", func() {
+			req := &csi.ListSnapshotsRequest{
+				SourceVolumeId: "volume-1",
+			}
+
+			expectedFilters := map[string]string{
+				"Status":   stackitclient.SnapshotReadyStatus,
+				"VolumeID": "volume-1",
+			}
+
+			iaasClient.EXPECT().ListSnapshots(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
+				Expect(filters).To(Equal(expectedFilters))
+				return []iaas.Snapshot{}, "", nil
+			})
+			iaasClient.EXPECT().ListBackups(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, filters map[string]string) ([]iaas.Backup, error) {
+				Expect(filters).To(Equal(expectedFilters))
+				return []iaas.Backup{}, nil
+			})
+
+			resp, err := fakeCs.ListSnapshots(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(resp.GetEntries()).To(BeEmpty())
+		})
+
 	})
 })
