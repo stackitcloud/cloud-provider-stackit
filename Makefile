@@ -2,6 +2,7 @@
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
+BUILD_BINARIES ?= stackit-csi-plugin cloud-controller-manager kubetest2-stackit
 BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*' 2>/dev/null || git rev-parse --short HEAD)
@@ -9,6 +10,7 @@ REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
+GO_BUILD_LDFLAGS := $(if $(strip $(LDFLAGS)),-ldflags $(LDFLAGS),)
 
 .PHONY: all
 all: verify
@@ -17,12 +19,12 @@ all: verify
 
 include ./hack/tools.mk
 
-build: $(BUILD_IMAGES)
+build: $(BUILD_BINARIES)
 
-$(BUILD_IMAGES): $(SOURCES)
+$(BUILD_BINARIES): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
 		-trimpath \
-		-ldflags $(LDFLAGS) \
+		$(GO_BUILD_LDFLAGS) \
 		-o $@ \
 		cmd/$@/main.go
 
@@ -61,7 +63,7 @@ modules: ## Runs go mod to ensure modules are up to date.
 
 .PHONY: test
 test: ## Run tests.
-	./hack/test.sh ./cmd/... ./pkg/...
+	./hack/test.sh ./cmd/... ./pkg/... ./test/...
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage.
@@ -132,6 +134,7 @@ mocks: $(MOCKGEN)
 	# API mocks
 	@$(MOCKGEN) -destination ./pkg/mock/loadbalancer/loadbalancer.go -package loadbalancer github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api DefaultAPI
 	@$(MOCKGEN) -destination ./pkg/mock/iaas/iaas.go -package iaas github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api DefaultAPI
+	@$(MOCKGEN) -destination ./pkg/mock/ske/ske.go -package ske github.com/stackitcloud/stackit-sdk-go/services/ske/v2api DefaultAPI
 
 	# client mocks
 	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
@@ -139,6 +142,7 @@ mocks: $(MOCKGEN)
 
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/iaas_mock.go -typed -package client ./pkg/stackit/client IaaSClient
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/loadbalancer_mock.go -typed -package client ./pkg/stackit/client LoadBalancingClient
+	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/ske_mock.go -typed -package client ./pkg/stackit/client SKEClient
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/mock.go -package client ./pkg/stackit/client Factory
 
 .PHONY: generate

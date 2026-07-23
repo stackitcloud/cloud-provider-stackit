@@ -27,6 +27,7 @@ var (
 	cloudConfig              string
 	cluster                  string
 	metricsAddress           string
+	driverName               string
 	provideControllerService bool
 	provideNodeService       bool
 	legacyStorageMode        bool
@@ -59,6 +60,10 @@ func main() {
 				return fmt.Errorf("unable to mark flag cloud-config to be required")
 			}
 
+			if legacyStorageMode && driverName != blockstorage.DefaultDriverName {
+				return fmt.Errorf("--legacy-storage-mode cannot be used with --driver-name=%q", driverName)
+			}
+
 			return nil
 		},
 		Version: version.Version,
@@ -74,6 +79,7 @@ func main() {
 	cmd.Flags().StringVar(&cloudConfig, "cloud-config", "", "CSI driver cloud config. This option can be given multiple times")
 
 	cmd.PersistentFlags().StringVar(&cluster, "cluster", "", "The identifier of the cluster that the plugin is running in.")
+	cmd.PersistentFlags().StringVar(&driverName, "driver-name", blockstorage.DefaultDriverName, "The CSI driver identity reported and used by the plugin.")
 	cmd.PersistentFlags().StringVar(&metricsAddress, "metrics-address", "",
 		"The TCP network address where the HTTP server for providing metrics for diagnostics, will listen (example: `:8080`)."+
 			"The default is empty string, which means the server is disabled.")
@@ -104,9 +110,10 @@ func handle(ctx context.Context) {
 	}
 	// Initialize cloud
 	driverOpts := &blockstorage.DriverOpts{
-		Endpoint:  endpoint,
-		ClusterID: cluster,
-		PVCLister: csi.GetPVCLister(),
+		Endpoint:   endpoint,
+		ClusterID:  cluster,
+		DriverName: driverName,
+		PVCLister:  csi.GetPVCLister(),
 	}
 
 	if legacyStorageMode {

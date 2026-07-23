@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [Bootstrapping a Kubeadm Test Environment](#bootstrapping-a-kubeadm-test-environment)
+- [Building the kubetest2 STACKIT Deployer](#building-the-kubetest2-stackit-deployer)
   - [Prerequisites](#prerequisites)
   - [Script Reference](#script-reference)
   - [Creating a Cluster](#creating-a-cluster)
@@ -170,6 +171,18 @@ E2E_DEPLOY_CCM_IMAGE="ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controll
  --project-id <STACKIT_PROJECT_ID> \
  --kubernetes-version <K8S_VERSION>
 ```
+
+## Building the kubetest2 STACKIT Deployer
+
+The repository now includes a local `kubetest2-stackit` deployer binary for provisioning a single STACKIT SKE cluster during a `kubetest2` run.
+
+Build it with:
+
+```bash
+make build
+```
+
+The binary is written to the repository root as `./kubetest2-stackit` alongside the existing controller-manager and CSI binaries.
 
 ## Running End-to-End (E2E) Tests for the CSI Driver
 
