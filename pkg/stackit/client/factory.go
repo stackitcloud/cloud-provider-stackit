@@ -40,6 +40,9 @@ type Factory interface {
 
 	// IaaS returns a STACKIT IaaS service client.
 	IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error)
+
+	// SKE returns a STACKIT Kubernetes Engine service client.
+	SKE(options []sdkconfig.ConfigurationOption) (SKEClient, error)
 }
 
 type factory struct {
@@ -60,6 +63,10 @@ func (f factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBal
 
 func (f factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options))
+}
+
+func (f factory) SKE(options []sdkconfig.ConfigurationOption) (SKEClient, error) {
+	return NewSKEClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options))
 }
 
 func withDefaultOptions(options []sdkconfig.ConfigurationOption) []sdkconfig.ConfigurationOption {

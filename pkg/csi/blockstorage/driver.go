@@ -15,16 +15,18 @@ import (
 )
 
 const (
-	driverName        = "block-storage.csi.stackit.cloud"
-	legacyDriverName  = "cinder.csi.openstack.org"
-	topologyKey       = "topology." + driverName + "/zone"
-	legacyTopologyKey = "topology." + legacyDriverName + "/zone"
+	DefaultDriverName = "block-storage.csi.stackit.cloud"
+	LegacyDriverName  = "cinder.csi.openstack.org"
 
 	// ResizeRequired parameter, if set to true, will trigger a resize on mount operation
-	ResizeRequired = driverName + "/resizeRequired"
+	ResizeRequired = DefaultDriverName + "/resizeRequired"
 )
 
 var (
+	driverName        = DefaultDriverName
+	legacyDriverName  = LegacyDriverName
+	topologyKey       = topologyKeyForDriver(DefaultDriverName)
+	legacyTopologyKey = topologyKeyForDriver(LegacyDriverName)
 	// CSI spec version
 	specVersion = "1.12.0"
 	Version     = "1.0.0"
@@ -53,15 +55,34 @@ type Driver struct {
 type DriverOpts struct {
 	ClusterID           string
 	Endpoint            string
+	DriverName          string
 	LegacyDriverName    bool
 	BlockVolumeCreation bool
 
 	PVCLister corev1.PersistentVolumeClaimLister
 }
 
+func ValidateDriverOpts(o *DriverOpts) error {
+	if o == nil {
+		return fmt.Errorf("driver options must not be nil")
+	}
+	if o.LegacyDriverName && o.DriverName != "" && o.DriverName != DefaultDriverName {
+		return fmt.Errorf("--legacy-storage-mode cannot be used with --driver-name=%q", o.DriverName)
+	}
+	return nil
+}
+
 func NewDriver(o *DriverOpts) *Driver {
+	if err := ValidateDriverOpts(o); err != nil {
+		klog.Fatal(err)
+	}
+
+	name := DefaultDriverName
+	if o.DriverName != "" {
+		name = o.DriverName
+	}
 	d := &Driver{
-		name:      driverName,
+		name:      name,
 		fqVersion: fmt.Sprintf("%s@%s", Version, version.Version),
 		endpoint:  o.Endpoint,
 		clusterID: o.ClusterID,
@@ -69,7 +90,7 @@ func NewDriver(o *DriverOpts) *Driver {
 	}
 
 	if o.LegacyDriverName {
-		d.name = legacyDriverName
+		d.name = LegacyDriverName
 		d.legacyDriver = true
 	}
 
@@ -110,6 +131,30 @@ func NewDriver(o *DriverOpts) *Driver {
 	d.ids = NewIdentityServer(d)
 
 	return d
+}
+
+func (d *Driver) topologyKey() string {
+	return topologyKeyForDriver(d.name)
+}
+
+func (d *Driver) resizeRequiredKey() string {
+	return resizeRequiredKeyForDriver(d.name)
+}
+
+func (d *Driver) clusterMetadataKey() string {
+	return clusterMetadataKeyForDriver(d.name)
+}
+
+func topologyKeyForDriver(name string) string {
+	return "topology." + name + "/zone"
+}
+
+func resizeRequiredKeyForDriver(name string) string {
+	return name + "/resizeRequired"
+}
+
+func clusterMetadataKeyForDriver(name string) string {
+	return name + "/cluster"
 }
 
 func (d *Driver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) {
