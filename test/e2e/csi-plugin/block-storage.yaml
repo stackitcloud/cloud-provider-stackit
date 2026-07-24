@@ -5,8 +5,8 @@ SnapshotClass:
 DriverInfo:
   Name: block-storage.csi.stackit.cloud
   SupportedFsType:
-    - "xfs"
-    - "ext4"
+    ext4: {}
+    xfs: {}
   Capabilities:
     # whether to support RAW block mode
     block: true
