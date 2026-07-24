@@ -68,6 +68,10 @@ test-cover: ## Run tests with coverage.
 	go test -coverprofile cover.out ./...
 	go tool cover -html cover.out -o cover.html
 
+.PHONY: test-e2e
+test-e2e: ## Run the end-to-end test suite (in CI, inside a throw-away STACKIT project).
+	./hack/test-e2e.sh
+
 ##@ Verification
 
 .PHONY: lint
