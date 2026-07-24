@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -41,6 +40,7 @@ PORTAL_FOLDER_ID: the folder in the portal overview in which the e2e portal proj
 
 const (
 	readinessWaitSeconds = 10
+	readinessRetries     = 30
 )
 
 func main() {
@@ -58,7 +58,6 @@ func main() {
 func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	var errs error
 
 	stackitClient, err := sdk.NewClient()
 	if err != nil {
@@ -67,24 +66,25 @@ func run() error {
 
 	stackitProjectID, err := createPortalProject(ctx, stackitClient)
 	if err != nil {
-		return errors.Join(errs, err)
+		return err
 	}
 	defer func() {
-		log.Printf("Deleting portal project %s.\n", stackitProjectID)
+		log.Printf("Deleting portal project %s.", stackitProjectID)
 		cleanupErr := deletePortalProject(context.Background(), stackitClient, stackitProjectID)
 		if cleanupErr != nil {
-			errs = errors.Join(errs, cleanupErr)
+			log.Printf("Deleting protal project %s failed: %v", stackitProjectID, cleanupErr)
 		}
 	}()
 
-	log.Printf("Created project %s. Waiting for it to become ACTIVE.\n", stackitProjectID)
-	if err = waitForProjectReadiness(ctx, stackitClient, stackitProjectID); err != nil {
-		return errors.Join(errs, err)
+	log.Printf("Created project %s. Waiting for it to become ACTIVE.", stackitProjectID)
+	err = waitForProjectReadiness(ctx, stackitClient, stackitProjectID)
+	if err != nil {
+		return err
 	}
 
 	saKeyJSON, err := createServiceAccountAndKey(ctx, stackitProjectID)
 	if err != nil {
-		return errors.Join(errs, err)
+		return err
 	}
 
 	// gosec G204/G702 warns when cmd input comes from an external source like os.Args
@@ -109,10 +109,10 @@ func run() error {
 	cmderr := cmd.Run()
 
 	if cmderr != nil {
-		errs = errors.Join(errs, fmt.Errorf("integration tests failed: %v", cmderr))
+		return fmt.Errorf("integration tests failed: %v", cmderr)
 	}
 
-	return errs
+	return nil
 }
 
 // checkRequiredEnvironmentVariables verifies if the required environment variables for the STACKIT service are set.
@@ -251,15 +251,15 @@ func generateRandomSuffix(length int) string {
 }
 
 // waitForProjectReadiness waits for a specified portal project to reach the ACTIVE lifecycle state.
-// The function waits 1 second in between status checks.
-// If the project becomes active within 30 retries, the function returns nil.
-// If the project does not become active within 30 seconds, the function returns an error indicating a timeout.
+// The function waits readinessWaitSeconds in between status checks.
+// If the project becomes active within readinessRetries, the function returns nil.
+// If the project does not become active within readinessRetries, the function returns an error indicating a timeout.
 func waitForProjectReadiness(ctx context.Context, client *sdk.Client, stackitProjectID string) error {
-	for range 30 {
+	for range readinessRetries {
 		project, err := client.GetProject(ctx, stackitProjectID)
 		if err != nil {
 			log.Printf("Error getting project: %v", err)
-			log.Printf("Retrying in %v seconds.\n", readinessWaitSeconds)
+			log.Printf("Retrying in %v seconds.", readinessWaitSeconds)
 
 			select {
 			case <-ctx.Done():
@@ -270,11 +270,11 @@ func waitForProjectReadiness(ctx context.Context, client *sdk.Client, stackitPro
 		}
 
 		if project.LifecycleState == resourcemanager.LIFECYCLESTATE_ACTIVE {
-			log.Printf("Project '%s' is now active.\n", stackitProjectID)
+			log.Printf("Project '%s' is now active.", stackitProjectID)
 			return nil
 		}
 
-		log.Printf("Project is not ACTIVE yet, retrying in %v seconds.\n", readinessWaitSeconds)
+		log.Printf("Project is not ACTIVE yet, retrying in %v seconds.", readinessWaitSeconds)
 		time.Sleep(readinessWaitSeconds * time.Second)
 	}
 	return fmt.Errorf("timeout waiting for project '%s' to become active", stackitProjectID)
