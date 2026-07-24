@@ -439,6 +439,51 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect UpdateLoadBalancer to have been called.
 			// Expect DeleteCredentials to have been called.
 		})
+
+		DescribeTable("return error when LoadBalancer is in error state",
+			func(lbErrors []loadbalancer.LoadBalancerError, wantedErrorString string) {
+				svc := minimalLoadBalancerService()
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
+				Expect(err).NotTo(HaveOccurred())
+				myLb := &loadbalancer.LoadBalancer{
+					Errors:          lbErrors,
+					ExternalAddress: spec.ExternalAddress,
+					PlanId:          spec.PlanId,
+					Listeners:       spec.Listeners,
+					Name:            spec.Name,
+					Networks:        spec.Networks,
+					Options:         spec.Options,
+					PrivateAddress:  spec.PrivateAddress,
+					Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_ERROR),
+					TargetPools:     spec.TargetPools,
+					Version:         new("current-version"),
+				}
+
+				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+
+				_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(wantedErrorString))
+
+			},
+			Entry("should keep DisableTargetSecurityGroupAssignment as true when it is initially true",
+				[]loadbalancer.LoadBalancerError{},
+				"the load balancer is in an error state",
+			),
+			Entry("should not set DisableTargetSecurityGroupAssignment to true when it is initially false",
+				[]loadbalancer.LoadBalancerError{
+					{
+						Type:        new(loadbalancer.LOADBALANCERERRORTYPE_TYPE_UNSPECIFIED),
+						Description: new("more details"),
+					},
+					{
+						Type:        new(loadbalancer.LOADBALANCERERRORTYPE_TYPE_UNSPECIFIED),
+						Description: new("even more details"),
+					},
+				},
+				"the load balancer is in an error state: [TYPE_UNSPECIFIED] more details; [TYPE_UNSPECIFIED] even more details",
+			),
+		)
 	})
 
 	Describe("EnsureLoadBalancerDeleted", func() {
