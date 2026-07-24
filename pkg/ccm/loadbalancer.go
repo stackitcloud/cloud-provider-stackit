@@ -175,7 +175,18 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 	}
 
 	if lb.Status != nil && *lb.Status == loadbalancer.LOADBALANCERSTATUS_STATUS_ERROR {
-		return nil, fmt.Errorf("the load balancer is in an error state")
+		errorsList := lb.GetErrors()
+
+		if len(errorsList) == 0 {
+			return nil, fmt.Errorf("the load balancer is in an error state")
+		}
+
+		var errMessages []string
+		for _, lbErr := range errorsList {
+			errMessages = append(errMessages, fmt.Sprintf("[%s] %s", lbErr.GetType(), lbErr.GetDescription()))
+		}
+
+		return nil, fmt.Errorf("the load balancer is in an error state: %s", strings.Join(errMessages, "; "))
 	}
 	if lb.Status == nil || *lb.Status != loadbalancer.LOADBALANCERSTATUS_STATUS_READY {
 		return nil, api.NewRetryError("waiting for load balancer to become ready. This error is normal while the load balancer starts.", retryDuration)
