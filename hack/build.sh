@@ -84,7 +84,16 @@ labels=(
   org.opencontainers.image.url=https://github.com/stackitcloud/cloud-provider-stackit
 )
 
-KO_DOCKER_REPO=${REGISTRY}/${REPO} \
+go_env=()
+if [[ -n "${LDFLAGS:-}" ]]; then
+  goflags="${GOFLAGS:-}"
+  if [[ -n "${goflags}" ]]; then
+    goflags="${goflags} "
+  fi
+  go_env+=("GOFLAGS=${goflags}-ldflags=${LDFLAGS}")
+fi
+
+env "${go_env[@]}" KO_DOCKER_REPO=${REGISTRY}/${REPO} \
   ko build --local="${LOCAL}" \
   -t "$(comma_separated "${tags[@]}")" \
   --sbom=none \

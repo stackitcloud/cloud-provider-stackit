@@ -15,20 +15,41 @@ import (
 )
 
 const (
-	driverName        = "block-storage.csi.stackit.cloud"
-	legacyDriverName  = "cinder.csi.openstack.org"
-	topologyKey       = "topology." + driverName + "/zone"
-	legacyTopologyKey = "topology." + legacyDriverName + "/zone"
-
-	// ResizeRequired parameter, if set to true, will trigger a resize on mount operation
-	ResizeRequired = driverName + "/resizeRequired"
+	legacyDriverName = "cinder.csi.openstack.org"
 )
 
 var (
+	// DriverName is the default CSI driver name and can be overridden at build time
+	// using `go build -ldflags "-X github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage.DriverName=..."`.
+	DriverName = "block-storage.csi.stackit.cloud"
 	// CSI spec version
 	specVersion = "1.12.0"
 	Version     = "1.0.0"
 )
+
+func topologyKeyForDriver(name string) string {
+	return "topology." + name + "/zone"
+}
+
+func driverResizeRequiredKey() string {
+	return DriverName + "/resizeRequired"
+}
+
+func driverClusterIDKey() string {
+	return DriverName + "/cluster"
+}
+
+func activeDriverName(legacy bool) string {
+	if legacy {
+		return legacyDriverName
+	}
+
+	return DriverName
+}
+
+func activeTopologyKey(legacy bool) string {
+	return topologyKeyForDriver(activeDriverName(legacy))
+}
 
 type Driver struct {
 	name                string
@@ -61,7 +82,7 @@ type DriverOpts struct {
 
 func NewDriver(o *DriverOpts) *Driver {
 	d := &Driver{
-		name:      driverName,
+		name:      DriverName,
 		fqVersion: fmt.Sprintf("%s@%s", Version, version.Version),
 		endpoint:  o.Endpoint,
 		clusterID: o.ClusterID,
@@ -69,7 +90,7 @@ func NewDriver(o *DriverOpts) *Driver {
 	}
 
 	if o.LegacyDriverName {
-		d.name = legacyDriverName
+		d.name = activeDriverName(true)
 		d.legacyDriver = true
 	}
 

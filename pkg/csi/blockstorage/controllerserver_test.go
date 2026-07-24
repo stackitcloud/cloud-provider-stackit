@@ -115,7 +115,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				},
 				AccessibilityRequirements: &csi.TopologyRequirement{
 					Requisite: []*csi.Topology{
-						{Segments: map[string]string{topologyKey: "zone-from-accessibility-reqs"}},
+						{Segments: map[string]string{activeTopologyKey(false): "zone-from-accessibility-reqs"}},
 					},
 				},
 			}
@@ -143,7 +143,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				},
 				AccessibilityRequirements: &csi.TopologyRequirement{
 					Requisite: []*csi.Topology{
-						{Segments: map[string]string{topologyKey: "zone-from-accessibility-reqs"}},
+						{Segments: map[string]string{activeTopologyKey(false): "zone-from-accessibility-reqs"}},
 					},
 				},
 			}
@@ -279,7 +279,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					AccessibilityRequirements: &csi.TopologyRequirement{
 						Requisite: []*csi.Topology{
 							{
-								Segments: map[string]string{topologyKey: "eu01"},
+								Segments: map[string]string{activeTopologyKey(false): "eu01"},
 							},
 						},
 					},
@@ -412,7 +412,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				}
 				req.AccessibilityRequirements = &csi.TopologyRequirement{
 					Requisite: []*csi.Topology{
-						{Segments: map[string]string{topologyKey: "some-other-zone"}},
+						{Segments: map[string]string{activeTopologyKey(false): "some-other-zone"}},
 					},
 				}
 

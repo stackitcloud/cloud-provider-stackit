@@ -22,7 +22,7 @@ build: $(BUILD_IMAGES)
 $(BUILD_IMAGES): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
 		-trimpath \
-		-ldflags $(LDFLAGS) \
+		-ldflags "$(LDFLAGS)" \
 		-o $@ \
 		cmd/$@/main.go
 
