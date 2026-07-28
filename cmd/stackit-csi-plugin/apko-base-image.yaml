@@ -8,6 +8,7 @@ contents:
   - ca-certificates
   - blkid=~2.42.2
   - blockdev=~2.42.2
+  - btrfs-progs=~7.1
   - e2fsprogs=~1.47.4
   - e2fsprogs-extra=~1.47.4
   - lsblk=~2.42.2
