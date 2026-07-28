@@ -277,7 +277,7 @@ func (ns *nodeServer) formatAndMountRetry(devicePath, stagingTarget, fsType stri
 	if fsType == util.FSTypeXfs {
 		// With newer xfsProgs version newer features are enabled by default. This forces mkfs.xfs to use flags compatible
 		// with the linux LTS 5.10 kernel
-		formatOptions := []string{"-i", "/usr/share/xfsprogs/mkfs/lts_5.10.conf"}
+		formatOptions := []string{"-n", "parent=0", "-i", "exchange=0"}
 		err = m.Mounter().FormatAndMountSensitiveWithFormatOptions(devicePath, stagingTarget, fsType, options, nil, formatOptions)
 	} else {
 		err = m.Mounter().FormatAndMount(devicePath, stagingTarget, fsType, options)
