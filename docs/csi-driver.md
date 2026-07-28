@@ -27,6 +27,14 @@ The CSI driver enables dynamic provisioning and management of persistent volumes
 
 ## Basic Usage
 
+### Supported Filesystems
+
+We currently support the following file systems:
+
+- ext4
+- xfs
+- [EXPERIMENTAL] btrfs. Use at your own risk!
+
 ### Create a StorageClass
 
 ```YAML
