@@ -466,11 +466,11 @@ var _ = Describe("LoadBalancer", func() {
 				Expect(err).To(MatchError(wantedErrorString))
 
 			},
-			Entry("should keep DisableTargetSecurityGroupAssignment as true when it is initially true",
+			Entry("should return an error without specific errors",
 				[]loadbalancer.LoadBalancerError{},
 				"the load balancer is in an error state",
 			),
-			Entry("should not set DisableTargetSecurityGroupAssignment to true when it is initially false",
+			Entry("should return an error with specific errors",
 				[]loadbalancer.LoadBalancerError{
 					{
 						Type:        new(loadbalancer.LOADBALANCERERRORTYPE_TYPE_UNSPECIFIED),
