@@ -9,6 +9,7 @@ const (
 )
 
 const (
+	FSTypeExt3  = "ext3"
 	FSTypeExt4  = "ext4"
 	FSTypeXfs   = "xfs"
 	FSTypeBtrfs = "btrfs"
