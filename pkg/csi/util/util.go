@@ -8,6 +8,11 @@ const (
 	TEBIBYTE
 )
 
+const (
+	FSTypeExt4 = "ext4"
+	FSTypeXfs  = "xfs"
+)
+
 // RoundUpSize calculates how many allocation units are needed to accommodate
 // a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
 // allocates volumes in gibibyte-sized chunks,
