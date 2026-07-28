@@ -206,7 +206,7 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// Volume Mount
 	if notMnt {
 		// set default fstype is ext4
-		fsType := "ext4"
+		fsType := util.FSTypeExt4
 		var options []string
 		if mnt := volumeCapability.GetMount(); mnt != nil {
 			if mnt.FsType != "" {
@@ -274,7 +274,7 @@ func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) (stagingTar
 func (ns *nodeServer) formatAndMountRetry(devicePath, stagingTarget, fsType string, options []string) error {
 	m := ns.Mount
 	var err error
-	if fsType == "xfs" {
+	if fsType == util.FSTypeXfs {
 		// With newer xfsProgs version newer features are enabled by default. This forces mkfs.xfs to use flags compatible
 		// with the linux LTS 5.10 kernel
 		formatOptions := []string{"-i", "/usr/share/xfsprogs/mkfs/lts_5.10.conf"}
@@ -516,7 +516,7 @@ func collectMountOptions(fsType string, mntFlags []string) []string {
 
 	// By default, xfs does not allow mounting of two volumes with the same filesystem uuid.
 	// Force ignore this uuid to be able to mount volume + its clone / restored snapshot on the same node.
-	if fsType == "xfs" {
+	if fsType == util.FSTypeXfs {
 		options = append(options, "nouuid")
 	}
 	return options
