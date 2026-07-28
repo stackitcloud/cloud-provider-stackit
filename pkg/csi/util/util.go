@@ -9,8 +9,9 @@ const (
 )
 
 const (
-	FSTypeExt4 = "ext4"
-	FSTypeXfs  = "xfs"
+	FSTypeExt4  = "ext4"
+	FSTypeXfs   = "xfs"
+	FSTypeBtrfs = "btrfs"
 )
 
 // RoundUpSize calculates how many allocation units are needed to accommodate
