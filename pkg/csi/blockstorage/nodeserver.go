@@ -39,6 +39,13 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 )
 
+var (
+	ValidFSTypes = map[string]struct{}{
+		util.FSTypeExt4: {},
+		util.FSTypeXfs:  {},
+	}
+)
+
 type nodeServer struct {
 	Driver   *Driver
 	Mount    mount.IMount
@@ -205,6 +212,12 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 			if mnt.FsType != "" {
 				fsType = mnt.FsType
 			}
+
+			_, ok := ValidFSTypes[strings.ToLower(fsType)]
+			if !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "NodeStageVolume: invalid fstype %s. Only supported fsTypes are xfs or ext4 (default)", fsType)
+			}
+
 			mountFlags := mnt.GetMountFlags()
 			options = append(options, collectMountOptions(fsType, mountFlags)...)
 		}
@@ -260,7 +273,15 @@ func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) (stagingTar
 // If the initial mount fails, it rescans the device and retries the mount operation.
 func (ns *nodeServer) formatAndMountRetry(devicePath, stagingTarget, fsType string, options []string) error {
 	m := ns.Mount
-	err := m.Mounter().FormatAndMount(devicePath, stagingTarget, fsType, options)
+	var err error
+	if fsType == "xfs" {
+		// With newer xfsProgs version newer features are enabled by default. This forces mkfs.xfs to use flags compatible
+		// with the linux LTS 5.10 kernel
+		formatOptions := []string{"-i", "/usr/share/xfsprogs/mkfs/lts_5.10.conf"}
+		err = m.Mounter().FormatAndMountSensitiveWithFormatOptions(devicePath, stagingTarget, fsType, options, nil, formatOptions)
+	} else {
+		err = m.Mounter().FormatAndMount(devicePath, stagingTarget, fsType, options)
+	}
 	if err != nil {
 		klog.Infof("Initial format and mount failed: %v. Attempting rescan.", err)
 		// Attempting rescan if the initial mount fails
