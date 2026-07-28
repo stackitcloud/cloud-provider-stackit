@@ -7,6 +7,8 @@ DriverInfo:
   SupportedFsType:
     ext4: {}
     xfs: {}
+    btrfs: {}
+    ext3: {}
   Capabilities:
     # whether to support RAW block mode
     block: true

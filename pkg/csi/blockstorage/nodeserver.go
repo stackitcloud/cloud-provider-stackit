@@ -41,6 +41,7 @@ import (
 
 var (
 	ValidFSTypes = map[string]struct{}{
+		util.FSTypeExt3:  {},
 		util.FSTypeExt4:  {},
 		util.FSTypeXfs:   {},
 		util.FSTypeBtrfs: {},
