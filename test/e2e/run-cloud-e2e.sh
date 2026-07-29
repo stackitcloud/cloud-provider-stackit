@@ -9,6 +9,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "> Running cloud-e2e suite against STACKIT project ${STACKIT_PROJECT_ID:-<unset>}"
-echo "> Versions: k8s=${K8S_VERSION:-<unset>} image=${IMAGE_VERSION:-<unset>}"
+echo "> Running cloud-e2e suite against a STACKIT project"
+echo "> STACKIT_PROJECT_ID=${STACKIT_PROJECT_ID:-<unset>}"
+echo "> K8S_VERSION=${K8S_VERSION:-<unset>}"
+echo "> IMAGE_VERSION=${IMAGE_VERSION:-<unset>}"
+echo "> IMAGE_NAME=${IMAGE_NAME:-<unset>}"
+echo "> MACHINE_TYPE=${MACHINE_TYPE:-<unset>}"
 echo "TODO: implement the cloud-e2e test suite"
