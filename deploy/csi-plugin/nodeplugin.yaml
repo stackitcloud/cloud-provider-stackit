@@ -34,7 +34,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        imagePullPolicy: Always
+        imagePullPolicy: "IfNotPresent"
         volumeMounts:
         - name: socket-dir
           mountPath: /csi
@@ -44,7 +44,6 @@ spec:
         image: registry.k8s.io/sig-storage/livenessprobe:v2.17.0
         args:
         - --csi-address=/csi/csi.sock
-        - --http-endpoint=:9809
         volumeMounts:
         - name: socket-dir
           mountPath: /csi
@@ -66,9 +65,9 @@ spec:
           value: unix://csi/csi.sock
         - name: CLOUD_CONFIG
           value: /etc/config/cloud.yaml
-        imagePullPolicy: Always
+        imagePullPolicy: "IfNotPresent"
         ports:
-        - containerPort: 9809
+        - containerPort: 9808
           name: healthz
           protocol: TCP
         livenessProbe:

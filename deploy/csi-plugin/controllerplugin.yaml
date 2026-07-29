@@ -36,7 +36,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        imagePullPolicy: Always
+        imagePullPolicy: "IfNotPresent"
         volumeMounts:
         - name: socket-dir
           mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -66,7 +66,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        imagePullPolicy: Always
+        imagePullPolicy: "IfNotPresent"
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -88,7 +88,6 @@ spec:
         image: registry.k8s.io/sig-storage/livenessprobe:v2.17.0
         args:
         - "--csi-address=$(ADDRESS)"
-        - "--http-endpoint=:9810"
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -117,7 +116,7 @@ spec:
           value: eu01
         imagePullPolicy: "IfNotPresent"
         ports:
-        - containerPort: 9810
+        - containerPort: 9808
           name: healthz
           protocol: TCP
         livenessProbe:

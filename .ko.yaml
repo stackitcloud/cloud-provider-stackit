@@ -4,4 +4,5 @@ builds:
   ldflags:
   - -s -w
   - -X github.com/stackitcloud/cloud-provider-stackit/pkg/version.Version={{.Env.VERSION}}
+  - -X github.com/stackitcloud/cloud-provider-stackit/pkg/csi.DriverName={{.Env.DRIVER_NAME}}
   

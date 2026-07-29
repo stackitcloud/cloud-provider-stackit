@@ -23,8 +23,6 @@ const (
 )
 
 var (
-	driverName        = DefaultDriverName
-	legacyDriverName  = LegacyDriverName
 	topologyKey       = topologyKeyForDriver(DefaultDriverName)
 	legacyTopologyKey = topologyKeyForDriver(LegacyDriverName)
 	// CSI spec version
@@ -65,9 +63,6 @@ type DriverOpts struct {
 func ValidateDriverOpts(o *DriverOpts) error {
 	if o == nil {
 		return fmt.Errorf("driver options must not be nil")
-	}
-	if o.LegacyDriverName && o.DriverName != "" && o.DriverName != DefaultDriverName {
-		return fmt.Errorf("--legacy-storage-mode cannot be used with --driver-name=%q", o.DriverName)
 	}
 	return nil
 }

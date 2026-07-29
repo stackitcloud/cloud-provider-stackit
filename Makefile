@@ -2,7 +2,6 @@
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-BUILD_BINARIES ?= stackit-csi-plugin cloud-controller-manager kubetest2-stackit
 BUILD_IMAGES ?= stackit-csi-plugin cloud-controller-manager
 SOURCES := Makefile go.mod go.sum $(shell find $(DEST) -name '*.go' 2>/dev/null)
 VERSION ?= $(shell git describe --dirty --tags --match='v*' 2>/dev/null || git rev-parse --short HEAD)
@@ -10,7 +9,7 @@ REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
-GO_BUILD_LDFLAGS := $(if $(strip $(LDFLAGS)),-ldflags $(LDFLAGS),)
+DRIVER_NAME ?=
 
 .PHONY: all
 all: verify
@@ -19,12 +18,14 @@ all: verify
 
 include ./hack/tools.mk
 
-build: $(BUILD_BINARIES)
+build: $(BUILD_IMAGES)
 
-$(BUILD_BINARIES): $(SOURCES)
+stackit-csi-plugin: LDFLAGS = $(if $(DRIVER_NAME),-X github.com/stackitcloud/cloud-provider-stackit/pkg/csi.DriverName=$(DRIVER_NAME))
+
+$(BUILD_IMAGES): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
 		-trimpath \
-		$(GO_BUILD_LDFLAGS) \
+		$(if $(LDFLAGS),-ldflags '$(LDFLAGS)') \
 		-o $@ \
 		cmd/$@/main.go
 
@@ -42,6 +43,7 @@ image-%: $(APKO) $(KO)
 	APKO_EXTRA_PACKAGES=$(APKO_EXTRA_PACKAGES) \
 	LOCAL=$(LOCAL) \
 	VERSION=$(VERSION) \
+	DRIVER_NAME=$(DRIVER_NAME) \
 	PLATFORMS="$(PLATFORMS)" \
 	REGISTRY=$(REGISTRY) \
 	REPO=$(REPO)/$* \
