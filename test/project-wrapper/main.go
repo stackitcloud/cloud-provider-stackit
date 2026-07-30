@@ -163,7 +163,7 @@ func createPortalProject(ctx context.Context, client *sdk.Client) (string, error
 	return portalProject.ProjectId, nil
 }
 
-func assignRoleToServiceAccount(ctx context.Context, projectID string, email string, roles set.Set[string]) error {
+func assignRoleToServiceAccount(ctx context.Context, projectID, email string, roles set.Set[string]) error {
 	client, err := authorization.NewAPIClient()
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func RetryWithBackoff[T any](ctx context.Context, backoff wait.Backoff, fn func(
 	var result T
 	var lastErr error
 
-	waitErr := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+	waitErr := wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
 		val, err := fn()
 		if err != nil {
 			lastErr = err
@@ -233,12 +233,12 @@ func createServiceAccountAndKey(ctx context.Context, projectID string) (string, 
 		return "", fmt.Errorf("error when calling CreateServiceAccountKey: %v", err)
 	}
 
-	saKeyJson, err := json.Marshal(saKey)
+	saKeyJSON, err := json.Marshal(saKey)
 	if err != nil {
 		return "", fmt.Errorf("error marshaling SA Key to JSON: %v", err)
 	}
 
-	return string(saKeyJson), nil
+	return string(saKeyJSON), nil
 }
 
 // generateRandomSuffix generates and returns a random alphanumeric string of the specified length.
