@@ -55,15 +55,6 @@ func TestNewDefaults(t *testing.T) {
 	if d.KubeconfigExpirationSeconds != defaultKubeconfigExpiration {
 		t.Fatalf("unexpected kubeconfig expiration: %d", d.KubeconfigExpirationSeconds)
 	}
-	if d.CSIDriverName != defaultCSIDriverName {
-		t.Fatalf("unexpected default CSI driver name: %q", d.CSIDriverName)
-	}
-	if d.CSIStorageClassName != defaultCSIStorageClassName {
-		t.Fatalf("unexpected default CSI storage class name: %q", d.CSIStorageClassName)
-	}
-	if d.CSISnapshotClassName != defaultCSISnapshotClassName {
-		t.Fatalf("unexpected default CSI snapshot class name: %q", d.CSISnapshotClassName)
-	}
 	if d.CSIImageName != defaultCSIImageName || d.CSIImageTag != defaultCSIImageTag {
 		t.Fatalf("unexpected default CSI image override: %s:%s", d.CSIImageName, d.CSIImageTag)
 	}
@@ -73,9 +64,6 @@ func TestNewDefaults(t *testing.T) {
 		"project-id",
 		"cluster-name",
 		"kubeconfig-expiration-seconds",
-		"csi-driver-name",
-		"csi-storage-class-name",
-		"csi-snapshot-class-name",
 		"csi-image-name",
 		"csi-image-tag",
 	} {
@@ -228,11 +216,6 @@ func TestUpRequiresFlags(t *testing.T) {
 			name:     "cluster name too long",
 			mutate:   func(d *Deployer) { d.ClusterName = "kt2-name-too-long" },
 			contains: "--cluster-name must be at most 11 characters",
-		},
-		{
-			name:     "csi driver name",
-			mutate:   func(d *Deployer) { d.CSIDriverName = "" },
-			contains: "--csi-driver-name must not be empty",
 		},
 		{
 			name:     "csi image tag",
@@ -418,17 +401,14 @@ func TestUpBuildsPayloadAndWritesArtifacts(t *testing.T) {
 	if len(reconciler.calls) != 1 {
 		t.Fatalf("expected one CSI reconcile call, got %d", len(reconciler.calls))
 	}
-	if reconciler.calls[0].DriverName != d.CSIDriverName {
-		t.Fatalf("unexpected CSI driver name: %q", reconciler.calls[0].DriverName)
-	}
 	testDriverContent, err := os.ReadFile(d.csiTestDriverPath)
 	if err != nil {
 		t.Fatalf("failed reading generated CSI testdriver config: %v", err)
 	}
-	if !strings.Contains(string(testDriverContent), "FromExistingClassName: "+d.CSIStorageClassName) {
+	if !strings.Contains(string(testDriverContent), "FromExistingClassName: "+kustomizeTestClassName) {
 		t.Fatalf("generated testdriver config missing storage class: %s", testDriverContent)
 	}
-	if !strings.Contains(string(testDriverContent), "Name: "+d.CSIDriverName) {
+	if !strings.Contains(string(testDriverContent), "Name: "+kustomizeTestDriverName) {
 		t.Fatalf("generated testdriver config missing driver name: %s", testDriverContent)
 	}
 }
@@ -836,13 +816,13 @@ type recordingCSIReconciler struct {
 	writeTestDriver bool
 }
 
-func (r *recordingCSIReconciler) Reconcile(_ context.Context, cfg csiInstallConfig) error {
-	r.calls = append(r.calls, cfg)
+func (r *recordingCSIReconciler) Reconcile(_ context.Context, cfg *csiInstallConfig) error {
+	r.calls = append(r.calls, *cfg)
 	if r.err != nil {
 		return r.err
 	}
 	if r.writeTestDriver {
-		return writeCSITestDriverConfig(cfg.TestDriverOutputPath, cfg)
+		return writeCSITestDriverConfig(cfg.TestDriverOutputPath)
 	}
 	return nil
 }

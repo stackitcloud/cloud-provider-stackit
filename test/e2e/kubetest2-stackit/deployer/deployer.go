@@ -30,11 +30,8 @@ const (
 	defaultNodes                = 1
 	defaultVolumeSize           = 100
 	defaultKubeconfigExpiration = 6 * 60 * 60 // 6 hours
-	defaultCSIDriverName        = "kubetest2.csi.stackit.cloud"
-	defaultCSIStorageClassName  = "kubetest2-stackit"
-	defaultCSIStorageClassType  = "storage_premium_perf4"
-	defaultCSISnapshotClassName = "kubetest2-stackit"
-	defaultCSISnapshotType      = "snapshot"
+	defaultCSIStorageClassType = "storage_premium_perf4"
+	defaultCSISnapshotType     = "snapshot"
 	defaultCSIImageName         = "ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin"
 	defaultCSIImageTag          = "1.35.5"
 	clusterStateFileName        = "cluster-state.json"
@@ -61,10 +58,7 @@ type Deployer struct {
 	VolumeSize                  int    `flag:"~volume-size" desc:"Root volume size in GiB for the nodepool."`
 	VolumeType                  string `flag:"~volume-type" desc:"Optional root volume type for the nodepool."`
 	KubeconfigExpirationSeconds int    `flag:"~kubeconfig-expiration-seconds" desc:"Expiration for the admin kubeconfig in seconds."`
-	CSIDriverName               string `flag:"~csi-driver-name" desc:"CSI driver identity to deploy into the cluster."`
-	CSIStorageClassName         string `flag:"~csi-storage-class-name" desc:"Primary StorageClass name to reconcile for the STACKIT CSI driver."`
 	CSIStorageClassType         string `flag:"~csi-storage-class-type" desc:"STACKIT block storage performance class for the reconciled StorageClass."`
-	CSISnapshotClassName        string `flag:"~csi-snapshot-class-name" desc:"VolumeSnapshotClass name to reconcile for the STACKIT CSI driver."`
 	CSISnapshotType             string `flag:"~csi-snapshot-type" desc:"STACKIT snapshot type to configure for the reconciled VolumeSnapshotClass."`
 	CSIImageName                string `flag:"~csi-image-name" desc:"Container image repository for the STACKIT CSI plugin workload containers."`
 	CSIImageTag                 string `flag:"~csi-image-tag" desc:"Container image tag for the STACKIT CSI plugin workload containers."`
@@ -117,16 +111,13 @@ func NewDeployer(opts types.Options) *Deployer {
 		Nodes:                       defaultNodes,
 		VolumeSize:                  defaultVolumeSize,
 		KubeconfigExpirationSeconds: defaultKubeconfigExpiration,
-		CSIDriverName:               defaultCSIDriverName,
-		CSIStorageClassName:         defaultCSIStorageClassName,
 		CSIStorageClassType:         defaultCSIStorageClassType,
-		CSISnapshotClassName:        defaultCSISnapshotClassName,
 		CSISnapshotType:             defaultCSISnapshotType,
 		CSIImageName:                defaultCSIImageName,
 		CSIImageTag:                 defaultCSIImageTag,
 		newFactory:                  client.New,
 		lookupEnv:                   os.LookupEnv,
-		csiReconciler:               newManifestCSIReconciler(),
+		csiReconciler:               newKustomizeCSIReconciler(),
 	}
 }
 
@@ -390,13 +381,10 @@ func (d *Deployer) validateUpFlags() error {
 		))
 	}
 	csiRequired := map[string]string{
-		"csi-driver-name":         d.CSIDriverName,
-		"csi-storage-class-name":  d.CSIStorageClassName,
-		"csi-storage-class-type":  d.CSIStorageClassType,
-		"csi-snapshot-class-name": d.CSISnapshotClassName,
-		"csi-snapshot-type":       d.CSISnapshotType,
-		"csi-image-name":          d.CSIImageName,
-		"csi-image-tag":           d.CSIImageTag,
+		"csi-storage-class-type": d.CSIStorageClassType,
+		"csi-snapshot-type":      d.CSISnapshotType,
+		"csi-image-name":         d.CSIImageName,
+		"csi-image-tag":          d.CSIImageTag,
 	}
 	for flagName, value := range csiRequired {
 		if strings.TrimSpace(value) == "" {
@@ -605,15 +593,12 @@ func (d *Deployer) reconcileCSI(ctx context.Context) error {
 	}
 
 	klog.Infof("Reconciling STACKIT CSI stack into cluster %q", d.lookupClusterName())
-	return d.csiReconciler.Reconcile(ctx, csiInstallConfig{
+	return d.csiReconciler.Reconcile(ctx, &csiInstallConfig{
 		KubeconfigPath:       d.kubeconfigPath,
 		ProjectID:            d.ProjectID,
 		Region:               d.Region,
 		ServiceAccountJSON:   serviceAccount,
-		DriverName:           d.CSIDriverName,
-		StorageClassName:     d.CSIStorageClassName,
 		StorageClassType:     d.CSIStorageClassType,
-		SnapshotClassName:    d.CSISnapshotClassName,
 		SnapshotType:         d.CSISnapshotType,
 		ImageName:            d.CSIImageName,
 		ImageTag:             d.CSIImageTag,
