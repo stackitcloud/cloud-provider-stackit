@@ -274,10 +274,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		})
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.GetId(), err)
-
-		if err != nil {
-			klog.Errorf("Failed to fetch volume %s status during cleanup check: %v", vol.GetId(), err)
-		} else if strings.ToUpper(vol.GetStatus()) == stackitclient.VolumeErrorStatus {
+		if strings.ToUpper(vol.GetStatus()) == stackitclient.VolumeErrorStatus {
 			klog.Warningf("Volume %s entered ERROR status, attempting cleanup deletion...", vol.GetId())
 			if deleteErr := cloud.DeleteVolume(ctx, vol.GetId()); deleteErr != nil {
 				klog.Errorf("Failed to delete erroneous volume %s: %v", vol.GetId(), deleteErr)
@@ -285,7 +282,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 				klog.Infof("Successfully deleted erroneous volume %s", vol.GetId())
 			}
 		}
-
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
 	}
 
