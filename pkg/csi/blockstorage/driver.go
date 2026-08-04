@@ -31,12 +31,13 @@ var (
 )
 
 type Driver struct {
-	name                string
-	fqVersion           string // Fully qualified version in format {Version}@{CPO version}
-	endpoint            string
-	clusterID           string
-	legacyDriver        bool
-	blockVolumeCreation bool
+	name                      string
+	fqVersion                 string // Fully qualified version in format {Version}@{CPO version}
+	endpoint                  string
+	clusterID                 string
+	legacyDriver              bool
+	blockVolumeCreation       bool
+	deleteVolumesInErrorState bool
 
 	ids *identityServer
 	cs  *controllerServer
@@ -51,10 +52,11 @@ type Driver struct {
 }
 
 type DriverOpts struct {
-	ClusterID           string
-	Endpoint            string
-	LegacyDriverName    bool
-	BlockVolumeCreation bool
+	ClusterID                 string
+	Endpoint                  string
+	LegacyDriverName          bool
+	BlockVolumeCreation       bool
+	DeleteVolumesInErrorState bool
 
 	PVCLister corev1.PersistentVolumeClaimLister
 }
@@ -71,6 +73,10 @@ func NewDriver(o *DriverOpts) *Driver {
 	if o.LegacyDriverName {
 		d.name = legacyDriverName
 		d.legacyDriver = true
+	}
+
+	if o.DeleteVolumesInErrorState {
+		d.deleteVolumesInErrorState = true
 	}
 
 	if o.BlockVolumeCreation {
