@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -274,13 +273,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		})
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.GetId(), err)
-		if strings.ToUpper(vol.GetStatus()) == stackitclient.VolumeErrorStatus {
-			klog.Warningf("Volume %s entered ERROR status, attempting cleanup deletion...", vol.GetId())
-			if deleteErr := cloud.DeleteVolume(ctx, vol.GetId()); deleteErr != nil {
-				klog.Errorf("Failed to delete erroneous volume %s: %v", vol.GetId(), deleteErr)
-			} else {
-				klog.Infof("Successfully deleted erroneous volume %s", vol.GetId())
-			}
+		if cs.Driver.deleteVolumesInErrorState {
+			cs.deleteVolumeInError(ctx, vol)
 		}
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
 	}
@@ -288,6 +282,18 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, vol.AvailabilityZone, *vol.Size)
 
 	return cs.getCreateVolumeResponse(vol), nil
+}
+
+func (cs *controllerServer) deleteVolumeInError(ctx context.Context, vol *iaas.Volume) {
+	cloud := cs.Instance
+	if vol.GetStatus() == stackitclient.VolumeErrorStatus {
+		klog.Warningf("Volume %s entered ERROR status, attempting cleanup deletion...", vol.GetId())
+		if deleteErr := cloud.DeleteVolume(ctx, vol.GetId()); deleteErr != nil {
+			klog.Errorf("Failed to delete erroneous volume %s: %v", vol.GetId(), deleteErr)
+		} else {
+			klog.Infof("Successfully deleted erroneous volume %s", vol.GetId())
+		}
+	}
 }
 
 func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *stackitParameterConfig) error {
