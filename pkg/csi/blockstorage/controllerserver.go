@@ -137,6 +137,9 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
 		if *vols[0].Status != stackitclient.VolumeAvailableStatus {
+			if cs.Driver.deleteVolumesInErrorState {
+				cs.deleteVolumeInError(ctx, &vols[0])
+			}
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, vols[0].AvailabilityZone, *vols[0].Size)
