@@ -68,6 +68,10 @@ test-cover: ## Run tests with coverage.
 	go test -coverprofile cover.out ./...
 	go tool cover -html cover.out -o cover.html
 
+.PHONY: test-cloud-e2e
+test-cloud-e2e: ## Run the cloud-e2e test suite inside a throw-away STACKIT project
+	./hack/test-cloud-e2e.sh
+
 ##@ Verification
 
 .PHONY: lint
