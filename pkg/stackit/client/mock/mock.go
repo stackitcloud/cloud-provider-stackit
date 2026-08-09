@@ -70,3 +70,18 @@ func (mr *MockFactoryMockRecorder) LoadBalancing(options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadBalancing", reflect.TypeOf((*MockFactory)(nil).LoadBalancing), options)
 }
+
+// SKE mocks base method.
+func (m *MockFactory) SKE(options []config.ConfigurationOption) (client.SKEClient, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SKE", options)
+	ret0, _ := ret[0].(client.SKEClient)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SKE indicates an expected call of SKE.
+func (mr *MockFactoryMockRecorder) SKE(options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SKE", reflect.TypeOf((*MockFactory)(nil).SKE), options)
+}

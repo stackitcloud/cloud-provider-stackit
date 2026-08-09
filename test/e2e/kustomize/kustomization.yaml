@@ -1,0 +1,96 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- github.com/kubernetes-csi/external-snapshotter/client/config/crd?ref=v8.3.0
+- github.com/kubernetes-csi/external-snapshotter/deploy/kubernetes/snapshot-controller?ref=v8.3.0
+- ../../../deploy/csi-plugin
+- snapshotclass.yaml
+
+images:
+- name: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin
+  newName: IMAGE_NAME_PLACEHOLDER
+  newTag: IMAGE_TAG_PLACEHOLDER
+
+patches:
+- target:
+    kind: CSIDriver
+  patch: |-
+    - op: replace
+      path: /metadata/name
+      value: CSI_DRIVER_NAME_PLACEHOLDER
+- target:
+    kind: StorageClass
+  patch: |-
+    - op: replace
+      path: /metadata/name
+      value: CSI_CLASS_NAME_PLACEHOLDER
+    - op: replace
+      path: /provisioner
+      value: CSI_DRIVER_NAME_PLACEHOLDER
+- target:
+    kind: VolumeSnapshotClass
+  patch: |-
+    - op: replace
+      path: /metadata/name
+      value: CSI_CLASS_NAME_PLACEHOLDER
+    - op: replace
+      path: /driver
+      value: CSI_DRIVER_NAME_PLACEHOLDER
+- target:
+    kind: Deployment
+    name: csi-stackit-controllerplugin
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: csi-stackit-controllerplugin
+    spec:
+      template:
+        spec:
+          containers:
+          - name: stackit-csi-plugin
+            imagePullPolicy: Always
+            env:
+            - name: CSI_DRIVER_NAME
+              value: CSI_DRIVER_NAME_PLACEHOLDER
+- target:
+    kind: DaemonSet
+    name: csi-stackit-nodeplugin
+  patch: |-
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: csi-stackit-nodeplugin
+    spec:
+      template:
+        spec:
+          containers:
+          - name: stackit-csi-plugin
+            imagePullPolicy: Always
+            env:
+            - name: CSI_DRIVER_NAME
+              value: CSI_DRIVER_NAME_PLACEHOLDER
+          - name: node-driver-registrar
+            env:
+            - name: CSI_DRIVER_NAME
+              value: CSI_DRIVER_NAME_PLACEHOLDER
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/CSI_DRIVER_NAME_PLACEHOLDER/csi.sock
+          volumes:
+          - name: socket-dir
+            hostPath:
+              path: /var/lib/kubelet/plugins/CSI_DRIVER_NAME_PLACEHOLDER
+- target:
+    kind: Deployment
+    name: snapshot-controller
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: snapshot-controller
+    spec:
+      template:
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet

@@ -9,6 +9,7 @@
   - [Accessing the Cluster](#accessing-the-cluster)
   - [Destroying the Cluster](#destroying-the-cluster)
   - [Testing Custom Branches or Images](#testing-custom-branches-or-images)
+- [Building the kubetest2 STACKIT Deployer](#building-the-kubetest2-stackit-deployer)
 - [Running End-to-End (E2E) Tests for the CSI Driver](#running-end-to-end-e2e-tests-for-the-csi-driver)
   - [Parallel E2E Test Suite](#parallel-e2e-test-suite)
   - [Sequential E2E Test Suite (Snapshots & Backups)](#sequential-e2e-test-suite-snapshots--backups)
@@ -38,7 +39,6 @@ Before running the script, you must have the following installed and configured 
    - You must be authenticated. Run `stackit auth login` if you haven't already.
 2. **jq:** The `jq` command-line JSON processor.
 3. **SSH Key Pair:** The script needs an SSH key pair to access the VM.
-
    - By default, it looks for `$HOME/.ssh/stackit-ccm-test.pub` and `$HOME/.ssh/stackit-ccm-test`.
    - You can generate a new key pair with:
 
@@ -170,6 +170,18 @@ E2E_DEPLOY_CCM_IMAGE="ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controll
  --project-id <STACKIT_PROJECT_ID> \
  --kubernetes-version <K8S_VERSION>
 ```
+
+## Building the kubetest2 STACKIT Deployer
+
+The repository now includes a local `kubetest2-stackit` deployer binary for provisioning a single STACKIT SKE cluster during a `kubetest2` run.
+
+Build it with:
+
+```bash
+make build
+```
+
+The binary is written to the repository root as `./kubetest2-stackit` alongside the existing controller-manager and CSI binaries.
 
 ## Running End-to-End (E2E) Tests for the CSI Driver
 

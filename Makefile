@@ -9,6 +9,7 @@ REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
+DRIVER_NAME ?=
 
 .PHONY: all
 all: verify
@@ -19,10 +20,12 @@ include ./hack/tools.mk
 
 build: $(BUILD_IMAGES)
 
+stackit-csi-plugin: LDFLAGS = $(if $(DRIVER_NAME),-X github.com/stackitcloud/cloud-provider-stackit/pkg/csi.DriverName=$(DRIVER_NAME))
+
 $(BUILD_IMAGES): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
 		-trimpath \
-		-ldflags $(LDFLAGS) \
+		$(if $(LDFLAGS),-ldflags '$(LDFLAGS)') \
 		-o $@ \
 		cmd/$@/main.go
 
@@ -40,6 +43,7 @@ image-%: $(APKO) $(KO)
 	APKO_EXTRA_PACKAGES=$(APKO_EXTRA_PACKAGES) \
 	LOCAL=$(LOCAL) \
 	VERSION=$(VERSION) \
+	DRIVER_NAME=$(DRIVER_NAME) \
 	PLATFORMS="$(PLATFORMS)" \
 	REGISTRY=$(REGISTRY) \
 	REPO=$(REPO)/$* \
@@ -61,7 +65,7 @@ modules: ## Runs go mod to ensure modules are up to date.
 
 .PHONY: test
 test: ## Run tests.
-	./hack/test.sh ./cmd/... ./pkg/...
+	./hack/test.sh ./cmd/... ./pkg/... ./test/...
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage.
@@ -132,6 +136,7 @@ mocks: $(MOCKGEN)
 	# API mocks
 	@$(MOCKGEN) -destination ./pkg/mock/loadbalancer/loadbalancer.go -package loadbalancer github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api DefaultAPI
 	@$(MOCKGEN) -destination ./pkg/mock/iaas/iaas.go -package iaas github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api DefaultAPI
+	@$(MOCKGEN) -destination ./pkg/mock/ske/ske.go -package ske github.com/stackitcloud/stackit-sdk-go/services/ske/v2api DefaultAPI
 
 	# client mocks
 	@$(MOCKGEN) -destination ./pkg/stackit/metadata/metadata_mock.go -package metadata ./pkg/stackit/metadata IMetadata
@@ -139,6 +144,7 @@ mocks: $(MOCKGEN)
 
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/iaas_mock.go -typed -package client ./pkg/stackit/client IaaSClient
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/loadbalancer_mock.go -typed -package client ./pkg/stackit/client LoadBalancingClient
+	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/ske_mock.go -typed -package client ./pkg/stackit/client SKEClient
 	@$(MOCKGEN) -destination ./pkg/stackit/client/mock/mock.go -package client ./pkg/stackit/client Factory
 
 .PHONY: generate

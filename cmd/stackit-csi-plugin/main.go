@@ -104,9 +104,10 @@ func handle(ctx context.Context) {
 	}
 	// Initialize cloud
 	driverOpts := &blockstorage.DriverOpts{
-		Endpoint:  endpoint,
-		ClusterID: cluster,
-		PVCLister: csi.GetPVCLister(),
+		Endpoint:   endpoint,
+		ClusterID:  cluster,
+		DriverName: csi.DriverName,
+		PVCLister:  csi.GetPVCLister(),
 	}
 
 	if legacyStorageMode {

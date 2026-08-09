@@ -67,6 +67,8 @@ var (
 )
 
 var (
+	// DriverName is set by the linker flags in the Makefile
+	DriverName string
 	// CSI controller options
 	pvcAnnotations bool
 	// k8s client options
