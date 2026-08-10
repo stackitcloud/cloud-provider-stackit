@@ -22,7 +22,7 @@ build: $(BUILD_IMAGES)
 $(BUILD_IMAGES): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
 		-trimpath \
-		-ldflags $(LDFLAGS) \
+		-ldflags "$(LDFLAGS)" \
 		-o $@ \
 		cmd/$@/main.go
 
@@ -45,6 +45,10 @@ image-%: $(APKO) $(KO)
 	REPO=$(REPO)/$* \
 	IS_DEV=$(IS_DEV) \
 	./hack/build.sh $*
+
+.PHONY: image-stackit-csi-plugin-test
+image-stackit-csi-plugin-test: export KO_CONFIG_PATH = test/e2e/.ko-kubetest2.yaml
+image-stackit-csi-plugin-test: image-stackit-csi-plugin
 
 .PHONY: clean-tools-bin
 clean-tools-bin: ## Empty the tools binary directory.
