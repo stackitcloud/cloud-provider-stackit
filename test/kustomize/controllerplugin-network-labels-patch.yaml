@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-stackit-controllerplugin
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      labels:
+        networking.gardener.cloud/to-apiserver: allowed
+        networking.gardener.cloud/to-dns: allowed
