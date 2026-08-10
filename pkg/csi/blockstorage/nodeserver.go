@@ -230,7 +230,7 @@ func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	if required, ok := volumeContext[ResizeRequired]; ok && strings.EqualFold(required, "true") {
+	if required, ok := volumeContext[driverResizeRequiredKey()]; ok && strings.EqualFold(required, "true") {
 		r := mountutil.NewResizeFs(ns.Mount.Mounter().Exec)
 
 		needResize, err := r.NeedResize(devicePath, stagingTarget)
@@ -335,14 +335,9 @@ func (ns *nodeServer) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest
 		return nil, status.Errorf(codes.Internal, "[NodeGetInfo] Unable to retrieve availability zone of node %v", err)
 	}
 
-	topoKey := topologyKey
-	if ns.Driver.legacyDriver {
-		topoKey = legacyTopologyKey
-	}
-
 	//TODO: support well-known topology key "topology.kubernetes.io/zone"
 	segments := map[string]string{
-		topoKey: zone,
+		activeTopologyKey(ns.Driver.legacyDriver): zone,
 	}
 
 	nodeInfo.AccessibleTopology = &csi.Topology{Segments: segments}
@@ -357,13 +352,7 @@ func (ns *nodeServer) calculateMaxVolumesPerNode() int64 {
 		freePCIeRootPorts = 0
 	}
 
-	csiDriverName := driverName
-	if ns.Driver.legacyDriver {
-		// If driver launched in legacy-mode use "cinder.csi.openstack.org"
-		csiDriverName = legacyDriverName
-	}
-
-	mountedCSIVolumes, err := mount.CountLocalCSIVolumes(csiDriverName)
+	mountedCSIVolumes, err := mount.CountLocalCSIVolumes(activeDriverName(ns.Driver.legacyDriver))
 	if err != nil {
 		klog.Errorf("[NodeGetInfo] unable to retrieve volume count: %v", err)
 		mountedCSIVolumes = 0
