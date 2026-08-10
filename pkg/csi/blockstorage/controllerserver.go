@@ -58,9 +58,8 @@ type stackitParameterConfig struct {
 }
 
 const (
-	blockStorageCSIClusterIDKey = "block-storage.csi.stackit.cloud/cluster"
-	snapshotTypeSnapshot        = "snapshot"
-	snapshotTypeBackup          = "backup"
+	snapshotTypeSnapshot = "snapshot"
+	snapshotTypeBackup   = "backup"
 )
 
 func (cs *controllerServer) validateVolumeCapabilities(req []*csi.VolumeCapability) error {
@@ -117,11 +116,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		accessibleTopologyReq := req.GetAccessibilityRequirements()
 		// Check from topology
 		if accessibleTopologyReq != nil {
-			if cs.Driver.legacyDriver {
-				volAvailability = sharedcsi.GetAZFromTopology(legacyTopologyKey, accessibleTopologyReq)
-			} else {
-				volAvailability = sharedcsi.GetAZFromTopology(topologyKey, accessibleTopologyReq)
-			}
+			volAvailability = sharedcsi.GetAZFromTopology(activeTopologyKey(cs.Driver.legacyDriver), accessibleTopologyReq)
 		}
 	}
 
@@ -148,7 +143,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Volume Create
 	// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
+	// properties := map[string]string{driverClusterIDKey(): cs.Driver.clusterID}
 	properties := map[string]string{}
 	// Tag volume with metadata if present: https://github.com/kubernetes-csi/external-provisioner/pull/399
 	for _, mKey := range sharedcsi.RecognizedCSIProvisionerParams {
@@ -678,7 +673,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 
 	// Add cluster ID to the snapshot metadata
 	// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
+	// properties := map[string]string{driverClusterIDKey(): cs.Driver.clusterID}
 	properties := map[string]string{}
 
 	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
@@ -711,7 +706,7 @@ func (cs *controllerServer) createSnapshot(ctx context.Context, name, volumeID s
 func (cs *controllerServer) createBackup(ctx context.Context, cloud stackitclient.IaaSClient, name, volumeID string, snap *iaas.Snapshot, parameters map[string]string) (*iaas.Backup, error) { //nolint:lll // looks weird when shortened
 	// Add cluster ID to the snapshot metadata
 	// TODO: Use once IaaS has extended the label regex to allow for forward slashes and dots
-	// properties := map[string]string{blockStorageCSIClusterIDKey: cs.Driver.clusterID}
+	// properties := map[string]string{driverClusterIDKey(): cs.Driver.clusterID}
 	properties := map[string]string{}
 
 	// see https://github.com/kubernetes-csi/external-snapshotter/pull/375/
@@ -1023,7 +1018,7 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 		volumeSourceType = stackitclient.VolumeSourceTypes(vol.Source.Type)
 		switch volumeSourceType {
 		case stackitclient.VolumeSource:
-			volCnx[ResizeRequired] = "true"
+			volCnx[driverResizeRequiredKey()] = "true"
 
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Volume{
@@ -1033,7 +1028,7 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 				},
 			}
 		case stackitclient.BackupSource:
-			volCnx[ResizeRequired] = "true"
+			volCnx[driverResizeRequiredKey()] = "true"
 
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Snapshot{
@@ -1043,7 +1038,7 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 				},
 			}
 		case stackitclient.SnapshotSource:
-			volCnx[ResizeRequired] = "true"
+			volCnx[driverResizeRequiredKey()] = "true"
 
 			volsrc = &csi.VolumeContentSource{
 				Type: &csi.VolumeContentSource_Snapshot{
@@ -1055,14 +1050,9 @@ func (cs *controllerServer) getCreateVolumeResponse(vol *iaas.Volume) *csi.Creat
 		}
 	}
 
-	topoKey := topologyKey
-	if cs.Driver.legacyDriver {
-		topoKey = legacyTopologyKey
-	}
-
 	accessibleTopology := []*csi.Topology{
 		{
-			Segments: map[string]string{topoKey: vol.AvailabilityZone},
+			Segments: map[string]string{activeTopologyKey(cs.Driver.legacyDriver): vol.AvailabilityZone},
 		},
 	}
 
