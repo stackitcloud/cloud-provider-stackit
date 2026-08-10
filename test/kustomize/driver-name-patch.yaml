@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-stackit-nodeplugin
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: node-driver-registrar
+        env:
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/plugins/kubetest2.csi.stackit.cloud/csi.sock
+      volumes:
+      - name: socket-dir
+        hostPath:
+          path: /var/lib/kubelet/plugins/kubetest2.csi.stackit.cloud
+          type: DirectoryOrCreate

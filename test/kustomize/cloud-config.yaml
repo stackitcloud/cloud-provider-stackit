@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stackit-cloud-config
+  namespace: kube-system
+data:
+  cloud.yaml: |-
+    global:
+      projectId: REPLACE_WITH_PROJECTID
+      region: eu01
+    blockStorage:
+      rescanOnResize: true
