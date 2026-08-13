@@ -17,6 +17,7 @@ require (
 	github.com/stackitcloud/stackit-sdk-go/core v0.26.0
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v1.14.1
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.15.1
+	github.com/stackitcloud/stackit-sdk-go/services/ske v1.6.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
@@ -31,6 +32,7 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/mount-utils v0.36.3
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	sigs.k8s.io/kubetest2 v0.0.0-20260510045745-558f16b589d1
 )
 
 replace k8s.io/cloud-provider => github.com/stackitcloud/cloud-provider v0.36.0-ske-2
@@ -81,6 +83,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/moby/term v0.5.2 // indirect
