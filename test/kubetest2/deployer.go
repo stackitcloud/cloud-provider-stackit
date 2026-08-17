@@ -37,11 +37,19 @@ type Deployer struct {
 	volumeType          string
 	kubeconfigExpiresIn int64
 
-	projectID      string
-	serviceAccount string
-	kubeconfigPath string
+	projectID                string
+	serviceAccount           string
+	parentContainerID        string
+	projectMemberEmail       string
+	childServiceAccountEmail string
+	kubeconfigPath           string
+	serviceAccountKeyPath    string
 
-	skeClient skeClient
+	projectClient        projectClient
+	serviceAccountClient serviceAccountClient
+	authorizationClient  authorizationClient
+	skeClient            skeClient
+	skeClientFactory     func(region, serviceAccount string) (skeClient, error)
 }
 
 var _ types.NewDeployer = New
@@ -60,6 +68,7 @@ func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 		nodepoolName:        defaultNodepoolName,
 		volumeSizeGiB:       defaultVolumeSizeGiB,
 		kubeconfigExpiresIn: defaultKubeconfigExpiration,
+		skeClientFactory:    newSKEClient,
 	}
 
 	fs := pflag.NewFlagSet(Name, pflag.ContinueOnError)
