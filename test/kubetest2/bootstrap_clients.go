@@ -1,0 +1,168 @@
+package kubetest2
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
+	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"github.com/stackitcloud/stackit-sdk-go/services/authorization"
+	"github.com/stackitcloud/stackit-sdk-go/services/resourcemanager"
+	resourcemanagerwait "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/wait"
+	"github.com/stackitcloud/stackit-sdk-go/services/serviceaccount"
+)
+
+const (
+	projectLabelScopeKey             = "scope"
+	projectLabelScopeValue           = "PUBLIC"
+	projectLabelManagedKey           = "kt2_managed"
+	projectLabelManagedValue         = "true"
+	projectLabelRunIDKey             = "kt2_run_id"
+	projectOwnerRole                 = "owner"
+	projectResourceType              = "project"
+	childProjectRole                 = "ske.admin"
+	projectListPageSize      float32 = 100
+)
+
+type projectClient interface {
+	ListProjects(ctx context.Context, parentContainerID string) ([]resourcemanager.Project, error)
+	CreateProject(ctx context.Context, parentContainerID, name, ownerEmail string, labels map[string]string) (*resourcemanager.Project, error)
+	WaitForProjectActive(ctx context.Context, containerID string) (*resourcemanager.GetProjectResponse, error)
+	DeleteProject(ctx context.Context, projectID string) error
+	WaitForProjectDeleted(ctx context.Context, projectID string) error
+}
+
+type serviceAccountClient interface {
+	ListServiceAccounts(ctx context.Context, projectID string) ([]serviceaccount.ServiceAccount, error)
+	CreateServiceAccount(ctx context.Context, projectID, name string) (*serviceaccount.ServiceAccount, error)
+	CreateServiceAccountKey(ctx context.Context, projectID, serviceAccountEmail string) (*serviceaccount.CreateServiceAccountKeyResponse, error)
+}
+
+type authorizationClient interface {
+	ListMembers(ctx context.Context, resourceType, resourceID string) ([]authorization.Member, error)
+	AddMembers(ctx context.Context, resourceID, resourceType string, members []authorization.Member) error
+}
+
+type sdkProjectClient struct {
+	api *resourcemanager.APIClient
+}
+
+type sdkServiceAccountClient struct {
+	api *serviceaccount.APIClient
+}
+
+type sdkAuthorizationClient struct {
+	api *authorization.APIClient
+}
+
+func newProjectClient(serviceAccountKey string) (projectClient, error) {
+	httpClient := metrics.NewInstrumentedHTTPClient("resourcemanager")
+	apiClient, err := resourcemanager.NewAPIClient(
+		sdkconfig.WithServiceAccountKey(serviceAccountKey),
+		sdkconfig.WithHTTPClient(httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create Resource Manager client: %w", err)
+	}
+	return &sdkProjectClient{api: apiClient}, nil
+}
+
+func newServiceAccountClient(serviceAccountKey string) (serviceAccountClient, error) {
+	httpClient := metrics.NewInstrumentedHTTPClient("serviceaccount")
+	apiClient, err := serviceaccount.NewAPIClient(
+		sdkconfig.WithServiceAccountKey(serviceAccountKey),
+		sdkconfig.WithHTTPClient(httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create Service Account client: %w", err)
+	}
+	return &sdkServiceAccountClient{api: apiClient}, nil
+}
+
+func newAuthorizationClient(serviceAccountKey string) (authorizationClient, error) {
+	httpClient := metrics.NewInstrumentedHTTPClient("authorization")
+	apiClient, err := authorization.NewAPIClient(
+		sdkconfig.WithServiceAccountKey(serviceAccountKey),
+		sdkconfig.WithHTTPClient(httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create Authorization client: %w", err)
+	}
+	return &sdkAuthorizationClient{api: apiClient}, nil
+}
+
+func (c *sdkProjectClient) ListProjects(ctx context.Context, parentContainerID string) ([]resourcemanager.Project, error) {
+	projects := make([]resourcemanager.Project, 0)
+	var offset float32
+	for {
+		resp, err := c.api.ListProjects(ctx).
+			ContainerParentId(parentContainerID).
+			Offset(offset).
+			Limit(projectListPageSize).
+			Execute()
+		if err != nil {
+			return nil, err
+		}
+		items := resp.GetItems()
+		projects = append(projects, items...)
+		if len(items) < int(projectListPageSize) {
+			return projects, nil
+		}
+		offset += float32(len(items))
+	}
+}
+
+func (c *sdkProjectClient) CreateProject(ctx context.Context, parentContainerID, name, ownerEmail string, labels map[string]string) (*resourcemanager.Project, error) {
+	payload := resourcemanager.NewCreateProjectPayload(
+		parentContainerID,
+		[]resourcemanager.Member{*resourcemanager.NewMember(projectOwnerRole, ownerEmail)},
+		name,
+	)
+	payload.SetLabels(labels)
+	return c.api.CreateProject(ctx).CreateProjectPayload(*payload).Execute()
+}
+
+func (c *sdkProjectClient) WaitForProjectActive(ctx context.Context, containerID string) (*resourcemanager.GetProjectResponse, error) {
+	return resourcemanagerwait.CreateProjectWaitHandler(ctx, c.api, containerID).WaitWithContext(ctx)
+}
+
+func (c *sdkProjectClient) DeleteProject(ctx context.Context, projectID string) error {
+	return c.api.DeleteProject(ctx, projectID).Execute()
+}
+
+func (c *sdkProjectClient) WaitForProjectDeleted(ctx context.Context, projectID string) error {
+	_, err := resourcemanagerwait.DeleteProjectWaitHandler(ctx, c.api, projectID).WaitWithContext(ctx)
+	return err
+}
+
+func (c *sdkServiceAccountClient) ListServiceAccounts(ctx context.Context, projectID string) ([]serviceaccount.ServiceAccount, error) {
+	resp, err := c.api.ListServiceAccounts(ctx, projectID).Execute()
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetItems(), nil
+}
+
+func (c *sdkServiceAccountClient) CreateServiceAccount(ctx context.Context, projectID, name string) (*serviceaccount.ServiceAccount, error) {
+	payload := serviceaccount.NewCreateServiceAccountPayload(name)
+	return c.api.CreateServiceAccount(ctx, projectID).CreateServiceAccountPayload(*payload).Execute()
+}
+
+func (c *sdkServiceAccountClient) CreateServiceAccountKey(ctx context.Context, projectID, serviceAccountEmail string) (*serviceaccount.CreateServiceAccountKeyResponse, error) {
+	payload := serviceaccount.NewCreateServiceAccountKeyPayloadWithDefaults()
+	return c.api.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail).CreateServiceAccountKeyPayload(*payload).Execute()
+}
+
+func (c *sdkAuthorizationClient) ListMembers(ctx context.Context, resourceType, resourceID string) ([]authorization.Member, error) {
+	resp, err := c.api.ListMembers(ctx, resourceType, resourceID).Execute()
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetMembers(), nil
+}
+
+func (c *sdkAuthorizationClient) AddMembers(ctx context.Context, resourceID, resourceType string, members []authorization.Member) error {
+	payload := authorization.NewAddMembersPayload(members, resourceType)
+	_, err := c.api.AddMembers(ctx, resourceID).AddMembersPayload(*payload).Execute()
+	return err
+}
