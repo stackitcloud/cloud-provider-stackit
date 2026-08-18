@@ -6,10 +6,10 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
-	"github.com/stackitcloud/stackit-sdk-go/services/authorization"
-	"github.com/stackitcloud/stackit-sdk-go/services/resourcemanager"
-	resourcemanagerwait "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/wait"
-	"github.com/stackitcloud/stackit-sdk-go/services/serviceaccount"
+	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
+	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
+	resourcemanagerwait "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api/wait"
+	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
 )
 
 const (
@@ -95,7 +95,7 @@ func (c *sdkProjectClient) ListProjects(ctx context.Context, parentContainerID s
 	projects := make([]resourcemanager.Project, 0)
 	var offset float32
 	for {
-		resp, err := c.api.ListProjects(ctx).
+		resp, err := c.api.DefaultAPI.ListProjects(ctx).
 			ContainerParentId(parentContainerID).
 			Offset(offset).
 			Limit(projectListPageSize).
@@ -119,24 +119,24 @@ func (c *sdkProjectClient) CreateProject(ctx context.Context, parentContainerID,
 		name,
 	)
 	payload.SetLabels(labels)
-	return c.api.CreateProject(ctx).CreateProjectPayload(*payload).Execute()
+	return c.api.DefaultAPI.CreateProject(ctx).CreateProjectPayload(*payload).Execute()
 }
 
 func (c *sdkProjectClient) WaitForProjectActive(ctx context.Context, containerID string) (*resourcemanager.GetProjectResponse, error) {
-	return resourcemanagerwait.CreateProjectWaitHandler(ctx, c.api, containerID).WaitWithContext(ctx)
+	return resourcemanagerwait.CreateProjectWaitHandler(ctx, c.api.DefaultAPI, containerID).WaitWithContext(ctx)
 }
 
 func (c *sdkProjectClient) DeleteProject(ctx context.Context, projectID string) error {
-	return c.api.DeleteProject(ctx, projectID).Execute()
+	return c.api.DefaultAPI.DeleteProject(ctx, projectID).Execute()
 }
 
 func (c *sdkProjectClient) WaitForProjectDeleted(ctx context.Context, projectID string) error {
-	_, err := resourcemanagerwait.DeleteProjectWaitHandler(ctx, c.api, projectID).WaitWithContext(ctx)
+	_, err := resourcemanagerwait.DeleteProjectWaitHandler(ctx, c.api.DefaultAPI, projectID).WaitWithContext(ctx)
 	return err
 }
 
 func (c *sdkServiceAccountClient) ListServiceAccounts(ctx context.Context, projectID string) ([]serviceaccount.ServiceAccount, error) {
-	resp, err := c.api.ListServiceAccounts(ctx, projectID).Execute()
+	resp, err := c.api.DefaultAPI.ListServiceAccounts(ctx, projectID).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -145,16 +145,16 @@ func (c *sdkServiceAccountClient) ListServiceAccounts(ctx context.Context, proje
 
 func (c *sdkServiceAccountClient) CreateServiceAccount(ctx context.Context, projectID, name string) (*serviceaccount.ServiceAccount, error) {
 	payload := serviceaccount.NewCreateServiceAccountPayload(name)
-	return c.api.CreateServiceAccount(ctx, projectID).CreateServiceAccountPayload(*payload).Execute()
+	return c.api.DefaultAPI.CreateServiceAccount(ctx, projectID).CreateServiceAccountPayload(*payload).Execute()
 }
 
 func (c *sdkServiceAccountClient) CreateServiceAccountKey(ctx context.Context, projectID, serviceAccountEmail string) (*serviceaccount.CreateServiceAccountKeyResponse, error) {
 	payload := serviceaccount.NewCreateServiceAccountKeyPayloadWithDefaults()
-	return c.api.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail).CreateServiceAccountKeyPayload(*payload).Execute()
+	return c.api.DefaultAPI.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail).CreateServiceAccountKeyPayload(*payload).Execute()
 }
 
 func (c *sdkAuthorizationClient) ListMembers(ctx context.Context, resourceType, resourceID string) ([]authorization.Member, error) {
-	resp, err := c.api.ListMembers(ctx, resourceType, resourceID).Execute()
+	resp, err := c.api.DefaultAPI.ListMembers(ctx, resourceType, resourceID).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +163,6 @@ func (c *sdkAuthorizationClient) ListMembers(ctx context.Context, resourceType, 
 
 func (c *sdkAuthorizationClient) AddMembers(ctx context.Context, resourceID, resourceType string, members []authorization.Member) error {
 	payload := authorization.NewAddMembersPayload(members, resourceType)
-	_, err := c.api.AddMembers(ctx, resourceID).AddMembersPayload(*payload).Execute()
+	_, err := c.api.DefaultAPI.AddMembers(ctx, resourceID).AddMembersPayload(*payload).Execute()
 	return err
 }

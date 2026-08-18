@@ -11,9 +11,9 @@ import (
 	"time"
 
 	oapierror "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
-	"github.com/stackitcloud/stackit-sdk-go/services/authorization"
-	"github.com/stackitcloud/stackit-sdk-go/services/resourcemanager"
-	"github.com/stackitcloud/stackit-sdk-go/services/serviceaccount"
+	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
+	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
+	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 	"sigs.k8s.io/kubetest2/pkg/types"
 )
@@ -724,9 +724,9 @@ func createServiceAccountKeyResponseFixture(email string) *serviceaccount.Create
 		time.Unix(0, 0).UTC(),
 		*credentials,
 		"00000000-0000-0000-0000-000000000003",
-		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEY_ALGORITHM__2048,
-		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEY_ORIGIN_GENERATED,
-		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEY_TYPE_USER_MANAGED,
+		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEYALGORITHM_RSA_2048,
+		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEYORIGIN_GENERATED,
+		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEYTYPE_USER_MANAGED,
 		"PUBLIC KEY",
 	)
 }
