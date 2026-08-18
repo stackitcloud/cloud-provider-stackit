@@ -55,36 +55,35 @@ type sdkAuthorizationClient struct {
 	api *authorization.APIClient
 }
 
-func newProjectClient(serviceAccountKey string) (projectClient, error) {
-	httpClient := metrics.NewInstrumentedHTTPClient("resourcemanager")
-	apiClient, err := resourcemanager.NewAPIClient(
+func apiClientOptions(serviceAccountKey, endpoint, apiName string) []sdkconfig.ConfigurationOption {
+	opts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithServiceAccountKey(serviceAccountKey),
-		sdkconfig.WithHTTPClient(httpClient),
-	)
+		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient(apiName)),
+	}
+	if endpoint != "" {
+		opts = append(opts, sdkconfig.WithEndpoint(endpoint))
+	}
+	return opts
+}
+
+func newProjectClient(serviceAccountKey, endpoint string) (projectClient, error) {
+	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "resourcemanager")...)
 	if err != nil {
 		return nil, fmt.Errorf("create Resource Manager client: %w", err)
 	}
 	return &sdkProjectClient{api: apiClient}, nil
 }
 
-func newServiceAccountClient(serviceAccountKey string) (serviceAccountClient, error) {
-	httpClient := metrics.NewInstrumentedHTTPClient("serviceaccount")
-	apiClient, err := serviceaccount.NewAPIClient(
-		sdkconfig.WithServiceAccountKey(serviceAccountKey),
-		sdkconfig.WithHTTPClient(httpClient),
-	)
+func newServiceAccountClient(serviceAccountKey, endpoint string) (serviceAccountClient, error) {
+	apiClient, err := serviceaccount.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "serviceaccount")...)
 	if err != nil {
 		return nil, fmt.Errorf("create Service Account client: %w", err)
 	}
 	return &sdkServiceAccountClient{api: apiClient}, nil
 }
 
-func newAuthorizationClient(serviceAccountKey string) (authorizationClient, error) {
-	httpClient := metrics.NewInstrumentedHTTPClient("authorization")
-	apiClient, err := authorization.NewAPIClient(
-		sdkconfig.WithServiceAccountKey(serviceAccountKey),
-		sdkconfig.WithHTTPClient(httpClient),
-	)
+func newAuthorizationClient(serviceAccountKey, endpoint string) (authorizationClient, error) {
+	apiClient, err := authorization.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "authorization")...)
 	if err != nil {
 		return nil, fmt.Errorf("create Authorization client: %w", err)
 	}

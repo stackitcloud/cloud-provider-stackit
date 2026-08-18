@@ -268,6 +268,10 @@ func TestLoadEnvironmentValidation(t *testing.T) {
 				"STACKIT_PARENT_CONTAINER_ID",
 				"STACKIT_PROJECT_MEMBER_EMAIL",
 				"STACKIT_PROJECT_ID",
+				"STACKIT_RESOURCE_MANAGER_ENDPOINT",
+				"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
+				"STACKIT_AUTHORIZATION_ENDPOINT",
+				"STACKIT_SKE_ENDPOINT",
 			} {
 				t.Setenv(key, "")
 			}
@@ -303,6 +307,46 @@ func TestLoadEnvironmentValidation(t *testing.T) {
 				t.Fatalf("serviceAccountKeyPath = %q", d.serviceAccountKeyPath)
 			}
 		})
+	}
+}
+
+func TestLoadEnvironmentReadsOptionalEndpoints(t *testing.T) {
+	for _, key := range []string{
+		"STACKIT_SERVICE_ACCOUNT",
+		"STACKIT_PARENT_CONTAINER_ID",
+		"STACKIT_PROJECT_MEMBER_EMAIL",
+		"STACKIT_RESOURCE_MANAGER_ENDPOINT",
+		"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
+		"STACKIT_AUTHORIZATION_ENDPOINT",
+		"STACKIT_SKE_ENDPOINT",
+	} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("STACKIT_SERVICE_ACCOUNT", "{}")
+	t.Setenv("STACKIT_PARENT_CONTAINER_ID", "parent-1")
+	t.Setenv("STACKIT_PROJECT_MEMBER_EMAIL", "owner@example.com")
+	t.Setenv("STACKIT_RESOURCE_MANAGER_ENDPOINT", "https://resource-manager.example.com")
+	t.Setenv("STACKIT_SERVICE_ACCOUNT_ENDPOINT", "https://service-account.example.com")
+	t.Setenv("STACKIT_AUTHORIZATION_ENDPOINT", "https://authorization.example.com")
+	t.Setenv("STACKIT_SKE_ENDPOINT", "https://ske.example.com")
+
+	runDir := t.TempDir()
+	d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
+	if err := d.loadEnvironment(); err != nil {
+		t.Fatalf("loadEnvironment() error = %v", err)
+	}
+
+	if d.resourceManagerEndpoint != "https://resource-manager.example.com" {
+		t.Fatalf("resourceManagerEndpoint = %q", d.resourceManagerEndpoint)
+	}
+	if d.serviceAccountEndpoint != "https://service-account.example.com" {
+		t.Fatalf("serviceAccountEndpoint = %q", d.serviceAccountEndpoint)
+	}
+	if d.authorizationEndpoint != "https://authorization.example.com" {
+		t.Fatalf("authorizationEndpoint = %q", d.authorizationEndpoint)
+	}
+	if d.skeEndpoint != "https://ske.example.com" {
+		t.Fatalf("skeEndpoint = %q", d.skeEndpoint)
 	}
 }
 
@@ -385,7 +429,7 @@ func TestEnsureManagedClusterAccessReusesCachedKeyAndSkipsMembershipWrite(t *tes
 	d.projectClient = projectClient
 	d.serviceAccountClient = serviceAccountClient
 	d.authorizationClient = authorizationClient
-	d.skeClientFactory = func(_, serviceAccount string) (skeClient, error) {
+	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		receivedKey = serviceAccount
 		return fakeSKE, nil
 	}
@@ -428,7 +472,7 @@ func TestEnsureManagedClusterAccessCreatesKeyAndAddsMembership(t *testing.T) {
 	d.projectClient = projectClient
 	d.serviceAccountClient = serviceAccountClient
 	d.authorizationClient = authorizationClient
-	d.skeClientFactory = func(_, serviceAccount string) (skeClient, error) {
+	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		receivedKey = serviceAccount
 		return &fakeSKEClient{}, nil
 	}
@@ -500,7 +544,7 @@ func TestUpUsesDiscoveredProjectAndWritesKubeconfig(t *testing.T) {
 			return cfg
 		}(),
 	}
-	d.skeClientFactory = func(_, serviceAccount string) (skeClient, error) {
+	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		if serviceAccount != cachedKey {
 			t.Fatalf("unexpected service account key passed to SKE client")
 		}
@@ -603,7 +647,7 @@ func TestIsUpProjectWithCachedKeyQueriesCluster(t *testing.T) {
 	fakeSKE := &fakeSKEClient{
 		getClusterResult: healthyClusterFixture(),
 	}
-	d.skeClientFactory = func(_, serviceAccount string) (skeClient, error) {
+	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		if serviceAccount != cachedKey {
 			t.Fatalf("unexpected cached key content")
 		}
@@ -745,7 +789,7 @@ func TestIsUpReturnsFalseWhenClusterMissing(t *testing.T) {
 	fakeSKE := &fakeSKEClient{
 		getClusterErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
 	}
-	d.skeClientFactory = func(_, _ string) (skeClient, error) {
+	d.skeClientFactory = func(_, _, _ string) (skeClient, error) {
 		return fakeSKE, nil
 	}
 

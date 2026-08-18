@@ -45,11 +45,16 @@ type Deployer struct {
 	kubeconfigPath           string
 	serviceAccountKeyPath    string
 
+	resourceManagerEndpoint string
+	serviceAccountEndpoint  string
+	authorizationEndpoint   string
+	skeEndpoint             string
+
 	projectClient        projectClient
 	serviceAccountClient serviceAccountClient
 	authorizationClient  authorizationClient
 	skeClient            skeClient
-	skeClientFactory     func(region, serviceAccount string) (skeClient, error)
+	skeClientFactory     func(region, serviceAccount, endpoint string) (skeClient, error)
 }
 
 var _ types.NewDeployer = New

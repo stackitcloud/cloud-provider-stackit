@@ -49,21 +49,21 @@ type serviceAccountKeyCredentialsFile struct {
 
 func (d *Deployer) initializeBootstrapClients() error {
 	if d.projectClient == nil {
-		client, err := newProjectClient(d.serviceAccount)
+		client, err := newProjectClient(d.serviceAccount, d.resourceManagerEndpoint)
 		if err != nil {
 			return err
 		}
 		d.projectClient = client
 	}
 	if d.serviceAccountClient == nil {
-		client, err := newServiceAccountClient(d.serviceAccount)
+		client, err := newServiceAccountClient(d.serviceAccount, d.serviceAccountEndpoint)
 		if err != nil {
 			return err
 		}
 		d.serviceAccountClient = client
 	}
 	if d.authorizationClient == nil {
-		client, err := newAuthorizationClient(d.serviceAccount)
+		client, err := newAuthorizationClient(d.serviceAccount, d.authorizationEndpoint)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func (d *Deployer) initializeSKEClient(serviceAccountKey string) error {
 	if d.skeClientFactory == nil {
 		d.skeClientFactory = newSKEClient
 	}
-	client, err := d.skeClientFactory(d.region, serviceAccountKey)
+	client, err := d.skeClientFactory(d.region, serviceAccountKey, d.skeEndpoint)
 	if err != nil {
 		return err
 	}
