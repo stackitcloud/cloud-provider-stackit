@@ -2,6 +2,7 @@ package kubetest2
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,7 +15,9 @@ import (
 	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
+	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/kubetest2/pkg/types"
 )
 
@@ -161,6 +164,49 @@ func (c *fakeAuthorizationClient) AddMembers(_ context.Context, resourceID, reso
 	c.lastAddedType = resourceType
 	c.lastAddedMembers = members
 	return c.addMembersErr
+}
+
+type fakeServiceEnablementClient struct {
+	getStatusResult *serviceenablement.ServiceStatus
+	getStatusErr    error
+	enableErr       error
+	waitErr         error
+
+	enableCalls int
+	waitCalls   int
+
+	lastGetStatusRegion    string
+	lastGetStatusProjectID string
+	lastGetStatusServiceID string
+	lastEnableRegion       string
+	lastEnableProjectID    string
+	lastEnableServiceID    string
+	lastWaitRegion         string
+	lastWaitProjectID      string
+	lastWaitServiceID      string
+}
+
+func (c *fakeServiceEnablementClient) GetServiceStatus(_ context.Context, region, projectID, serviceID string) (*serviceenablement.ServiceStatus, error) {
+	c.lastGetStatusRegion = region
+	c.lastGetStatusProjectID = projectID
+	c.lastGetStatusServiceID = serviceID
+	return c.getStatusResult, c.getStatusErr
+}
+
+func (c *fakeServiceEnablementClient) EnableService(_ context.Context, region, projectID, serviceID string) error {
+	c.enableCalls++
+	c.lastEnableRegion = region
+	c.lastEnableProjectID = projectID
+	c.lastEnableServiceID = serviceID
+	return c.enableErr
+}
+
+func (c *fakeServiceEnablementClient) WaitForServiceEnabled(_ context.Context, region, projectID, serviceID string) error {
+	c.waitCalls++
+	c.lastWaitRegion = region
+	c.lastWaitProjectID = projectID
+	c.lastWaitServiceID = serviceID
+	return c.waitErr
 }
 
 type fakeSKEClient struct {
@@ -428,6 +474,7 @@ func TestEnsureManagedClusterAccessReusesCachedKeyAndSkipsMembershipWrite(t *tes
 	d.projectClient = projectClient
 	d.serviceAccountClient = serviceAccountClient
 	d.authorizationClient = authorizationClient
+	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
 	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		receivedKey = serviceAccount
 		return fakeSKE, nil
@@ -471,6 +518,7 @@ func TestEnsureManagedClusterAccessCreatesKeyAndAddsMembership(t *testing.T) {
 	d.projectClient = projectClient
 	d.serviceAccountClient = serviceAccountClient
 	d.authorizationClient = authorizationClient
+	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
 	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
 		receivedKey = serviceAccount
 		return &fakeSKEClient{}, nil
@@ -507,6 +555,120 @@ func TestEnsureManagedClusterAccessCreatesKeyAndAddsMembership(t *testing.T) {
 	}
 }
 
+func TestEnsureSKEServiceEnabledSkipsWhenAlreadyEnabled(t *testing.T) {
+	d := newTestDeployer(t)
+	client := &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+	d.serviceEnablementClient = client
+
+	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
+		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
+	}
+	if client.enableCalls != 0 {
+		t.Fatalf("enableCalls = %d, want 0", client.enableCalls)
+	}
+	if client.waitCalls != 0 {
+		t.Fatalf("waitCalls = %d, want 0", client.waitCalls)
+	}
+	if client.lastGetStatusServiceID != skeServiceID {
+		t.Fatalf("service ID = %q, want %q", client.lastGetStatusServiceID, skeServiceID)
+	}
+}
+
+func TestEnsureSKEServiceEnabledEnablesWhenNotFound(t *testing.T) {
+	d := newTestDeployer(t)
+	client := &fakeServiceEnablementClient{
+		getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
+	}
+	d.serviceEnablementClient = client
+
+	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
+		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
+	}
+	if client.enableCalls != 1 {
+		t.Fatalf("enableCalls = %d, want 1", client.enableCalls)
+	}
+	if client.waitCalls != 1 {
+		t.Fatalf("waitCalls = %d, want 1", client.waitCalls)
+	}
+	if client.lastEnableProjectID != "project-123" || client.lastEnableServiceID != skeServiceID {
+		t.Fatalf("EnableService called with project_id=%q service_id=%q", client.lastEnableProjectID, client.lastEnableServiceID)
+	}
+}
+
+func TestEnsureSKEServiceEnabledEnablesWhenDisabled(t *testing.T) {
+	d := newTestDeployer(t)
+	client := &fakeServiceEnablementClient{
+		getStatusResult: disabledServiceStatusFixture(),
+	}
+	d.serviceEnablementClient = client
+
+	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
+		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
+	}
+	if client.enableCalls != 1 {
+		t.Fatalf("enableCalls = %d, want 1", client.enableCalls)
+	}
+	if client.waitCalls != 1 {
+		t.Fatalf("waitCalls = %d, want 1", client.waitCalls)
+	}
+}
+
+func TestEnsureSKEServiceEnabledFailsOnGetStatusError(t *testing.T) {
+	d := newTestDeployer(t)
+	client := &fakeServiceEnablementClient{
+		getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusForbidden},
+	}
+	d.serviceEnablementClient = client
+
+	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err == nil {
+		t.Fatal("ensureSKEServiceEnabled() error = nil, want non-nil")
+	}
+	if client.enableCalls != 0 {
+		t.Fatalf("enableCalls = %d, want 0", client.enableCalls)
+	}
+}
+
+func disabledServiceStatusFixture() *serviceenablement.ServiceStatus {
+	status := serviceenablement.NewServiceStatus()
+	state := serviceenablement.SERVICESTATUSSTATE_DISABLED
+	status.State = &state
+	return status
+}
+
+func TestRetryWithBackoffRetriesUntilSuccess(t *testing.T) {
+	calls := 0
+	result, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (string, error) {
+		calls++
+		if calls < 2 {
+			return "", errors.New("transient")
+		}
+		return "done", nil
+	})
+	if err != nil {
+		t.Fatalf("retryWithBackoff() error = %v", err)
+	}
+	if result != "done" {
+		t.Fatalf("result = %q, want %q", result, "done")
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2", calls)
+	}
+}
+
+func TestRetryWithBackoffReturnsLastErrorWhenExhausted(t *testing.T) {
+	calls := 0
+	_, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (int, error) {
+		calls++
+		return 0, errors.New("always fails")
+	})
+	if err == nil {
+		t.Fatal("retryWithBackoff() error = nil, want non-nil")
+	}
+	if calls != 3 {
+		t.Fatalf("calls = %d, want 3", calls)
+	}
+}
+
 func TestUpUsesDiscoveredProjectAndWritesKubeconfig(t *testing.T) {
 	d := newTestDeployer(t)
 	configureValidUpInputs(d)
@@ -532,6 +694,7 @@ func TestUpUsesDiscoveredProjectAndWritesKubeconfig(t *testing.T) {
 			*authorization.NewMember(childProjectRole, serviceAccountEmail),
 		},
 	}
+	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
 
 	fakeSKE := &fakeSKEClient{
 		providerOptions:      providerOptionsFixture(),
