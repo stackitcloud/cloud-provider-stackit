@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stackitcloud/stackit-sdk-go/services/authorization"
-	"github.com/stackitcloud/stackit-sdk-go/services/resourcemanager"
-	"github.com/stackitcloud/stackit-sdk-go/services/serviceaccount"
+	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
+	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
+	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
 	"k8s.io/klog/v2"
 )
 
@@ -115,7 +115,8 @@ func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, err
 	}
 
 	matches := make([]managedProject, 0, 1)
-	for _, project := range projects {
+	for i := range projects {
+		project := &projects[i]
 		if !d.matchesManagedProject(project) {
 			continue
 		}
@@ -267,7 +268,7 @@ func (d *Deployer) ensureCachedChildServiceAccountKey(ctx context.Context, proje
 	return keyJSON, nil
 }
 
-func (d *Deployer) readCachedChildServiceAccountKey() (string, bool, error) {
+func (d *Deployer) readCachedChildServiceAccountKey() (key string, ok bool, err error) {
 	if strings.TrimSpace(d.serviceAccountKeyPath) == "" {
 		return "", false, nil
 	}
@@ -293,7 +294,7 @@ func (d *Deployer) managedProjectLabels() map[string]string {
 	}
 }
 
-func (d *Deployer) matchesManagedProject(project resourcemanager.Project) bool {
+func (d *Deployer) matchesManagedProject(project *resourcemanager.Project) bool {
 	if project.GetName() != d.projectName() {
 		return false
 	}
@@ -320,7 +321,7 @@ func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
 func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyResponse) (string, error) {
 	credentials := createdKey.GetCredentials()
 	privateKey, ok := credentials.GetPrivateKeyOk()
-	if !ok || strings.TrimSpace(privateKey) == "" {
+	if !ok || strings.TrimSpace(*privateKey) == "" {
 		return "", fmt.Errorf("service-account key response did not include a private key")
 	}
 
@@ -331,7 +332,7 @@ func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyRes
 			Aud:           credentials.GetAud(),
 			Iss:           credentials.GetIss(),
 			Kid:           credentials.GetKid(),
-			PrivateKey:    &privateKey,
+			PrivateKey:    privateKey,
 			Sub:           credentials.GetSub(),
 			TokenEndpoint: credentials.GetTokenEndpoint(),
 		},
@@ -342,7 +343,7 @@ func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyRes
 		PublicKey:    createdKey.GetPublicKey(),
 	}
 	if validUntil, ok := createdKey.GetValidUntilOk(); ok {
-		serviceAccountKey.ValidUntil = &validUntil
+		serviceAccountKey.ValidUntil = validUntil
 	}
 
 	keyJSON, err := json.Marshal(serviceAccountKey)
