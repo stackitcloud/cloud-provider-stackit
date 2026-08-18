@@ -3,16 +3,27 @@ package kubetest2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	oapierror "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
+	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+var childKeyCreationRetryBackoff = wait.Backoff{
+	Duration: 3 * time.Second,
+	Factor:   2.0,
+	Steps:    5,
+}
 
 type managedProject struct {
 	ContainerID string
@@ -69,6 +80,13 @@ func (d *Deployer) initializeBootstrapClients() error {
 		}
 		d.authorizationClient = client
 	}
+	if d.serviceEnablementClient == nil {
+		client, err := newServiceEnablementClient(d.serviceAccount, d.serviceEnablementEndpoint)
+		if err != nil {
+			return err
+		}
+		d.serviceEnablementClient = client
+	}
 	return nil
 }
 
@@ -91,6 +109,10 @@ func (d *Deployer) ensureManagedClusterAccess(ctx context.Context) error {
 	}
 	d.projectID = project.ProjectID
 
+	if err := d.ensureSKEServiceEnabled(ctx, project.ProjectID); err != nil {
+		return err
+	}
+
 	childServiceAccount, err := d.resolveManagedServiceAccount(ctx, project.ProjectID)
 	if err != nil {
 		return err
@@ -106,6 +128,36 @@ func (d *Deployer) ensureManagedClusterAccess(ctx context.Context) error {
 		return err
 	}
 	return d.initializeSKEClient(serviceAccountKey)
+}
+
+// ensureSKEServiceEnabled idempotently enables the SKE (Kubernetes Engine)
+// service for the managed project and waits until it is enabled.
+func (d *Deployer) ensureSKEServiceEnabled(ctx context.Context, projectID string) error {
+	status, err := d.serviceEnablementClient.GetServiceStatus(ctx, d.region, projectID, skeServiceID)
+	if err != nil {
+		if !isNotFound(err) {
+			return fmt.Errorf("get SKE service status for project %q: %w", projectID, err)
+		}
+		klog.Infof("SKE service not yet enabled for project_id=%q", projectID)
+	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLED {
+		klog.Infof("SKE service already enabled for project_id=%q", projectID)
+		return nil
+	} else {
+		klog.Infof("SKE service in state %q for project_id=%q, enabling", status.GetState(), projectID)
+	}
+
+	if err := d.serviceEnablementClient.EnableService(ctx, d.region, projectID, skeServiceID); err != nil {
+		return fmt.Errorf("enable SKE service for project %q: %w", projectID, err)
+	}
+	if err := d.serviceEnablementClient.WaitForServiceEnabled(ctx, d.region, projectID, skeServiceID); err != nil {
+		return fmt.Errorf("wait for SKE service enablement for project %q: %w", projectID, err)
+	}
+	return nil
+}
+
+func isNotFound(err error) bool {
+	var oapiErr *oapierror.GenericOpenAPIError
+	return errors.As(err, &oapiErr) && oapiErr.StatusCode == http.StatusNotFound
 }
 
 func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, error) {
@@ -254,7 +306,9 @@ func (d *Deployer) ensureCachedChildServiceAccountKey(ctx context.Context, proje
 	}
 
 	klog.Infof("Creating child service-account key for service_account=%q in project_id=%q", serviceAccountEmail, projectID)
-	createdKey, err := d.serviceAccountClient.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail)
+	createdKey, err := retryWithBackoff(ctx, childKeyCreationRetryBackoff, func() (*serviceaccount.CreateServiceAccountKeyResponse, error) {
+		return d.serviceAccountClient.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail)
+	})
 	if err != nil {
 		return "", fmt.Errorf("create service-account key for %q in STACKIT project %q: %w", serviceAccountEmail, projectID, err)
 	}
@@ -266,6 +320,29 @@ func (d *Deployer) ensureCachedChildServiceAccountKey(ctx context.Context, proje
 		return "", fmt.Errorf("write cached child service-account key %q: %w", d.serviceAccountKeyPath, err)
 	}
 	return keyJSON, nil
+}
+
+// retryWithBackoff retries fn until it succeeds or the backoff is exhausted.
+// It is used for operations that may fail transiently, e.g. while a freshly
+// created service account is still propagating through the STACKIT IAM and is
+// not yet ready to have a key created for it.
+func retryWithBackoff[T any](ctx context.Context, backoff wait.Backoff, fn func() (T, error)) (T, error) {
+	var result T
+	var lastErr error
+
+	waitErr := wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
+		val, err := fn()
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+		result = val
+		return true, nil
+	})
+	if waitErr != nil {
+		return result, fmt.Errorf("backoff failed: %w, last error: %v", waitErr, lastErr)
+	}
+	return result, nil
 }
 
 func (d *Deployer) readCachedChildServiceAccountKey() (key string, ok bool, err error) {

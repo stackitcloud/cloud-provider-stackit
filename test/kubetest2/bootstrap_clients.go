@@ -10,6 +10,8 @@ import (
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	resourcemanagerwait "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api/wait"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
+	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
+	serviceenablementwait "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api/wait"
 )
 
 const (
@@ -22,6 +24,7 @@ const (
 	projectResourceType              = "project"
 	childProjectRole                 = "ske.admin"
 	projectListPageSize      float32 = 100
+	skeServiceID                     = "cloud.stackit.ske"
 )
 
 type projectClient interface {
@@ -43,6 +46,12 @@ type authorizationClient interface {
 	AddMembers(ctx context.Context, resourceID, resourceType string, members []authorization.Member) error
 }
 
+type serviceEnablementClient interface {
+	GetServiceStatus(ctx context.Context, region, projectID, serviceID string) (*serviceenablement.ServiceStatus, error)
+	EnableService(ctx context.Context, region, projectID, serviceID string) error
+	WaitForServiceEnabled(ctx context.Context, region, projectID, serviceID string) error
+}
+
 type sdkProjectClient struct {
 	api *resourcemanager.APIClient
 }
@@ -53,6 +62,10 @@ type sdkServiceAccountClient struct {
 
 type sdkAuthorizationClient struct {
 	api *authorization.APIClient
+}
+
+type sdkServiceEnablementClient struct {
+	api *serviceenablement.APIClient
 }
 
 func apiClientOptions(serviceAccountKey, endpoint, apiName string) []sdkconfig.ConfigurationOption {
@@ -95,6 +108,14 @@ func newAuthorizationClient(serviceAccountKey, endpoint string) (authorizationCl
 		return nil, fmt.Errorf("create Authorization client: %w", err)
 	}
 	return &sdkAuthorizationClient{api: apiClient}, nil
+}
+
+func newServiceEnablementClient(serviceAccountKey, endpoint string) (serviceEnablementClient, error) {
+	apiClient, err := serviceenablement.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "serviceenablement")...)
+	if err != nil {
+		return nil, fmt.Errorf("create Service Enablement client: %w", err)
+	}
+	return &sdkServiceEnablementClient{api: apiClient}, nil
 }
 
 func (c *sdkProjectClient) ListProjects(ctx context.Context, parentContainerID string) ([]resourcemanager.Project, error) {
@@ -174,5 +195,18 @@ func (c *sdkAuthorizationClient) ListMembers(ctx context.Context, resourceType, 
 func (c *sdkAuthorizationClient) AddMembers(ctx context.Context, resourceID, resourceType string, members []authorization.Member) error {
 	payload := authorization.NewAddMembersPayload(members, resourceType)
 	_, err := c.api.DefaultAPI.AddMembers(ctx, resourceID).AddMembersPayload(*payload).Execute()
+	return err
+}
+
+func (c *sdkServiceEnablementClient) GetServiceStatus(ctx context.Context, region, projectID, serviceID string) (*serviceenablement.ServiceStatus, error) {
+	return c.api.DefaultAPI.GetServiceStatusRegional(ctx, region, projectID, serviceID).Execute()
+}
+
+func (c *sdkServiceEnablementClient) EnableService(ctx context.Context, region, projectID, serviceID string) error {
+	return c.api.DefaultAPI.EnableServiceRegional(ctx, region, projectID, serviceID).Execute()
+}
+
+func (c *sdkServiceEnablementClient) WaitForServiceEnabled(ctx context.Context, region, projectID, serviceID string) error {
+	_, err := serviceenablementwait.EnableServiceWaitHandler(ctx, c.api.DefaultAPI, region, projectID, serviceID).WaitWithContext(ctx)
 	return err
 }
