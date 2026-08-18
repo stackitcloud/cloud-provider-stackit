@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
-	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 	skewait "github.com/stackitcloud/stackit-sdk-go/services/ske/wait"
 	"k8s.io/klog/v2"
@@ -26,14 +24,10 @@ type sdkSKEClient struct {
 	api ske.DefaultApi
 }
 
-func newSKEClient(region, serviceAccount string) (skeClient, error) {
+func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
 	klog.Infof("Creating SKE API client for region=%q with service_account_bytes=%d", region, len(serviceAccount))
 
-	httpClient := metrics.NewInstrumentedHTTPClient("ske")
-	apiClient, err := ske.NewAPIClient(
-		sdkconfig.WithServiceAccountKey(serviceAccount),
-		sdkconfig.WithHTTPClient(httpClient),
-	)
+	apiClient, err := ske.NewAPIClient(apiClientOptions(serviceAccount, endpoint, "ske")...)
 	if err != nil {
 		return nil, fmt.Errorf("create SKE client: %w", err)
 	}
