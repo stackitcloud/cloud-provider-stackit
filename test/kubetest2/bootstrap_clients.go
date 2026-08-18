@@ -66,6 +66,13 @@ func apiClientOptions(serviceAccountKey, endpoint, apiName string) []sdkconfig.C
 	return opts
 }
 
+func apiEndpointURL(cfg *sdkconfig.Configuration) string {
+	if cfg == nil || len(cfg.Servers) == 0 {
+		return "unknown"
+	}
+	return cfg.Servers[0].URL
+}
+
 func newProjectClient(serviceAccountKey, endpoint string) (projectClient, error) {
 	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "resourcemanager")...)
 	if err != nil {
@@ -149,7 +156,11 @@ func (c *sdkServiceAccountClient) CreateServiceAccount(ctx context.Context, proj
 
 func (c *sdkServiceAccountClient) CreateServiceAccountKey(ctx context.Context, projectID, serviceAccountEmail string) (*serviceaccount.CreateServiceAccountKeyResponse, error) {
 	payload := serviceaccount.NewCreateServiceAccountKeyPayloadWithDefaults()
-	return c.api.DefaultAPI.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail).CreateServiceAccountKeyPayload(*payload).Execute()
+	resp, err := c.api.DefaultAPI.CreateServiceAccountKey(ctx, projectID, serviceAccountEmail).CreateServiceAccountKeyPayload(*payload).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("%w (endpoint: %s)", err, apiEndpointURL(c.api.GetConfig()))
+	}
+	return resp, nil
 }
 
 func (c *sdkAuthorizationClient) ListMembers(ctx context.Context, resourceType, resourceID string) ([]authorization.Member, error) {

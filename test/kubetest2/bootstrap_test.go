@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/kubetest2/pkg/types"
 )
 
+const validServiceAccountKey = `{"credentials":{"iss":"owner@example.com"}}`
+
 type fakeOptions struct {
 	runID  string
 	runDir string
@@ -230,33 +232,30 @@ func TestLoadEnvironmentValidation(t *testing.T) {
 		{
 			name: "missing service account",
 			env: map[string]string{
-				"STACKIT_PARENT_CONTAINER_ID":  "parent-1",
-				"STACKIT_PROJECT_MEMBER_EMAIL": "owner@example.com",
+				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
 			},
 			wantErrContains: "STACKIT_SERVICE_ACCOUNT",
 		},
 		{
 			name: "missing parent container",
 			env: map[string]string{
-				"STACKIT_SERVICE_ACCOUNT":      "{}",
-				"STACKIT_PROJECT_MEMBER_EMAIL": "owner@example.com",
+				"STACKIT_SERVICE_ACCOUNT": validServiceAccountKey,
 			},
 			wantErrContains: "STACKIT_PARENT_CONTAINER_ID",
 		},
 		{
-			name: "missing project member email",
+			name: "invalid service account key",
 			env: map[string]string{
 				"STACKIT_SERVICE_ACCOUNT":     "{}",
 				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
 			},
-			wantErrContains: "STACKIT_PROJECT_MEMBER_EMAIL",
+			wantErrContains: "invalid STACKIT_SERVICE_ACCOUNT",
 		},
 		{
 			name: "project id no longer required",
 			env: map[string]string{
-				"STACKIT_SERVICE_ACCOUNT":      "{}",
-				"STACKIT_PARENT_CONTAINER_ID":  "parent-1",
-				"STACKIT_PROJECT_MEMBER_EMAIL": "owner@example.com",
+				"STACKIT_SERVICE_ACCOUNT":     validServiceAccountKey,
+				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
 			},
 		},
 	}
@@ -266,7 +265,6 @@ func TestLoadEnvironmentValidation(t *testing.T) {
 			for _, key := range []string{
 				"STACKIT_SERVICE_ACCOUNT",
 				"STACKIT_PARENT_CONTAINER_ID",
-				"STACKIT_PROJECT_MEMBER_EMAIL",
 				"STACKIT_PROJECT_ID",
 				"STACKIT_RESOURCE_MANAGER_ENDPOINT",
 				"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
@@ -314,7 +312,6 @@ func TestLoadEnvironmentReadsOptionalEndpoints(t *testing.T) {
 	for _, key := range []string{
 		"STACKIT_SERVICE_ACCOUNT",
 		"STACKIT_PARENT_CONTAINER_ID",
-		"STACKIT_PROJECT_MEMBER_EMAIL",
 		"STACKIT_RESOURCE_MANAGER_ENDPOINT",
 		"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
 		"STACKIT_AUTHORIZATION_ENDPOINT",
@@ -322,9 +319,8 @@ func TestLoadEnvironmentReadsOptionalEndpoints(t *testing.T) {
 	} {
 		t.Setenv(key, "")
 	}
-	t.Setenv("STACKIT_SERVICE_ACCOUNT", "{}")
+	t.Setenv("STACKIT_SERVICE_ACCOUNT", validServiceAccountKey)
 	t.Setenv("STACKIT_PARENT_CONTAINER_ID", "parent-1")
-	t.Setenv("STACKIT_PROJECT_MEMBER_EMAIL", "owner@example.com")
 	t.Setenv("STACKIT_RESOURCE_MANAGER_ENDPOINT", "https://resource-manager.example.com")
 	t.Setenv("STACKIT_SERVICE_ACCOUNT_ENDPOINT", "https://service-account.example.com")
 	t.Setenv("STACKIT_AUTHORIZATION_ENDPOINT", "https://authorization.example.com")
@@ -336,6 +332,9 @@ func TestLoadEnvironmentReadsOptionalEndpoints(t *testing.T) {
 		t.Fatalf("loadEnvironment() error = %v", err)
 	}
 
+	if d.projectMemberEmail != "owner@example.com" {
+		t.Fatalf("projectMemberEmail = %q, want %q", d.projectMemberEmail, "owner@example.com")
+	}
 	if d.resourceManagerEndpoint != "https://resource-manager.example.com" {
 		t.Fatalf("resourceManagerEndpoint = %q", d.resourceManagerEndpoint)
 	}
