@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
-	"testing"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	oapierror "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
@@ -269,568 +268,426 @@ func (c *fakeSKEClient) WaitForClusterDeleted(_ context.Context, _, _, _ string)
 	return nil
 }
 
-func TestLoadEnvironmentValidation(t *testing.T) {
-	testCases := []struct {
-		name            string
-		env             map[string]string
-		wantErrContains string
-	}{
-		{
-			name: "missing service account",
-			env: map[string]string{
-				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
-			},
-			wantErrContains: "STACKIT_SERVICE_ACCOUNT",
-		},
-		{
-			name: "missing parent container",
-			env: map[string]string{
-				"STACKIT_SERVICE_ACCOUNT": validServiceAccountKey,
-			},
-			wantErrContains: "STACKIT_PARENT_CONTAINER_ID",
-		},
-		{
-			name: "invalid service account key",
-			env: map[string]string{
-				"STACKIT_SERVICE_ACCOUNT":     "{}",
-				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
-			},
-			wantErrContains: "invalid STACKIT_SERVICE_ACCOUNT",
-		},
-		{
-			name: "project id no longer required",
-			env: map[string]string{
-				"STACKIT_SERVICE_ACCOUNT":     validServiceAccountKey,
-				"STACKIT_PARENT_CONTAINER_ID": "parent-1",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			for _, key := range []string{
-				"STACKIT_SERVICE_ACCOUNT",
-				"STACKIT_PARENT_CONTAINER_ID",
-				"STACKIT_PROJECT_ID",
-				"STACKIT_RESOURCE_MANAGER_ENDPOINT",
-				"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
-				"STACKIT_AUTHORIZATION_ENDPOINT",
-				"STACKIT_SKE_ENDPOINT",
-			} {
-				t.Setenv(key, "")
-			}
-			for key, value := range tc.env {
-				t.Setenv(key, value)
-			}
-
-			runDir := t.TempDir()
-			d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
-			err := d.loadEnvironment()
-			if tc.wantErrContains != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantErrContains) {
-					t.Fatalf("expected error containing %q, got %v", tc.wantErrContains, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("loadEnvironment() error = %v", err)
-			}
-			if d.parentContainerID != "parent-1" {
-				t.Fatalf("parentContainerID = %q, want %q", d.parentContainerID, "parent-1")
-			}
-			if d.projectMemberEmail != "owner@example.com" {
-				t.Fatalf("projectMemberEmail = %q, want %q", d.projectMemberEmail, "owner@example.com")
-			}
-			if d.projectID != "" {
-				t.Fatalf("projectID = %q, want empty", d.projectID)
-			}
-			if d.kubeconfigPath != filepath.Join(runDir, "kubeconfig") {
-				t.Fatalf("kubeconfigPath = %q", d.kubeconfigPath)
-			}
-			if d.serviceAccountKeyPath != filepath.Join(runDir, "service-account-key.json") {
-				t.Fatalf("serviceAccountKeyPath = %q", d.serviceAccountKeyPath)
-			}
-		})
-	}
-}
-
-func TestLoadEnvironmentReadsOptionalEndpoints(t *testing.T) {
-	for _, key := range []string{
+var _ = Describe("loadEnvironment", func() {
+	envVarKeys := []string{
 		"STACKIT_SERVICE_ACCOUNT",
 		"STACKIT_PARENT_CONTAINER_ID",
+		"STACKIT_PROJECT_ID",
 		"STACKIT_RESOURCE_MANAGER_ENDPOINT",
 		"STACKIT_SERVICE_ACCOUNT_ENDPOINT",
 		"STACKIT_AUTHORIZATION_ENDPOINT",
 		"STACKIT_SKE_ENDPOINT",
-	} {
-		t.Setenv(key, "")
-	}
-	t.Setenv("STACKIT_SERVICE_ACCOUNT", validServiceAccountKey)
-	t.Setenv("STACKIT_PARENT_CONTAINER_ID", "parent-1")
-	t.Setenv("STACKIT_RESOURCE_MANAGER_ENDPOINT", "https://resource-manager.example.com")
-	t.Setenv("STACKIT_SERVICE_ACCOUNT_ENDPOINT", "https://service-account.example.com")
-	t.Setenv("STACKIT_AUTHORIZATION_ENDPOINT", "https://authorization.example.com")
-	t.Setenv("STACKIT_SKE_ENDPOINT", "https://ske.example.com")
-
-	runDir := t.TempDir()
-	d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
-	if err := d.loadEnvironment(); err != nil {
-		t.Fatalf("loadEnvironment() error = %v", err)
 	}
 
-	if d.projectMemberEmail != "owner@example.com" {
-		t.Fatalf("projectMemberEmail = %q, want %q", d.projectMemberEmail, "owner@example.com")
-	}
-	if d.resourceManagerEndpoint != "https://resource-manager.example.com" {
-		t.Fatalf("resourceManagerEndpoint = %q", d.resourceManagerEndpoint)
-	}
-	if d.serviceAccountEndpoint != "https://service-account.example.com" {
-		t.Fatalf("serviceAccountEndpoint = %q", d.serviceAccountEndpoint)
-	}
-	if d.authorizationEndpoint != "https://authorization.example.com" {
-		t.Fatalf("authorizationEndpoint = %q", d.authorizationEndpoint)
-	}
-	if d.skeEndpoint != "https://ske.example.com" {
-		t.Fatalf("skeEndpoint = %q", d.skeEndpoint)
-	}
-}
+	DescribeTable("validates required environment variables",
+		func(env map[string]string, wantErrContains string) {
+			for _, key := range envVarKeys {
+				setEnvVar(key, "")
+			}
+			for key, value := range env {
+				setEnvVar(key, value)
+			}
 
-func TestResolveManagedProjectCreatesWhenMissing(t *testing.T) {
-	d := newTestDeployer(t)
-	projectClient := &fakeProjectClient{
-		createProjectResult: projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		waitActiveResult:    projectResponseFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-	}
-	d.projectClient = projectClient
-
-	project, err := d.resolveManagedProject(context.Background())
-	if err != nil {
-		t.Fatalf("resolveManagedProject() error = %v", err)
-	}
-	if project.ProjectID != "project-123" {
-		t.Fatalf("project id = %q, want %q", project.ProjectID, "project-123")
-	}
-	if projectClient.createCalls != 1 {
-		t.Fatalf("createCalls = %d, want 1", projectClient.createCalls)
-	}
-	if projectClient.waitActiveCalls != 1 {
-		t.Fatalf("waitActiveCalls = %d, want 1", projectClient.waitActiveCalls)
-	}
-	if projectClient.lastCreateParentContainerID != d.parentContainerID {
-		t.Fatalf("parent container = %q, want %q", projectClient.lastCreateParentContainerID, d.parentContainerID)
-	}
-	if projectClient.lastCreateName != d.projectName() {
-		t.Fatalf("created project name = %q, want %q", projectClient.lastCreateName, d.projectName())
-	}
-	if projectClient.lastCreateOwnerEmail != d.projectMemberEmail {
-		t.Fatalf("created owner email = %q, want %q", projectClient.lastCreateOwnerEmail, d.projectMemberEmail)
-	}
-	if !reflect.DeepEqual(projectClient.lastCreateLabels, d.managedProjectLabels()) {
-		t.Fatalf("created labels = %#v, want %#v", projectClient.lastCreateLabels, d.managedProjectLabels())
-	}
-}
-
-func TestResolveManagedProjectErrorsOnMultipleMatches(t *testing.T) {
-	d := newTestDeployer(t)
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-1", "container-1", d.managedProjectLabels()),
-			*projectFixture(d.projectName(), "project-2", "container-2", d.managedProjectLabels()),
+			runDir := GinkgoT().TempDir()
+			d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
+			err := d.loadEnvironment()
+			if wantErrContains != "" {
+				Expect(err).To(MatchError(ContainSubstring(wantErrContains)))
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(d.parentContainerID).To(Equal("parent-1"))
+			Expect(d.projectMemberEmail).To(Equal("owner@example.com"))
+			Expect(d.projectID).To(BeEmpty())
+			Expect(d.kubeconfigPath).To(Equal(filepath.Join(runDir, "kubeconfig")))
+			Expect(d.serviceAccountKeyPath).To(Equal(filepath.Join(runDir, "service-account-key.json")))
 		},
-	}
+		Entry("missing service account", map[string]string{
+			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
+		}, "STACKIT_SERVICE_ACCOUNT"),
+		Entry("missing parent container", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT": validServiceAccountKey,
+		}, "STACKIT_PARENT_CONTAINER_ID"),
+		Entry("invalid service account key", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT":     "{}",
+			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
+		}, "invalid STACKIT_SERVICE_ACCOUNT"),
+		Entry("project id no longer required", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT":     validServiceAccountKey,
+			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
+		}, ""),
+	)
 
-	_, err := d.findManagedProject(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "found 2 managed STACKIT projects") {
-		t.Fatalf("expected duplicate managed project error, got %v", err)
-	}
-}
-
-func TestEnsureManagedClusterAccessReusesCachedKeyAndSkipsMembershipWrite(t *testing.T) {
-	d := newTestDeployer(t)
-	cachedKey := `{"credentials":{"privateKey":"cached"}}`
-	if err := os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600); err != nil {
-		t.Fatalf("write cached key: %v", err)
-	}
-
-	projectClient := &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-	serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
-	serviceAccountClient := &fakeServiceAccountClient{
-		listResult: []serviceaccount.ServiceAccount{
-			*serviceAccountFixture(serviceAccountEmail, "project-123"),
-		},
-	}
-	authorizationClient := &fakeAuthorizationClient{
-		listMembersResult: []authorization.Member{
-			*authorization.NewMember(childProjectRole, serviceAccountEmail),
-		},
-	}
-	fakeSKE := &fakeSKEClient{}
-	var receivedKey string
-
-	d.projectClient = projectClient
-	d.serviceAccountClient = serviceAccountClient
-	d.authorizationClient = authorizationClient
-	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
-	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
-		receivedKey = serviceAccount
-		return fakeSKE, nil
-	}
-
-	if err := d.ensureManagedClusterAccess(context.Background()); err != nil {
-		t.Fatalf("ensureManagedClusterAccess() error = %v", err)
-	}
-	if receivedKey != cachedKey {
-		t.Fatalf("received key = %q, want cached key", receivedKey)
-	}
-	if authorizationClient.addCalls != 0 {
-		t.Fatalf("addCalls = %d, want 0", authorizationClient.addCalls)
-	}
-	if serviceAccountClient.createKeyCalls != 0 {
-		t.Fatalf("createKeyCalls = %d, want 0", serviceAccountClient.createKeyCalls)
-	}
-	if d.projectID != "project-123" {
-		t.Fatalf("projectID = %q, want %q", d.projectID, "project-123")
-	}
-}
-
-func TestEnsureManagedClusterAccessCreatesKeyAndAddsMembership(t *testing.T) {
-	d := newTestDeployer(t)
-
-	projectClient := &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-	serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
-	serviceAccountClient := &fakeServiceAccountClient{
-		listResult: []serviceaccount.ServiceAccount{
-			*serviceAccountFixture(serviceAccountEmail, "project-123"),
-		},
-		createKeyResult: createServiceAccountKeyResponseFixture(serviceAccountEmail),
-	}
-	authorizationClient := &fakeAuthorizationClient{}
-	var receivedKey string
-
-	d.projectClient = projectClient
-	d.serviceAccountClient = serviceAccountClient
-	d.authorizationClient = authorizationClient
-	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
-	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
-		receivedKey = serviceAccount
-		return &fakeSKEClient{}, nil
-	}
-
-	if err := d.ensureManagedClusterAccess(context.Background()); err != nil {
-		t.Fatalf("ensureManagedClusterAccess() error = %v", err)
-	}
-	if authorizationClient.addCalls != 1 {
-		t.Fatalf("addCalls = %d, want 1", authorizationClient.addCalls)
-	}
-	if serviceAccountClient.createKeyCalls != 1 {
-		t.Fatalf("createKeyCalls = %d, want 1", serviceAccountClient.createKeyCalls)
-	}
-	if authorizationClient.lastAddedType != projectResourceType || authorizationClient.lastAddedID != "project-123" {
-		t.Fatalf("AddMembers called with type=%q id=%q", authorizationClient.lastAddedType, authorizationClient.lastAddedID)
-	}
-	keyBytes, err := os.ReadFile(d.serviceAccountKeyPath)
-	if err != nil {
-		t.Fatalf("read cached key: %v", err)
-	}
-	if receivedKey != string(keyBytes) {
-		t.Fatalf("factory key mismatch")
-	}
-	if !strings.Contains(string(keyBytes), "\"privateKey\":\"PRIVATE\"") {
-		t.Fatalf("cached key did not contain serialized private key: %s", string(keyBytes))
-	}
-	info, err := os.Stat(d.serviceAccountKeyPath)
-	if err != nil {
-		t.Fatalf("stat cached key: %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("cached key mode = %o, want 600", info.Mode().Perm())
-	}
-}
-
-func TestEnsureSKEServiceEnabledSkipsWhenAlreadyEnabled(t *testing.T) {
-	d := newTestDeployer(t)
-	client := &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
-	d.serviceEnablementClient = client
-
-	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
-		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
-	}
-	if client.enableCalls != 0 {
-		t.Fatalf("enableCalls = %d, want 0", client.enableCalls)
-	}
-	if client.waitCalls != 0 {
-		t.Fatalf("waitCalls = %d, want 0", client.waitCalls)
-	}
-	if client.lastGetStatusServiceID != skeServiceID {
-		t.Fatalf("service ID = %q, want %q", client.lastGetStatusServiceID, skeServiceID)
-	}
-}
-
-func TestEnsureSKEServiceEnabledEnablesWhenNotFound(t *testing.T) {
-	d := newTestDeployer(t)
-	client := &fakeServiceEnablementClient{
-		getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
-	}
-	d.serviceEnablementClient = client
-
-	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
-		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
-	}
-	if client.enableCalls != 1 {
-		t.Fatalf("enableCalls = %d, want 1", client.enableCalls)
-	}
-	if client.waitCalls != 1 {
-		t.Fatalf("waitCalls = %d, want 1", client.waitCalls)
-	}
-	if client.lastEnableProjectID != "project-123" || client.lastEnableServiceID != skeServiceID {
-		t.Fatalf("EnableService called with project_id=%q service_id=%q", client.lastEnableProjectID, client.lastEnableServiceID)
-	}
-}
-
-func TestEnsureSKEServiceEnabledEnablesWhenDisabled(t *testing.T) {
-	d := newTestDeployer(t)
-	client := &fakeServiceEnablementClient{
-		getStatusResult: disabledServiceStatusFixture(),
-	}
-	d.serviceEnablementClient = client
-
-	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err != nil {
-		t.Fatalf("ensureSKEServiceEnabled() error = %v", err)
-	}
-	if client.enableCalls != 1 {
-		t.Fatalf("enableCalls = %d, want 1", client.enableCalls)
-	}
-	if client.waitCalls != 1 {
-		t.Fatalf("waitCalls = %d, want 1", client.waitCalls)
-	}
-}
-
-func TestEnsureSKEServiceEnabledFailsOnGetStatusError(t *testing.T) {
-	d := newTestDeployer(t)
-	client := &fakeServiceEnablementClient{
-		getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusForbidden},
-	}
-	d.serviceEnablementClient = client
-
-	if err := d.ensureSKEServiceEnabled(context.Background(), "project-123"); err == nil {
-		t.Fatal("ensureSKEServiceEnabled() error = nil, want non-nil")
-	}
-	if client.enableCalls != 0 {
-		t.Fatalf("enableCalls = %d, want 0", client.enableCalls)
-	}
-}
-
-func disabledServiceStatusFixture() *serviceenablement.ServiceStatus {
-	status := serviceenablement.NewServiceStatus()
-	state := serviceenablement.SERVICESTATUSSTATE_DISABLED
-	status.State = &state
-	return status
-}
-
-func TestRetryWithBackoffRetriesUntilSuccess(t *testing.T) {
-	calls := 0
-	result, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (string, error) {
-		calls++
-		if calls < 2 {
-			return "", errors.New("transient")
+	It("reads optional endpoints", func() {
+		for _, key := range envVarKeys {
+			setEnvVar(key, "")
 		}
-		return "done", nil
+		setEnvVar("STACKIT_SERVICE_ACCOUNT", validServiceAccountKey)
+		setEnvVar("STACKIT_PARENT_CONTAINER_ID", "parent-1")
+		setEnvVar("STACKIT_RESOURCE_MANAGER_ENDPOINT", "https://resource-manager.example.com")
+		setEnvVar("STACKIT_SERVICE_ACCOUNT_ENDPOINT", "https://service-account.example.com")
+		setEnvVar("STACKIT_AUTHORIZATION_ENDPOINT", "https://authorization.example.com")
+		setEnvVar("STACKIT_SKE_ENDPOINT", "https://ske.example.com")
+
+		runDir := GinkgoT().TempDir()
+		d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
+		Expect(d.loadEnvironment()).To(Succeed())
+
+		Expect(d.projectMemberEmail).To(Equal("owner@example.com"))
+		Expect(d.resourceManagerEndpoint).To(Equal("https://resource-manager.example.com"))
+		Expect(d.serviceAccountEndpoint).To(Equal("https://service-account.example.com"))
+		Expect(d.authorizationEndpoint).To(Equal("https://authorization.example.com"))
+		Expect(d.skeEndpoint).To(Equal("https://ske.example.com"))
 	})
-	if err != nil {
-		t.Fatalf("retryWithBackoff() error = %v", err)
-	}
-	if result != "done" {
-		t.Fatalf("result = %q, want %q", result, "done")
-	}
-	if calls != 2 {
-		t.Fatalf("calls = %d, want 2", calls)
-	}
-}
+})
 
-func TestRetryWithBackoffReturnsLastErrorWhenExhausted(t *testing.T) {
-	calls := 0
-	_, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (int, error) {
-		calls++
-		return 0, errors.New("always fails")
+var _ = Describe("resolveManagedProject", func() {
+	It("creates a project when missing", func() {
+		d := newTestDeployer()
+		projectClient := &fakeProjectClient{
+			createProjectResult: projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			waitActiveResult:    projectResponseFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+		}
+		d.projectClient = projectClient
+
+		project, err := d.resolveManagedProject(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(project.ProjectID).To(Equal("project-123"))
+		Expect(projectClient.createCalls).To(Equal(1))
+		Expect(projectClient.waitActiveCalls).To(Equal(1))
+		Expect(projectClient.lastCreateParentContainerID).To(Equal(d.parentContainerID))
+		Expect(projectClient.lastCreateName).To(Equal(d.projectName()))
+		Expect(projectClient.lastCreateOwnerEmail).To(Equal(d.projectMemberEmail))
+		Expect(projectClient.lastCreateLabels).To(Equal(d.managedProjectLabels()))
 	})
-	if err == nil {
-		t.Fatal("retryWithBackoff() error = nil, want non-nil")
-	}
-	if calls != 3 {
-		t.Fatalf("calls = %d, want 3", calls)
-	}
-}
 
-func TestUpUsesDiscoveredProjectAndWritesKubeconfig(t *testing.T) {
-	d := newTestDeployer(t)
-	configureValidUpInputs(d)
-
-	cachedKey := `{"credentials":{"privateKey":"cached"}}`
-	if err := os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600); err != nil {
-		t.Fatalf("write cached key: %v", err)
-	}
-
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-	serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
-	d.serviceAccountClient = &fakeServiceAccountClient{
-		listResult: []serviceaccount.ServiceAccount{
-			*serviceAccountFixture(serviceAccountEmail, "project-123"),
-		},
-	}
-	d.authorizationClient = &fakeAuthorizationClient{
-		listMembersResult: []authorization.Member{
-			*authorization.NewMember(childProjectRole, serviceAccountEmail),
-		},
-	}
-	d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
-
-	fakeSKE := &fakeSKEClient{
-		providerOptions:      providerOptionsFixture(),
-		createOrUpdateResult: ske.NewClusterWithDefaults(),
-		waitReadyResult:      ske.NewClusterWithDefaults(),
-		kubeconfigResult: func() *ske.Kubeconfig {
-			cfg := ske.NewKubeconfig()
-			cfg.SetKubeconfig("apiVersion: v1\n")
-			return cfg
-		}(),
-	}
-	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
-		if serviceAccount != cachedKey {
-			t.Fatalf("unexpected service account key passed to SKE client")
+	It("errors on multiple matches", func() {
+		d := newTestDeployer()
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-1", "container-1", d.managedProjectLabels()),
+				*projectFixture(d.projectName(), "project-2", "container-2", d.managedProjectLabels()),
+			},
 		}
-		return fakeSKE, nil
-	}
 
-	if err := d.Up(); err != nil {
-		t.Fatalf("Up() error = %v", err)
-	}
-	if fakeSKE.lastCreateProjectID != "project-123" {
-		t.Fatalf("CreateOrUpdate projectID = %q, want %q", fakeSKE.lastCreateProjectID, "project-123")
-	}
-	if fakeSKE.lastCreateClusterName != d.clusterName() {
-		t.Fatalf("cluster name = %q, want %q", fakeSKE.lastCreateClusterName, d.clusterName())
-	}
-	kubeconfigBytes, err := os.ReadFile(d.kubeconfigPath)
-	if err != nil {
-		t.Fatalf("read kubeconfig: %v", err)
-	}
-	if string(kubeconfigBytes) != "apiVersion: v1\n" {
-		t.Fatalf("kubeconfig = %q", string(kubeconfigBytes))
-	}
-}
+		_, err := d.findManagedProject(context.Background())
+		Expect(err).To(MatchError(ContainSubstring("found 2 managed STACKIT projects")))
+	})
+})
 
-func TestDownMissingProjectIsSuccess(t *testing.T) {
-	d := newTestDeployer(t)
-	projectClient := &fakeProjectClient{}
-	d.projectClient = projectClient
+var _ = Describe("ensureManagedClusterAccess", func() {
+	It("reuses cached key and skips membership write", func() {
+		d := newTestDeployer()
+		cachedKey := `{"credentials":{"privateKey":"cached"}}`
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600)).To(Succeed())
 
-	if err := d.Down(); err != nil {
-		t.Fatalf("Down() error = %v", err)
-	}
-	if projectClient.deleteCalls != 0 {
-		t.Fatalf("deleteCalls = %d, want 0", projectClient.deleteCalls)
-	}
-}
-
-func TestDownDeletesProjectWithoutTouchingClusterDelete(t *testing.T) {
-	d := newTestDeployer(t)
-	fakeSKE := &fakeSKEClient{}
-	d.skeClient = fakeSKE
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-
-	if err := d.Down(); err != nil {
-		t.Fatalf("Down() error = %v", err)
-	}
-	if d.projectClient.(*fakeProjectClient).deleteCalls != 1 {
-		t.Fatalf("deleteCalls = %d, want 1", d.projectClient.(*fakeProjectClient).deleteCalls)
-	}
-	if d.projectClient.(*fakeProjectClient).waitDeletedCalls != 1 {
-		t.Fatalf("waitDeletedCalls = %d, want 1", d.projectClient.(*fakeProjectClient).waitDeletedCalls)
-	}
-	if fakeSKE.deleteClusterCalled || fakeSKE.waitDeletedCalled {
-		t.Fatalf("cluster delete path was invoked unexpectedly")
-	}
-}
-
-func TestIsUpNoProjectReturnsFalse(t *testing.T) {
-	d := newTestDeployer(t)
-	d.projectClient = &fakeProjectClient{}
-
-	isUp, err := d.IsUp()
-	if err != nil {
-		t.Fatalf("IsUp() error = %v", err)
-	}
-	if isUp {
-		t.Fatalf("IsUp() = true, want false")
-	}
-}
-
-func TestIsUpProjectWithoutCachedKeyReturnsError(t *testing.T) {
-	d := newTestDeployer(t)
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-
-	isUp, err := d.IsUp()
-	if err == nil || !strings.Contains(err.Error(), "child service-account key cache") {
-		t.Fatalf("expected missing key cache error, got up=%v err=%v", isUp, err)
-	}
-}
-
-func TestIsUpProjectWithCachedKeyQueriesCluster(t *testing.T) {
-	d := newTestDeployer(t)
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-	cachedKey := `{"credentials":{"privateKey":"cached"}}`
-	if err := os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600); err != nil {
-		t.Fatalf("write cached key: %v", err)
-	}
-	fakeSKE := &fakeSKEClient{
-		getClusterResult: healthyClusterFixture(),
-	}
-	d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
-		if serviceAccount != cachedKey {
-			t.Fatalf("unexpected cached key content")
+		projectClient := &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
 		}
-		return fakeSKE, nil
-	}
+		serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
+		serviceAccountClient := &fakeServiceAccountClient{
+			listResult: []serviceaccount.ServiceAccount{
+				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+			},
+		}
+		authorizationClient := &fakeAuthorizationClient{
+			listMembersResult: []authorization.Member{
+				*authorization.NewMember(childProjectRole, serviceAccountEmail),
+			},
+		}
+		fakeSKE := &fakeSKEClient{}
+		var receivedKey string
 
-	isUp, err := d.IsUp()
-	if err != nil {
-		t.Fatalf("IsUp() error = %v", err)
-	}
-	if !isUp {
-		t.Fatalf("IsUp() = false, want true")
-	}
-	if fakeSKE.lastGetProjectID != "project-123" {
-		t.Fatalf("GetCluster projectID = %q, want %q", fakeSKE.lastGetProjectID, "project-123")
-	}
-}
+		d.projectClient = projectClient
+		d.serviceAccountClient = serviceAccountClient
+		d.authorizationClient = authorizationClient
+		d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+		d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
+			receivedKey = serviceAccount
+			return fakeSKE, nil
+		}
 
-func newTestDeployer(t *testing.T) *Deployer {
-	t.Helper()
-	runDir := t.TempDir()
+		Expect(d.ensureManagedClusterAccess(context.Background())).To(Succeed())
+		Expect(receivedKey).To(Equal(cachedKey))
+		Expect(authorizationClient.addCalls).To(Equal(0))
+		Expect(serviceAccountClient.createKeyCalls).To(Equal(0))
+		Expect(d.projectID).To(Equal("project-123"))
+	})
+
+	It("creates key and adds membership", func() {
+		d := newTestDeployer()
+
+		projectClient := &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+		serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
+		serviceAccountClient := &fakeServiceAccountClient{
+			listResult: []serviceaccount.ServiceAccount{
+				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+			},
+			createKeyResult: createServiceAccountKeyResponseFixture(serviceAccountEmail),
+		}
+		authorizationClient := &fakeAuthorizationClient{}
+		var receivedKey string
+
+		d.projectClient = projectClient
+		d.serviceAccountClient = serviceAccountClient
+		d.authorizationClient = authorizationClient
+		d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+		d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
+			receivedKey = serviceAccount
+			return &fakeSKEClient{}, nil
+		}
+
+		Expect(d.ensureManagedClusterAccess(context.Background())).To(Succeed())
+		Expect(authorizationClient.addCalls).To(Equal(1))
+		Expect(serviceAccountClient.createKeyCalls).To(Equal(1))
+		Expect(authorizationClient.lastAddedType).To(Equal(projectResourceType))
+		Expect(authorizationClient.lastAddedID).To(Equal("project-123"))
+
+		keyBytes, err := os.ReadFile(d.serviceAccountKeyPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(receivedKey).To(Equal(string(keyBytes)))
+		Expect(string(keyBytes)).To(ContainSubstring(`"privateKey":"PRIVATE"`))
+
+		info, err := os.Stat(d.serviceAccountKeyPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(info.Mode().Perm()).To(Equal(os.FileMode(0o600)))
+	})
+})
+
+var _ = Describe("ensureSKEServiceEnabled", func() {
+	It("skips when already enabled", func() {
+		d := newTestDeployer()
+		client := &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+		d.serviceEnablementClient = client
+
+		Expect(d.ensureSKEServiceEnabled(context.Background(), "project-123")).To(Succeed())
+		Expect(client.enableCalls).To(Equal(0))
+		Expect(client.waitCalls).To(Equal(0))
+		Expect(client.lastGetStatusServiceID).To(Equal(skeServiceID))
+	})
+
+	It("enables when not found", func() {
+		d := newTestDeployer()
+		client := &fakeServiceEnablementClient{
+			getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
+		}
+		d.serviceEnablementClient = client
+
+		Expect(d.ensureSKEServiceEnabled(context.Background(), "project-123")).To(Succeed())
+		Expect(client.enableCalls).To(Equal(1))
+		Expect(client.waitCalls).To(Equal(1))
+		Expect(client.lastEnableProjectID).To(Equal("project-123"))
+		Expect(client.lastEnableServiceID).To(Equal(skeServiceID))
+	})
+
+	It("enables when disabled", func() {
+		d := newTestDeployer()
+		client := &fakeServiceEnablementClient{
+			getStatusResult: disabledServiceStatusFixture(),
+		}
+		d.serviceEnablementClient = client
+
+		Expect(d.ensureSKEServiceEnabled(context.Background(), "project-123")).To(Succeed())
+		Expect(client.enableCalls).To(Equal(1))
+		Expect(client.waitCalls).To(Equal(1))
+	})
+
+	It("fails on get status error", func() {
+		d := newTestDeployer()
+		client := &fakeServiceEnablementClient{
+			getStatusErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusForbidden},
+		}
+		d.serviceEnablementClient = client
+
+		err := d.ensureSKEServiceEnabled(context.Background(), "project-123")
+		Expect(err).To(HaveOccurred())
+		Expect(client.enableCalls).To(Equal(0))
+	})
+})
+
+var _ = Describe("retryWithBackoff", func() {
+	It("retries until success", func() {
+		calls := 0
+		result, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (string, error) {
+			calls++
+			if calls < 2 {
+				return "", errors.New("transient")
+			}
+			return "done", nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal("done"))
+		Expect(calls).To(Equal(2))
+	})
+
+	It("returns last error when exhausted", func() {
+		calls := 0
+		_, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (int, error) {
+			calls++
+			return 0, errors.New("always fails")
+		})
+		Expect(err).To(HaveOccurred())
+		Expect(calls).To(Equal(3))
+	})
+})
+
+var _ = Describe("Up", func() {
+	It("uses discovered project and writes kubeconfig", func() {
+		d := newTestDeployer()
+		configureValidUpInputs(d)
+
+		cachedKey := `{"credentials":{"privateKey":"cached"}}`
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600)).To(Succeed())
+
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+		serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
+		d.serviceAccountClient = &fakeServiceAccountClient{
+			listResult: []serviceaccount.ServiceAccount{
+				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+			},
+		}
+		d.authorizationClient = &fakeAuthorizationClient{
+			listMembersResult: []authorization.Member{
+				*authorization.NewMember(childProjectRole, serviceAccountEmail),
+			},
+		}
+		d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+
+		fakeSKE := &fakeSKEClient{
+			providerOptions:      providerOptionsFixture(),
+			createOrUpdateResult: ske.NewClusterWithDefaults(),
+			waitReadyResult:      ske.NewClusterWithDefaults(),
+			kubeconfigResult: func() *ske.Kubeconfig {
+				cfg := ske.NewKubeconfig()
+				cfg.SetKubeconfig("apiVersion: v1\n")
+				return cfg
+			}(),
+		}
+		d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
+			Expect(serviceAccount).To(Equal(cachedKey))
+			return fakeSKE, nil
+		}
+
+		Expect(d.Up()).To(Succeed())
+		Expect(fakeSKE.lastCreateProjectID).To(Equal("project-123"))
+		Expect(fakeSKE.lastCreateClusterName).To(Equal(d.clusterName()))
+
+		kubeconfigBytes, err := os.ReadFile(d.kubeconfigPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(kubeconfigBytes)).To(Equal("apiVersion: v1\n"))
+	})
+})
+
+var _ = Describe("Down", func() {
+	It("succeeds when project is missing", func() {
+		d := newTestDeployer()
+		projectClient := &fakeProjectClient{}
+		d.projectClient = projectClient
+
+		Expect(d.Down()).To(Succeed())
+		Expect(projectClient.deleteCalls).To(Equal(0))
+	})
+
+	It("deletes project without touching cluster delete", func() {
+		d := newTestDeployer()
+		fakeSKE := &fakeSKEClient{}
+		d.skeClient = fakeSKE
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+
+		Expect(d.Down()).To(Succeed())
+		projectClient := d.projectClient.(*fakeProjectClient)
+		Expect(projectClient.deleteCalls).To(Equal(1))
+		Expect(projectClient.waitDeletedCalls).To(Equal(1))
+		Expect(fakeSKE.deleteClusterCalled).To(BeFalse())
+		Expect(fakeSKE.waitDeletedCalled).To(BeFalse())
+	})
+})
+
+var _ = Describe("IsUp", func() {
+	It("returns false when no project", func() {
+		d := newTestDeployer()
+		d.projectClient = &fakeProjectClient{}
+
+		isUp, err := d.IsUp()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isUp).To(BeFalse())
+	})
+
+	It("returns error when project without cached key", func() {
+		d := newTestDeployer()
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+
+		_, err := d.IsUp()
+		Expect(err).To(MatchError(ContainSubstring("child service-account key cache")))
+	})
+
+	It("queries cluster when project with cached key", func() {
+		d := newTestDeployer()
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+		cachedKey := `{"credentials":{"privateKey":"cached"}}`
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600)).To(Succeed())
+
+		fakeSKE := &fakeSKEClient{
+			getClusterResult: healthyClusterFixture(),
+		}
+		d.skeClientFactory = func(_, serviceAccount, _ string) (skeClient, error) {
+			Expect(serviceAccount).To(Equal(cachedKey))
+			return fakeSKE, nil
+		}
+
+		isUp, err := d.IsUp()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isUp).To(BeTrue())
+		Expect(fakeSKE.lastGetProjectID).To(Equal("project-123"))
+	})
+
+	It("returns false when cluster missing", func() {
+		d := newTestDeployer()
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+		cachedKey := `{"credentials":{"privateKey":"cached"}}`
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600)).To(Succeed())
+
+		fakeSKE := &fakeSKEClient{
+			getClusterErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
+		}
+		d.skeClientFactory = func(_, _, _ string) (skeClient, error) {
+			return fakeSKE, nil
+		}
+
+		isUp, err := d.IsUp()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isUp).To(BeFalse())
+	})
+})
+
+func newTestDeployer() *Deployer {
+	runDir := GinkgoT().TempDir()
 	return &Deployer{
 		options:               fakeOptions{runID: "run-123", runDir: runDir},
 		region:                defaultRegion,
@@ -849,6 +706,11 @@ func configureValidUpInputs(d *Deployer) {
 	d.nodeImageVersion = "v1"
 	d.nodepoolName = defaultNodepoolName
 	d.volumeType = "storage"
+}
+
+func setEnvVar(key, value string) {
+	Expect(os.Setenv(key, value)).To(Succeed())
+	DeferCleanup(os.Unsetenv, key)
 }
 
 func providerOptionsFixture() *ske.ProviderOptions {
@@ -886,6 +748,13 @@ func healthyClusterFixture() *ske.Cluster {
 	status.SetAggregated(ske.CLUSTERSTATUSSTATE_HEALTHY)
 	cluster.SetStatus(*status)
 	return cluster
+}
+
+func disabledServiceStatusFixture() *serviceenablement.ServiceStatus {
+	status := serviceenablement.NewServiceStatus()
+	state := serviceenablement.SERVICESTATUSSTATE_DISABLED
+	status.State = &state
+	return status
 }
 
 func projectFixture(name, projectID, containerID string, labels map[string]string) *resourcemanager.Project {
@@ -935,33 +804,6 @@ func createServiceAccountKeyResponseFixture(email string) *serviceaccount.Create
 		serviceaccount.CREATESERVICEACCOUNTKEYRESPONSEKEYTYPE_USER_MANAGED,
 		"PUBLIC KEY",
 	)
-}
-
-func TestIsUpReturnsFalseWhenClusterMissing(t *testing.T) {
-	d := newTestDeployer(t)
-	d.projectClient = &fakeProjectClient{
-		listProjectsResult: []resourcemanager.Project{
-			*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
-		},
-	}
-	cachedKey := `{"credentials":{"privateKey":"cached"}}`
-	if err := os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600); err != nil {
-		t.Fatalf("write cached key: %v", err)
-	}
-	fakeSKE := &fakeSKEClient{
-		getClusterErr: &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound},
-	}
-	d.skeClientFactory = func(_, _, _ string) (skeClient, error) {
-		return fakeSKE, nil
-	}
-
-	isUp, err := d.IsUp()
-	if err != nil {
-		t.Fatalf("IsUp() error = %v", err)
-	}
-	if isUp {
-		t.Fatalf("IsUp() = true, want false")
-	}
 }
 
 var _ types.Options = fakeOptions{}
