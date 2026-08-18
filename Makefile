@@ -65,7 +65,7 @@ modules: ## Runs go mod to ensure modules are up to date.
 
 .PHONY: test
 test: ## Run tests.
-	./hack/test.sh ./cmd/... ./pkg/...
+	./hack/test.sh ./cmd/... ./pkg/... ./test/...
 
 .PHONY: test-cover
 test-cover: ## Run tests with coverage.
