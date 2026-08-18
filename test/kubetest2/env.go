@@ -1,6 +1,8 @@
 package kubetest2
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,9 +23,9 @@ func (d *Deployer) loadEnvironment() error {
 		return incorrectUsagef("STACKIT_PARENT_CONTAINER_ID environment variable is required")
 	}
 
-	projectMemberEmail, ok := os.LookupEnv("STACKIT_PROJECT_MEMBER_EMAIL")
-	if !ok || strings.TrimSpace(projectMemberEmail) == "" {
-		return incorrectUsagef("STACKIT_PROJECT_MEMBER_EMAIL environment variable is required")
+	projectMemberEmail, err := extractServiceAccountEmail(serviceAccount)
+	if err != nil {
+		return incorrectUsagef("invalid STACKIT_SERVICE_ACCOUNT: %v", err)
 	}
 
 	d.serviceAccount = serviceAccount
@@ -54,4 +56,16 @@ func (d *Deployer) loadEnvironment() error {
 	)
 
 	return nil
+}
+
+func extractServiceAccountEmail(serviceAccountKey string) (string, error) {
+	var key serviceAccountKeyFile
+	if err := json.Unmarshal([]byte(serviceAccountKey), &key); err != nil {
+		return "", fmt.Errorf("parse service account key: %w", err)
+	}
+	email := strings.TrimSpace(key.Credentials.Iss)
+	if email == "" {
+		return "", fmt.Errorf("service account key has no email in credentials.iss")
+	}
+	return email, nil
 }
