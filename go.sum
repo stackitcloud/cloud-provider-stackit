@@ -196,6 +196,8 @@ github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.24.2 h1:4UxxJ
 github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.24.2/go.mod h1:NEz3f+GV5G++BE9/MmZCsXJyCih7jtg0pZuSyG2sLEs=
 github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.20.1 h1:zVVA/Puge2PK3G8lrGGolnQzxYwwsNUgfMyyRUUQc44=
 github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.20.1/go.mod h1:xJNa86o89czK2o60+s46vz8+NSKDTbQduFGFaztJnsA=
+github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.7.0 h1:TNZHrunhsXRbuqZcucLs2Gqy1sEyvabufM7pB5Tscmo=
+github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.7.0/go.mod h1:fXq3TmVLb4JMSve989NFFViMFoYa83s7M3hJWgN6mdQ=
 github.com/stackitcloud/stackit-sdk-go/services/ske v1.6.0 h1:Dab1jzN0u9c67lvELoWf1RuagjO3eUBRytoX8SYL8Zs=
 github.com/stackitcloud/stackit-sdk-go/services/ske v1.6.0/go.mod h1:NzcTU5GGlUF6Lys3Ra7ylRj4ZKxJr3f/29/yoE5tjPI=
 github.com/stoewer/go-strcase v1.3.1 h1:iS0MdW+kVTxgMoE1LAZyMiYJFKlOzLooE4MxjirtkAs=
