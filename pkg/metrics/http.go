@@ -1,32 +1,45 @@
 package metrics
 
 import (
-	"fmt"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func NewInstrumentedHTTPClient(api string) *http.Client {
-	return &http.Client{
-		Transport: &InstrumentedRoundTripper{
-			api:  api,
-			base: http.DefaultTransport,
-		},
+const UnknownOperation = "UnknownOperation"
+
+func NewHTTPClient(componentName string) *http.Client {
+	return WrapHTTPClient(http.DefaultClient, componentName)
+}
+
+func WrapHTTPClient(client *http.Client, componentName string) *http.Client {
+	wrappedClient := *client
+
+	baseTransport := client.Transport
+	if baseTransport == nil {
+		baseTransport = http.DefaultTransport
 	}
+
+	// Chain your instrumented round tripper
+	wrappedClient.Transport = &InstrumentedRoundTripper{
+		base:          baseTransport,
+		componentName: componentName,
+	}
+
+	return &wrappedClient
 }
 
 type InstrumentedRoundTripper struct {
-	api  string
-	base http.RoundTripper
+	base          http.RoundTripper
+	componentName string
 }
 
 func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	operation := operationFromRequest(request)
-
 	startTime := time.Now()
 	response, err := rt.base.RoundTrip(request)
 	duration := time.Since(startTime)
@@ -37,9 +50,10 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	}
 
 	labels := prometheus.Labels{
-		apiLabel:       rt.api,
+		componentLabel: rt.componentName,
+		hostLabel:      request.Host,
 		methodLabel:    request.Method,
-		operationLabel: operation,
+		operationLabel: getSDKOperationName(),
 		codeLabel:      statusCode,
 	}
 
@@ -56,30 +70,48 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 	return response, err
 }
 
-func operationFromRequest(request *http.Request) string {
-	verb := strings.ToLower(request.Method)
+// getSDKOperationName returns the name of the STACKIT SDK function. To do this the function gets the last 10 callers and checks
+// for functions from the stackitcloud/stackit-sdk-go. It fall back to UnknownOperation if no function was found.
+func getSDKOperationName() string {
+	pc := make([]uintptr, 10)
 
-	pathElements := strings.Split(request.URL.Path, "/")
-	if len(pathElements) <= 1 {
-		return fmt.Sprintf("%s_%s", verb, request.URL.Path)
-	}
-	// since the path starts with a '/', the first path element is the empty string
-	pathElements = pathElements[1:]
-
-	// the subject is always the last or the second to last element:
-	// .../subject -> even number of path elements
-	// .../subject/<some-id> -> odd number of path elements
-	var subject string
-	if len(pathElements) == 1 {
-		// edge case
-		subject = pathElements[0]
-	} else if len(pathElements)%2 == 0 {
-		// even
-		subject = pathElements[len(pathElements)-1]
-	} else {
-		// odd
-		subject = pathElements[len(pathElements)-2] + "_instance"
+	// Skip 3 because the first 3 are always Callers, getSDKOperationName, RoundTrip.
+	n := runtime.Callers(3, pc)
+	if n == 0 {
+		return UnknownOperation
 	}
 
-	return fmt.Sprintf("%s_%s", verb, subject)
+	frames := runtime.CallersFrames(pc[:n])
+	moreFrames := true
+	for moreFrames {
+		var frame runtime.Frame
+		frame, moreFrames = frames.Next()
+
+		if !strings.Contains(frame.Function, "stackitcloud/stackit-sdk-go") {
+			continue
+		}
+
+		parts := strings.Split(frame.Function, ".")
+		if len(parts) > 0 {
+			funcName := parts[len(parts)-1]
+
+			// Skip function names with 0 len
+			// Skip Execute, because there is a function with more detailed name
+			// Skip RoundTrip, because this only the RoundTrip for the AuthFlow
+			if funcName == "" ||
+				funcName == "Execute" ||
+				funcName == "RoundTrip" {
+				continue
+			}
+
+			// Skip Private functions
+			if !unicode.IsUpper(rune(funcName[0])) {
+				continue
+			}
+
+			return strings.TrimSuffix(funcName, "Execute")
+		}
+	}
+
+	return UnknownOperation
 }
