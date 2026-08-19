@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
@@ -17,6 +16,7 @@ import (
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics/legacyregistry"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version"
 	"k8s.io/klog/v2"
@@ -25,13 +25,9 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 )
 
-const (
-	defaultMetricsAddress = ":9090"
-)
-
-var (
-	metricsAddressFlag *string
-)
+func init() {
+	legacyregistry.RawMustRegister(metrics.NewExporter())
+}
 
 func main() {
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
@@ -49,8 +45,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	// setup metrics
-	metricsAddressFlag = additionalFlags.FlagSet("metrics").String("metrics-address", defaultMetricsAddress, "set the prometheus metrics endpoint")
+	_ = additionalFlags.FlagSet("metrics").String("metrics-address", "", "set the prometheus metrics endpoint. Deprecated, do not use!")
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer(ctx), controllerInitializers, controllerAliases, additionalFlags, wait.NeverStop)
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
@@ -63,22 +58,8 @@ func main() {
 	}
 }
 
-func cloudInitializer(ctx context.Context) func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
+func cloudInitializer(_ context.Context) func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
 	return func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
-		// The metrics goroutine must be started in the initializer to make sure the cli flags were parsed and
-		// metricsAddressFlag contains a value. Check it anyway, just to be sure.
-		if metricsAddressFlag == nil {
-			klog.Fatal("The CLI flag metrics-address is not parsed yet!")
-		}
-		metricsAddress := *metricsAddressFlag
-		metricsExporter := metrics.NewExporter()
-		prometheus.MustRegister(metricsExporter)
-		go func() {
-			if err := metrics.Run(ctx, metricsAddress); err != nil {
-				klog.Fatalf("Run metrics returned an error: %v", err)
-			}
-		}()
-
 		cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
 		// initialize cloud provider with the cloud provider name and config file provided
 		cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
