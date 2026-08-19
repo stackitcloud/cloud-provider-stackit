@@ -3,12 +3,17 @@ package kubetest2
 import (
 	"context"
 	"fmt"
-	"os"
+	"path/filepath"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 	"k8s.io/klog/v2"
 )
+
+type bootstrapStep struct {
+	name string
+	fn   func(context.Context) error
+}
 
 func (d *Deployer) Init() error {
 	klog.Infof("Initializing STACKIT kubetest2 deployer")
@@ -33,37 +38,20 @@ func (d *Deployer) Up() error {
 	klog.Infof("Starting cluster up flow for cluster=%q", d.clusterName())
 
 	ctx := context.Background()
-	if err := d.ensureManagedClusterAccess(ctx); err != nil {
-		return err
-	}
-	if err := d.validateProviderOptions(ctx); err != nil {
-		return err
-	}
-
-	clusterName := d.clusterName()
-	payload := d.clusterPayload()
-
-	klog.Infof("Submitting SKE create/update request for cluster=%q", clusterName)
-	if _, err := d.skeClient.CreateOrUpdateCluster(ctx, d.projectID, d.region, clusterName, payload); err != nil {
-		return fmt.Errorf("create or update SKE cluster %q: %w", clusterName, err)
-	}
-	klog.Infof("Submitted SKE create/update request for cluster=%q", clusterName)
-
-	if _, err := d.skeClient.WaitForClusterReady(ctx, d.projectID, d.region, clusterName); err != nil {
-		return fmt.Errorf("wait for SKE cluster %q to become ready: %w", clusterName, err)
+	for _, step := range []bootstrapStep{
+		{"project", d.ensureProject},
+		{"service account", d.ensureServiceAccount},
+		{"cluster", d.ensureCluster},
+		{"csi", d.ensureCSI},
+	} {
+		klog.Infof("Bootstrap step %q starting", step.name)
+		if err := step.fn(ctx); err != nil {
+			return fmt.Errorf("bootstrap step %q: %w", step.name, err)
+		}
+		klog.Infof("Bootstrap step %q completed", step.name)
 	}
 
-	klog.Infof("Creating kubeconfig for cluster=%q", clusterName)
-	kubeconfig, err := d.skeClient.CreateKubeconfig(ctx, d.projectID, d.region, clusterName, d.kubeconfigExpiresIn)
-	if err != nil {
-		return fmt.Errorf("create kubeconfig for SKE cluster %q: %w", clusterName, err)
-	}
-	klog.Infof("Writing kubeconfig for cluster=%q to %q", clusterName, d.kubeconfigPath)
-	if err := os.WriteFile(d.kubeconfigPath, []byte(kubeconfig.GetKubeconfig()), 0o600); err != nil {
-		return fmt.Errorf("write kubeconfig %q: %w", d.kubeconfigPath, err)
-	}
-
-	klog.Infof("Cluster up flow completed successfully for cluster=%q", clusterName)
+	klog.Infof("Cluster up flow completed successfully for cluster=%q", d.clusterName())
 
 	return nil
 }
@@ -149,7 +137,7 @@ func (d *Deployer) IsUp() (bool, error) {
 
 func (d *Deployer) Kubeconfig() (string, error) {
 	if d.kubeconfigPath == "" {
-		d.kubeconfigPath = d.options.RunDir() + "/kubeconfig"
+		d.kubeconfigPath = filepath.Join(d.options.RunDir(), "kubeconfig")
 	}
 	klog.Infof("Returning kubeconfig path %q", d.kubeconfigPath)
 	return d.kubeconfigPath, nil
