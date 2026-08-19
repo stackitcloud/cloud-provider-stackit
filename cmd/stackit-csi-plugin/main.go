@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	metrics2 "github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/csi"
@@ -18,6 +21,7 @@ import (
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/metadata"
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/version"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/component-base/cli"
 	"k8s.io/klog/v2"
 )
@@ -94,13 +98,41 @@ func main() {
 
 func handle(ctx context.Context) {
 	if metricsAddress != "" {
-		metricsExporter := metrics.NewExporter()
-		prometheus.MustRegister(metricsExporter)
-		go func() {
-			if err := metrics.Run(ctx, metricsAddress); err != nil {
-				klog.Fatalf("Run metrics returned an error: %v", err)
+		driverName := blockstorage.DriverName
+		if legacyStorageMode {
+			driverName = "cinder.csi.openstack.org"
+		}
+		metricsManager := metrics2.NewCSIMetricsManagerForPlugin(driverName)
+		if provideNodeService {
+			metricsManager = metrics2.NewCSIMetricsManagerForPlugin(driverName)
+		}
+
+		metricsManager.GetRegistry().RawMustRegister(metrics.NewExporter())
+
+		mux := http.NewServeMux()
+		metricsManager.RegisterToServer(mux, "/metrics")
+
+		serv := &http.Server{
+			Addr:              metricsAddress,
+			Handler:           mux,
+			ReadTimeout:       5 * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+			WriteTimeout:      5 * time.Second,
+		}
+		g, gCtx := errgroup.WithContext(ctx)
+
+		g.Go(func() error {
+			if err := serv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				return err
 			}
-		}()
+			return nil
+		})
+
+		g.Go(func() error {
+			<-gCtx.Done()
+			klog.Info("Shutdown prometheus listener")
+			return serv.Shutdown(gCtx)
+		})
 	}
 	// Initialize cloud
 	driverOpts := &blockstorage.DriverOpts{
