@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/metrics"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
@@ -15,16 +14,16 @@ import (
 )
 
 const (
-	projectLabelScopeKey             = "scope"
-	projectLabelScopeValue           = "PUBLIC"
-	projectLabelManagedKey           = "kt2_managed"
-	projectLabelManagedValue         = "true"
-	projectLabelRunIDKey             = "kt2_run_id"
-	projectOwnerRole                 = "owner"
-	projectResourceType              = "project"
-	childProjectRole                 = "ske.admin"
-	projectListPageSize      float32 = 100
-	skeServiceID                     = "cloud.stackit.ske"
+	projectLabelScopeKey     = "scope"
+	projectLabelScopeValue   = "PUBLIC"
+	projectLabelManagedKey   = "kt2_managed"
+	projectLabelManagedValue = "true"
+	projectLabelRunIDKey     = "kt2_run_id"
+	projectOwnerRole         = "owner"
+	projectResourceType      = "project"
+	childProjectRole         = "ske.admin"
+	projectListPageSize      = 100
+	skeServiceID             = "cloud.stackit.ske"
 )
 
 type projectClient interface {
@@ -68,10 +67,9 @@ type sdkServiceEnablementClient struct {
 	api *serviceenablement.APIClient
 }
 
-func apiClientOptions(serviceAccountKey, endpoint, apiName string) []sdkconfig.ConfigurationOption {
+func apiClientOptions(serviceAccountKey, endpoint string) []sdkconfig.ConfigurationOption {
 	opts := []sdkconfig.ConfigurationOption{
 		sdkconfig.WithServiceAccountKey(serviceAccountKey),
-		sdkconfig.WithHTTPClient(metrics.NewInstrumentedHTTPClient(apiName)),
 	}
 	if endpoint != "" {
 		opts = append(opts, sdkconfig.WithEndpoint(endpoint))
@@ -87,7 +85,7 @@ func apiEndpointURL(cfg *sdkconfig.Configuration) string {
 }
 
 func newProjectClient(serviceAccountKey, endpoint string) (projectClient, error) {
-	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "resourcemanager")...)
+	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Resource Manager client: %w", err)
 	}
@@ -95,7 +93,7 @@ func newProjectClient(serviceAccountKey, endpoint string) (projectClient, error)
 }
 
 func newServiceAccountClient(serviceAccountKey, endpoint string) (serviceAccountClient, error) {
-	apiClient, err := serviceaccount.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "serviceaccount")...)
+	apiClient, err := serviceaccount.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Service Account client: %w", err)
 	}
@@ -103,7 +101,7 @@ func newServiceAccountClient(serviceAccountKey, endpoint string) (serviceAccount
 }
 
 func newAuthorizationClient(serviceAccountKey, endpoint string) (authorizationClient, error) {
-	apiClient, err := authorization.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "authorization")...)
+	apiClient, err := authorization.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Authorization client: %w", err)
 	}
@@ -111,7 +109,7 @@ func newAuthorizationClient(serviceAccountKey, endpoint string) (authorizationCl
 }
 
 func newServiceEnablementClient(serviceAccountKey, endpoint string) (serviceEnablementClient, error) {
-	apiClient, err := serviceenablement.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint, "serviceenablement")...)
+	apiClient, err := serviceenablement.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Service Enablement client: %w", err)
 	}
@@ -119,23 +117,23 @@ func newServiceEnablementClient(serviceAccountKey, endpoint string) (serviceEnab
 }
 
 func (c *sdkProjectClient) ListProjects(ctx context.Context, parentContainerID string) ([]resourcemanager.Project, error) {
-	projects := make([]resourcemanager.Project, 0)
-	var offset float32
+	projects := make([]resourcemanager.Project, 0, projectListPageSize)
+	offset := 0
 	for {
 		resp, err := c.api.DefaultAPI.ListProjects(ctx).
 			ContainerParentId(parentContainerID).
-			Offset(offset).
-			Limit(projectListPageSize).
+			Offset(float32(offset)).
+			Limit(float32(projectListPageSize)).
 			Execute()
 		if err != nil {
 			return nil, err
 		}
 		items := resp.GetItems()
 		projects = append(projects, items...)
-		if len(items) < int(projectListPageSize) {
+		if len(items) < projectListPageSize {
 			return projects, nil
 		}
-		offset += float32(len(items))
+		offset += len(items)
 	}
 }
 
@@ -209,4 +207,49 @@ func (c *sdkServiceEnablementClient) EnableService(ctx context.Context, region, 
 func (c *sdkServiceEnablementClient) WaitForServiceEnabled(ctx context.Context, region, projectID, serviceID string) error {
 	_, err := serviceenablementwait.EnableServiceWaitHandler(ctx, c.api.DefaultAPI, region, projectID, serviceID).WaitWithContext(ctx)
 	return err
+}
+
+func (d *Deployer) initializeBootstrapClients() error {
+	if err := initializeBootstrapClient(d.projectClient != nil, &d.projectClient, func() (projectClient, error) {
+		return newProjectClient(d.serviceAccount, d.resourceManagerEndpoint)
+	}); err != nil {
+		return err
+	}
+	if err := initializeBootstrapClient(d.serviceAccountClient != nil, &d.serviceAccountClient, func() (serviceAccountClient, error) {
+		return newServiceAccountClient(d.serviceAccount, d.serviceAccountEndpoint)
+	}); err != nil {
+		return err
+	}
+	if err := initializeBootstrapClient(d.authorizationClient != nil, &d.authorizationClient, func() (authorizationClient, error) {
+		return newAuthorizationClient(d.serviceAccount, d.authorizationEndpoint)
+	}); err != nil {
+		return err
+	}
+	if err := initializeBootstrapClient(d.serviceEnablementClient != nil, &d.serviceEnablementClient, func() (serviceEnablementClient, error) {
+		return newServiceEnablementClient(d.serviceAccount, d.serviceEnablementEndpoint)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func initializeBootstrapClient[T any](initialized bool, dst *T, build func() (T, error)) error {
+	if initialized {
+		return nil
+	}
+	client, err := build()
+	if err != nil {
+		return err
+	}
+	*dst = client
+	return nil
+}
+
+func (d *Deployer) initializeSKEClient(serviceAccountKey string) error {
+	client, err := d.skeClientFactory(d.region, serviceAccountKey, d.skeEndpoint)
+	if err != nil {
+		return err
+	}
+	d.skeClient = client
+	return nil
 }

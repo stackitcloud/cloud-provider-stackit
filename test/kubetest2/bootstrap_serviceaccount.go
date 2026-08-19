@@ -3,18 +3,13 @@ package kubetest2
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	oapierror "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	authorization "github.com/stackitcloud/stackit-sdk-go/services/authorization/v2api"
-	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
-	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -23,13 +18,6 @@ var childKeyCreationRetryBackoff = wait.Backoff{
 	Duration: 3 * time.Second,
 	Factor:   2.0,
 	Steps:    5,
-}
-
-type managedProject struct {
-	ContainerID string
-	ProjectID   string
-	Name        string
-	Labels      map[string]string
 }
 
 type managedServiceAccount struct {
@@ -58,176 +46,24 @@ type serviceAccountKeyCredentialsFile struct {
 	TokenEndpoint string  `json:"tokenEndpoint"`
 }
 
-func (d *Deployer) initializeBootstrapClients() error {
-	if d.projectClient == nil {
-		client, err := newProjectClient(d.serviceAccount, d.resourceManagerEndpoint)
-		if err != nil {
-			return err
-		}
-		d.projectClient = client
-	}
-	if d.serviceAccountClient == nil {
-		client, err := newServiceAccountClient(d.serviceAccount, d.serviceAccountEndpoint)
-		if err != nil {
-			return err
-		}
-		d.serviceAccountClient = client
-	}
-	if d.authorizationClient == nil {
-		client, err := newAuthorizationClient(d.serviceAccount, d.authorizationEndpoint)
-		if err != nil {
-			return err
-		}
-		d.authorizationClient = client
-	}
-	if d.serviceEnablementClient == nil {
-		client, err := newServiceEnablementClient(d.serviceAccount, d.serviceEnablementEndpoint)
-		if err != nil {
-			return err
-		}
-		d.serviceEnablementClient = client
-	}
-	return nil
-}
-
-func (d *Deployer) initializeSKEClient(serviceAccountKey string) error {
-	if d.skeClientFactory == nil {
-		d.skeClientFactory = newSKEClient
-	}
-	client, err := d.skeClientFactory(d.region, serviceAccountKey, d.skeEndpoint)
+// ensureServiceAccount idempotently resolves (or creates) the managed child
+// service account, grants it the SKE admin role, caches a service-account key
+// and initializes the SKE client from it. Depends on d.projectID being set.
+func (d *Deployer) ensureServiceAccount(ctx context.Context) error {
+	childServiceAccount, err := d.resolveManagedServiceAccount(ctx, d.projectID)
 	if err != nil {
 		return err
 	}
-	d.skeClient = client
-	return nil
-}
 
-func (d *Deployer) ensureManagedClusterAccess(ctx context.Context) error {
-	project, err := d.resolveManagedProject(ctx)
-	if err != nil {
-		return err
-	}
-	d.projectID = project.ProjectID
-
-	if err := d.ensureSKEServiceEnabled(ctx, project.ProjectID); err != nil {
+	if err := d.ensureProjectServiceAccountRole(ctx, d.projectID, childServiceAccount.Email); err != nil {
 		return err
 	}
 
-	childServiceAccount, err := d.resolveManagedServiceAccount(ctx, project.ProjectID)
-	if err != nil {
-		return err
-	}
-	d.childServiceAccountEmail = childServiceAccount.Email
-
-	if err := d.ensureProjectServiceAccountRole(ctx, project.ProjectID, childServiceAccount.Email); err != nil {
-		return err
-	}
-
-	serviceAccountKey, err := d.ensureCachedChildServiceAccountKey(ctx, project.ProjectID, childServiceAccount.Email)
+	serviceAccountKey, err := d.ensureCachedChildServiceAccountKey(ctx, d.projectID, childServiceAccount.Email)
 	if err != nil {
 		return err
 	}
 	return d.initializeSKEClient(serviceAccountKey)
-}
-
-// ensureSKEServiceEnabled idempotently enables the SKE (Kubernetes Engine)
-// service for the managed project and waits until it is enabled.
-func (d *Deployer) ensureSKEServiceEnabled(ctx context.Context, projectID string) error {
-	status, err := d.serviceEnablementClient.GetServiceStatus(ctx, d.region, projectID, skeServiceID)
-	if err != nil {
-		if !isNotFound(err) {
-			return fmt.Errorf("get SKE service status for project %q: %w", projectID, err)
-		}
-		klog.Infof("SKE service not yet enabled for project_id=%q", projectID)
-	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLED {
-		klog.Infof("SKE service already enabled for project_id=%q", projectID)
-		return nil
-	} else {
-		klog.Infof("SKE service in state %q for project_id=%q, enabling", status.GetState(), projectID)
-	}
-
-	if err := d.serviceEnablementClient.EnableService(ctx, d.region, projectID, skeServiceID); err != nil {
-		return fmt.Errorf("enable SKE service for project %q: %w", projectID, err)
-	}
-	if err := d.serviceEnablementClient.WaitForServiceEnabled(ctx, d.region, projectID, skeServiceID); err != nil {
-		return fmt.Errorf("wait for SKE service enablement for project %q: %w", projectID, err)
-	}
-	return nil
-}
-
-func isNotFound(err error) bool {
-	var oapiErr *oapierror.GenericOpenAPIError
-	return errors.As(err, &oapiErr) && oapiErr.StatusCode == http.StatusNotFound
-}
-
-func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, error) {
-	projects, err := d.projectClient.ListProjects(ctx, d.parentContainerID)
-	if err != nil {
-		return nil, fmt.Errorf("list STACKIT projects under parent container %q: %w", d.parentContainerID, err)
-	}
-
-	matches := make([]managedProject, 0, 1)
-	for i := range projects {
-		project := &projects[i]
-		if !d.matchesManagedProject(project) {
-			continue
-		}
-		matches = append(matches, managedProject{
-			ContainerID: project.GetContainerId(),
-			ProjectID:   project.GetProjectId(),
-			Name:        project.GetName(),
-			Labels:      project.GetLabels(),
-		})
-	}
-
-	switch len(matches) {
-	case 0:
-		return nil, nil
-	case 1:
-		return &matches[0], nil
-	default:
-		return nil, fmt.Errorf(
-			"found %d managed STACKIT projects for run token %q under parent container %q",
-			len(matches),
-			d.runToken(),
-			d.parentContainerID,
-		)
-	}
-}
-
-func (d *Deployer) resolveManagedProject(ctx context.Context) (*managedProject, error) {
-	project, err := d.findManagedProject(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if project != nil {
-		klog.Infof("Reusing managed project=%q project_id=%q", project.Name, project.ProjectID)
-		return project, nil
-	}
-
-	klog.Infof("Creating managed project=%q under parent_container_id=%q", d.projectName(), d.parentContainerID)
-	createdProject, err := d.projectClient.CreateProject(
-		ctx,
-		d.parentContainerID,
-		d.projectName(),
-		d.projectMemberEmail,
-		d.managedProjectLabels(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create STACKIT project %q: %w", d.projectName(), err)
-	}
-
-	activeProject, err := d.projectClient.WaitForProjectActive(ctx, createdProject.GetContainerId())
-	if err != nil {
-		return nil, fmt.Errorf("wait for STACKIT project %q to become active: %w", createdProject.GetProjectId(), err)
-	}
-
-	return &managedProject{
-		ContainerID: activeProject.GetContainerId(),
-		ProjectID:   activeProject.GetProjectId(),
-		Name:        activeProject.GetName(),
-		Labels:      activeProject.GetLabels(),
-	}, nil
 }
 
 func (d *Deployer) resolveManagedServiceAccount(ctx context.Context, projectID string) (*managedServiceAccount, error) {
@@ -360,28 +196,10 @@ func (d *Deployer) readCachedChildServiceAccountKey() (key string, ok bool, err 
 }
 
 func (d *Deployer) writeCachedChildServiceAccountKey(serviceAccountKey string) error {
+	if strings.TrimSpace(d.serviceAccountKeyPath) == "" {
+		return nil
+	}
 	return os.WriteFile(d.serviceAccountKeyPath, []byte(serviceAccountKey), 0o600)
-}
-
-func (d *Deployer) managedProjectLabels() map[string]string {
-	return map[string]string{
-		projectLabelScopeKey:   projectLabelScopeValue,
-		projectLabelManagedKey: projectLabelManagedValue,
-		projectLabelRunIDKey:   d.runToken(),
-	}
-}
-
-func (d *Deployer) matchesManagedProject(project *resourcemanager.Project) bool {
-	if project.GetName() != d.projectName() {
-		return false
-	}
-	labels := project.GetLabels()
-	if labels == nil {
-		return false
-	}
-	return labels[projectLabelScopeKey] == projectLabelScopeValue &&
-		labels[projectLabelManagedKey] == projectLabelManagedValue &&
-		labels[projectLabelRunIDKey] == d.runToken()
 }
 
 func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
@@ -392,7 +210,7 @@ func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
 	if !found {
 		return false
 	}
-	return strings.HasPrefix(localPart, d.serviceAccountName())
+	return localPart == d.serviceAccountName()
 }
 
 func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyResponse) (string, error) {

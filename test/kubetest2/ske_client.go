@@ -16,8 +16,6 @@ type skeClient interface {
 	CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error)
 	WaitForClusterReady(ctx context.Context, projectID, region, name string) (*ske.Cluster, error)
 	CreateKubeconfig(ctx context.Context, projectID, region, name string, expirationSeconds int64) (*ske.Kubeconfig, error)
-	DeleteCluster(ctx context.Context, projectID, region, name string) error
-	WaitForClusterDeleted(ctx context.Context, projectID, region, name string) error
 }
 
 type sdkSKEClient struct {
@@ -27,7 +25,7 @@ type sdkSKEClient struct {
 func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
 	klog.Infof("Creating SKE API client for region=%q with service_account_bytes=%d", region, len(serviceAccount))
 
-	apiClient, err := ske.NewAPIClient(apiClientOptions(serviceAccount, endpoint, "ske")...)
+	apiClient, err := ske.NewAPIClient(apiClientOptions(serviceAccount, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create SKE client: %w", err)
 	}
@@ -75,16 +73,4 @@ func (c *sdkSKEClient) CreateKubeconfig(ctx context.Context, projectID, region, 
 	payload := ske.NewCreateKubeconfigPayload()
 	payload.SetExpirationSeconds(strconv.FormatInt(expirationSeconds, 10))
 	return c.api.CreateKubeconfig(ctx, projectID, region, name).CreateKubeconfigPayload(*payload).Execute()
-}
-
-func (c *sdkSKEClient) DeleteCluster(ctx context.Context, projectID, region, name string) error {
-	klog.Infof("SKE DeleteCluster: project_id=%q region=%q cluster=%q", projectID, region, name)
-	_, err := c.api.DeleteCluster(ctx, projectID, region, name).Execute()
-	return err
-}
-
-func (c *sdkSKEClient) WaitForClusterDeleted(ctx context.Context, projectID, region, name string) error {
-	klog.Infof("Waiting for SKE cluster deletion: project_id=%q region=%q cluster=%q", projectID, region, name)
-	_, err := skewait.DeleteClusterWaitHandler(ctx, c.api, projectID, region, name).WaitWithContext(ctx)
-	return err
 }

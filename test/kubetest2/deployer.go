@@ -17,9 +17,9 @@ const (
 	defaultNodeCount            int64 = 2
 	defaultNodepoolName               = "default"
 	defaultVolumeSizeGiB        int64 = 100
-	defaultKubeconfigExpiration int64 = 3600
-	minKubeconfigExpiration     int64 = 600
-	maxKubeconfigExpiration     int64 = 15552000
+	defaultKubeconfigExpiration int64 = 6 * 60 * 60        // 6 hours
+	minKubeconfigExpiration     int64 = 10 * 60            // 10 minutes
+	maxKubeconfigExpiration     int64 = 180 * 24 * 60 * 60 // 180 days
 )
 
 type Deployer struct {
@@ -37,13 +37,12 @@ type Deployer struct {
 	volumeType          string
 	kubeconfigExpiresIn int64
 
-	projectID                string
-	serviceAccount           string
-	parentContainerID        string
-	projectMemberEmail       string
-	childServiceAccountEmail string
-	kubeconfigPath           string
-	serviceAccountKeyPath    string
+	projectID             string
+	serviceAccount        string
+	parentContainerID     string
+	projectMemberEmail    string
+	kubeconfigPath        string
+	serviceAccountKeyPath string
 
 	resourceManagerEndpoint   string
 	serviceAccountEndpoint    string
