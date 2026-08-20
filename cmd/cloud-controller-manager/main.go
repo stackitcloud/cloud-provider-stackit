@@ -17,6 +17,7 @@ import (
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics/legacyregistry"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version"
 	"k8s.io/klog/v2"
@@ -32,6 +33,12 @@ const (
 var (
 	metricsAddressFlag *string
 )
+
+func init() {
+	// RawMustRegister is marked as deprecated because this bypasses the metric stability framework. But we want to
+	// use the same metrics in different repos, so it does not make sense to only use different types in this repo.
+	legacyregistry.RawMustRegister(metrics.NewExporter())
+}
 
 func main() {
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
@@ -49,8 +56,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	// setup metrics
-	metricsAddressFlag = additionalFlags.FlagSet("metrics").String("metrics-address", defaultMetricsAddress, "set the prometheus metrics endpoint")
+	// TODO: remove this later. Not removed yet because it is breaking to remove it.
+	metricsAddressFlag = additionalFlags.FlagSet("metrics").String("metrics-address", defaultMetricsAddress, "set the prometheus metrics endpoint.  Deprecated, do not use! Use --secure-port for metrics.")
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer(ctx), controllerInitializers, controllerAliases, additionalFlags, wait.NeverStop)
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
