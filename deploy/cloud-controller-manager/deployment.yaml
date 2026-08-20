@@ -17,6 +17,10 @@ spec:
       labels:
         app: stackit-cloud-controller-manager
     spec:
+      tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: Exists
+        effect: NoSchedule
       serviceAccountName: stackit-cloud-controller-manager
       terminationGracePeriodSeconds: 30
       containers:
