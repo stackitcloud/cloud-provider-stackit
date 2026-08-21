@@ -39,7 +39,6 @@ spec:
           value: /etc/serviceaccount/sa_key.json
         ports:
         - containerPort: 10258
-          hostPort: 10258
           name: https
           protocol: TCP
         resources:
