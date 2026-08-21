@@ -26,3 +26,8 @@ This could be:
 Additionally, add the breaking label for the release note generation via:
 /label breaking
 -->
+
+/cherry-pick release-v1.34
+/cherry-pick release-v1.35
+/cherry-pick release-v1.36
+
