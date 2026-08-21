@@ -126,9 +126,8 @@ func handle(ctx context.Context) {
 			klog.Fatal(err)
 		}
 
-		iaasHTTPClient := metrics.NewInstrumentedHTTPClient(metrics.APINameIaaS)
 		iaasOpts := []sdkconfig.ConfigurationOption{
-			sdkconfig.WithHTTPClient(iaasHTTPClient),
+			sdkconfig.WithHTTPClient(metrics.NewHTTPClient("stackit-csi-plugin")),
 		}
 
 		if cfg.Global.APIEndpoints.IaasAPI != "" {
