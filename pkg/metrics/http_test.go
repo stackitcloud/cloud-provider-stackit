@@ -14,16 +14,15 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-	loadbalancer "github.com/stackitcloud/stackit-sdk-go/services/loadbalancer/v2api"
 )
 
 var _ = Describe("Metrics", func() {
 	Describe("getSDKOperationName", func() {
 		var (
-			server           *httptest.Server
-			sdkConfigOptions []sdkconfig.ConfigurationOption
-			host             string
-			component        = "test"
+			server     *httptest.Server
+			host       string
+			component  = "test"
+			iaasClient *iaas.APIClient
 		)
 
 		BeforeEach(func() {
@@ -33,56 +32,47 @@ var _ = Describe("Metrics", func() {
 			url, err := url.Parse(server.URL)
 			Expect(err).NotTo(HaveOccurred())
 			host = url.Host
-			sdkConfigOptions = []sdkconfig.ConfigurationOption{
-				sdkconfig.WithHTTPClient(NewHTTPClient(component)),
-				sdkconfig.WithEndpoint(server.URL),
-				sdkconfig.WithoutAuthentication(),
-			}
 
 			HTTPRequestCount.Reset()
 			HTTPErrorCount.Reset()
 			HTTPRequestDurationHistogram.Reset()
+
+			iaasClient, err = iaas.NewAPIClient(
+				sdkconfig.WithHTTPClient(NewHTTPClient(component)),
+				sdkconfig.WithEndpoint(server.URL),
+				sdkconfig.WithoutAuthentication(),
+			)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
 			server.Close()
 		})
 
-		It("should return the name of the SDK operation", func() {
-			lbClient, err := loadbalancer.NewAPIClient(
-				sdkConfigOptions...,
-			)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = lbClient.DefaultAPI.DeleteLoadBalancer(context.TODO(), "", "", "").Execute()
+		It("should return DeleteVolume as operation", func() {
+			err := iaasClient.DefaultAPI.DeleteVolume(context.TODO(), uuid.New().String(), "", uuid.New().String()).Execute()
 			Expect(err).NotTo(HaveOccurred())
 
 			labels := prometheus.Labels{
 				hostLabel:      host,
 				componentLabel: component,
 				methodLabel:    "DELETE",
-				operationLabel: "DeleteLoadBalancer",
+				operationLabel: "DeleteVolume",
 				codeLabel:      "200",
 			}
 
 			Expect(testutil.ToFloat64(HTTPRequestCount.With(labels))).To(Equal(float64(1)))
 		})
 
-		It("should return the name of the SDK operation", func() {
-			iaasClient, err := iaas.NewAPIClient(
-				sdkConfigOptions...,
-			)
-
-			Expect(err).NotTo(HaveOccurred())
-
-			err = iaasClient.DefaultAPI.DeleteImage(context.TODO(), uuid.New().String(), "", uuid.New().String()).Execute()
+		It("should return DeleteServer as operation", func() {
+			err := iaasClient.DefaultAPI.DeleteServer(context.TODO(), uuid.New().String(), "", uuid.New().String()).Execute()
 			Expect(err).NotTo(HaveOccurred())
 
 			labels := prometheus.Labels{
 				hostLabel:      host,
 				componentLabel: component,
 				methodLabel:    "DELETE",
-				operationLabel: "DeleteImage",
+				operationLabel: "DeleteServer",
 				codeLabel:      "200",
 			}
 
