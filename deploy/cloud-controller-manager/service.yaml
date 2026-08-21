@@ -9,12 +9,8 @@ spec:
   selector:
     app: stackit-cloud-controller-manager
   ports:
-  - name: main
-    port: 80
-    targetPort: 8888
-    protocol: TCP
-  - name: metrics
-    port: 8080
-    targetPort: metrics
+  - name: https
+    port: 10258
+    targetPort: https
     protocol: TCP
   type: ClusterIP
