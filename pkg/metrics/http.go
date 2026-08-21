@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -18,6 +19,9 @@ func NewHTTPClient(componentName string) *http.Client {
 }
 
 func WrapHTTPClient(client *http.Client, componentName string) *http.Client {
+	if client == nil {
+		return nil
+	}
 	wrappedClient := *client
 
 	baseTransport := client.Transport
@@ -49,9 +53,15 @@ func (rt *InstrumentedRoundTripper) RoundTrip(request *http.Request) (*http.Resp
 		statusCode = strconv.Itoa(response.StatusCode)
 	}
 
+	// request.Host is optional so we can fallback to request.URL.Host (if available)
+	host := request.Host
+	if host == "" && request.URL != nil {
+		host = request.URL.Host
+	}
+
 	labels := prometheus.Labels{
 		componentLabel: rt.componentName,
-		hostLabel:      request.Host,
+		hostLabel:      host,
 		methodLabel:    request.Method,
 		operationLabel: getSDKOperationName(),
 		codeLabel:      statusCode,
@@ -105,7 +115,8 @@ func getSDKOperationName() string {
 			}
 
 			// Skip Private functions
-			if !unicode.IsUpper(rune(funcName[0])) {
+			r, _ := utf8.DecodeRuneInString(funcName)
+			if !unicode.IsUpper(r) {
 				continue
 			}
 
