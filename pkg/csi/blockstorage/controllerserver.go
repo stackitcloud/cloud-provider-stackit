@@ -132,6 +132,9 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
 		if *vols[0].Status != stackitclient.VolumeAvailableStatus {
+			if cs.Driver.deleteVolumesInErrorState {
+				cs.deleteVolumeInError(ctx, &vols[0])
+			}
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", *vols[0].Id))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", *vols[0].Id, vols[0].AvailabilityZone, *vols[0].Size)
@@ -260,20 +263,35 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	targetStatus := []string{stackitclient.VolumeAvailableStatus}
 	// Recheck after: 0s (immediate), 20s, 45.6s, 78.36s, 120.31s
-	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, *vol.Id, targetStatus,
+	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, &vol, targetStatus,
 		&wait.Backoff{
 			Duration: 20 * time.Second,
 			Steps:    5,
 			Factor:   1.28,
 		})
 	if err != nil {
-		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", *vol.Id, err)
+		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.GetId(), err)
+		if cs.Driver.deleteVolumesInErrorState {
+			cs.deleteVolumeInError(ctx, vol)
+		}
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
 	}
 
 	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", *vol.Id, vol.AvailabilityZone, *vol.Size)
 
 	return cs.getCreateVolumeResponse(vol), nil
+}
+
+func (cs *controllerServer) deleteVolumeInError(ctx context.Context, vol *iaas.Volume) {
+	cloud := cs.Instance
+	if vol.GetStatus() == stackitclient.VolumeErrorStatus {
+		klog.Warningf("Volume %s entered ERROR status, attempting cleanup deletion...", vol.GetId())
+		if deleteErr := cloud.DeleteVolume(ctx, vol.GetId()); deleteErr != nil {
+			klog.Errorf("Failed to delete erroneous volume %s: %v", vol.GetId(), deleteErr)
+		} else {
+			klog.Infof("Successfully deleted erroneous volume %s", vol.GetId())
+		}
+	}
 }
 
 func setVolumeEncryptionParameters(opts *iaas.CreateVolumePayload, volParams *stackitParameterConfig) error {
