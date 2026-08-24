@@ -10,6 +10,9 @@ REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
 
+E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
+E2E_PARALLEL_NODES ?= 4
+
 .PHONY: all
 all: verify
 
@@ -47,7 +50,9 @@ image-%: $(APKO) $(KO)
 	./hack/build.sh $*
 
 .PHONY: image-stackit-csi-plugin-test
-image-stackit-csi-plugin-test: export KO_CONFIG_PATH = test/e2e/.ko-kubetest2.yaml
+image-stackit-csi-plugin-test: export KO_CONFIG_PATH = test/.ko-kubetest2.yaml
+image-stackit-csi-plugin-test: export IS_DEV = true
+image-stackit-csi-plugin-test: export VERSION := $(VERSION)-kubetest2
 image-stackit-csi-plugin-test: image-stackit-csi-plugin
 
 .PHONY: clean-tools-bin
@@ -126,6 +131,33 @@ verify-image-stackit-csi-plugin: APKO_EXTRA_PACKAGES = busybox
 verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 	@echo "verifying binaries in image"
 	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/$(REPO)/stackit-csi-plugin-dev:$(VERSION)
+
+.PHONY: test-e2e
+test-e2e: image-stackit-csi-plugin-test
+	go run ./test \
+	--up \
+	--test=ginkgo \
+	--run-id "$(E2E_RUN_ID)" \
+	--rundir "_rundir" \
+	--region "eu01" \
+	--kubernetes-version "$(E2E_K8S_VERSION)" \
+	--availability-zone "eu01-1" \
+	--machine-type "$(E2E_MACHINE_TYPE)" \
+	--node-image-name "$(E2E_IMAGE_NAME)" \
+	--node-image-version "$(E2E_IMAGE_VERSION)" \
+	--nodepool-name "default" \
+	--volume-size 100 \
+	--kubeconfig-expiration-seconds 3600 \
+	--csi-image-name "$(REGISTRY)/$(REPO)/stackit-csi-plugin-dev" \
+	--csi-image-tag "$(VERSION)-kubetest2" \
+	"$@" \
+	-- \
+	--test-package-version="v$(E2E_K8S_VERSION)" \
+	--focus-regex="External.Storage" \
+	--skip-regex="\[Feature:|\[Disruptive\]|\[Serial\]" \
+	--ginkgo-args="-v" \
+	--parallel="$(E2E_PARALLEL_NODES)" \
+	--test-args="--storage.testdriver=$(PWD)/_rundir/$(E2E_RUN_ID)/csi-testdriver.yaml"
 
 # generate mock types for the following services (space-separated list)
 .PHONY: mocks
