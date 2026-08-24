@@ -8,6 +8,17 @@ Tide will not merge your PR, if it is missing a `kind/*` label.
 "/kind" identifiers:    api-change|bug|cleanup|discussion|enhancement|epic|impediment|poc|post-mortem|question|regression|task|technical-debt|test
 -->
 
+/kind <specify>
+
+<!--
+Once this PR is merged, Prow automatically creates cherry-pick PRs for the release branches specified below.
+Keep only the release branches this change should be ported to.
+-->
+
+/cherry-pick release-v1.34
+/cherry-pick release-v1.35
+/cherry-pick release-v1.36
+
 **What this PR does / why we need it**:
 
 **Which issue(s) this PR fixes**:
@@ -26,8 +37,3 @@ This could be:
 Additionally, add the breaking label for the release note generation via:
 /label breaking
 -->
-
-/cherry-pick release-v1.34
-/cherry-pick release-v1.35
-/cherry-pick release-v1.36
-
