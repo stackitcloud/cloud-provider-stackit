@@ -13,19 +13,25 @@ import (
 func (d *Deployer) loadEnvironment() error {
 	klog.Infof("Loading STACKIT environment variables")
 
-	serviceAccount, ok := os.LookupEnv("STACKIT_SERVICE_ACCOUNT")
-	if !ok || strings.TrimSpace(serviceAccount) == "" {
-		return incorrectUsagef("STACKIT_SERVICE_ACCOUNT environment variable is required")
-	}
-
 	parentContainerID, ok := os.LookupEnv("STACKIT_PARENT_CONTAINER_ID")
 	if !ok || strings.TrimSpace(parentContainerID) == "" {
 		return incorrectUsagef("STACKIT_PARENT_CONTAINER_ID environment variable is required")
 	}
 
-	projectMemberEmail, err := extractServiceAccountEmail(serviceAccount)
-	if err != nil {
-		return incorrectUsagef("invalid STACKIT_SERVICE_ACCOUNT: %v", err)
+	serviceAccount := strings.TrimSpace(os.Getenv("STACKIT_SERVICE_ACCOUNT"))
+	serviceAccountEmail := strings.TrimSpace(os.Getenv("STACKIT_SERVICE_ACCOUNT_EMAIL"))
+
+	var projectMemberEmail string
+	if serviceAccount != "" {
+		var err error
+		projectMemberEmail, err = extractServiceAccountEmail(serviceAccount)
+		if err != nil {
+			return incorrectUsagef("invalid STACKIT_SERVICE_ACCOUNT: %v", err)
+		}
+	} else if serviceAccountEmail != "" {
+		projectMemberEmail = serviceAccountEmail
+	} else {
+		return incorrectUsagef("either STACKIT_SERVICE_ACCOUNT or STACKIT_SERVICE_ACCOUNT_EMAIL must be provided")
 	}
 
 	d.serviceAccount = serviceAccount
