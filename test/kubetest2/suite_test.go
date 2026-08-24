@@ -102,6 +102,7 @@ func (c *fakeProjectClient) WaitForProjectDeleted(_ context.Context, projectID s
 
 type fakeServiceAccountClient struct {
 	listResult []serviceaccount.ServiceAccount
+	listResults [][]serviceaccount.ServiceAccount
 	listErr    error
 
 	createResult *serviceaccount.ServiceAccount
@@ -118,10 +119,19 @@ type fakeServiceAccountClient struct {
 	lastCreatedName           string
 	lastProjectIDForCreateKey string
 	lastCreateKeyEmail        string
+	listCalls                 int
 }
 
 func (c *fakeServiceAccountClient) ListServiceAccounts(_ context.Context, projectID string) ([]serviceaccount.ServiceAccount, error) {
 	c.lastProjectIDForList = projectID
+	c.listCalls++
+	if len(c.listResults) > 0 {
+		result := c.listResults[0]
+		if len(c.listResults) > 1 {
+			c.listResults = c.listResults[1:]
+		}
+		return result, c.listErr
+	}
 	return c.listResult, c.listErr
 }
 
@@ -267,6 +277,9 @@ func newTestDeployer() *Deployer {
 		kubeconfigPath:        filepath.Join(runDir, "kubeconfig"),
 		serviceAccountKeyPath: filepath.Join(runDir, "service-account-key.json"),
 		skeClientFactory:      newSKEClient,
+		csiApplier: func(_ context.Context, _, _ string) error {
+			return nil
+		},
 	}
 }
 
@@ -278,6 +291,8 @@ func configureValidUpInputs(d *Deployer) {
 	d.nodeImageVersion = "v1"
 	d.nodepoolName = defaultNodepoolName
 	d.volumeType = "storage"
+	d.csiImageName = "ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin"
+	d.csiImageTag = "v1.0.0"
 }
 
 func setEnvVar(key, value string) {

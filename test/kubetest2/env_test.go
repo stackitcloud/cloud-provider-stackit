@@ -34,6 +34,7 @@ var _ = Describe("loadEnvironment", func() {
 		"STACKIT_AUTHORIZATION_ENDPOINT",
 		"STACKIT_SERVICE_ENABLEMENT_ENDPOINT",
 		"STACKIT_SKE_ENDPOINT",
+		"STACKIT_IAAS_ENDPOINT",
 	}
 
 	DescribeTable("validates required environment variables",
@@ -85,6 +86,7 @@ var _ = Describe("loadEnvironment", func() {
 		setEnvVar("STACKIT_SERVICE_ACCOUNT_ENDPOINT", "https://service-account.example.com")
 		setEnvVar("STACKIT_AUTHORIZATION_ENDPOINT", "https://authorization.example.com")
 		setEnvVar("STACKIT_SKE_ENDPOINT", "https://ske.example.com")
+		setEnvVar("STACKIT_IAAS_ENDPOINT", "https://iaas.example.com")
 
 		runDir := GinkgoT().TempDir()
 		d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
@@ -95,5 +97,6 @@ var _ = Describe("loadEnvironment", func() {
 		Expect(d.serviceAccountEndpoint).To(Equal("https://service-account.example.com"))
 		Expect(d.authorizationEndpoint).To(Equal("https://authorization.example.com"))
 		Expect(d.skeEndpoint).To(Equal("https://ske.example.com"))
+		Expect(d.iaasEndpoint).To(Equal("https://iaas.example.com"))
 	})
 })

@@ -21,7 +21,8 @@ const (
 	projectLabelRunIDKey     = "kt2_run_id"
 	projectOwnerRole         = "owner"
 	projectResourceType      = "project"
-	childProjectRole         = "ske.admin"
+	childProjectSKERole      = "ske.admin"
+	childProjectStorageRole  = "blockstorage.admin"
 	projectListPageSize      = 100
 	skeServiceID             = "cloud.stackit.ske"
 )

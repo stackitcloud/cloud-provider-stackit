@@ -37,6 +37,9 @@ type Deployer struct {
 	volumeType          string
 	kubeconfigExpiresIn int64
 
+	csiImageName string
+	csiImageTag  string
+
 	projectID             string
 	serviceAccount        string
 	parentContainerID     string
@@ -49,6 +52,7 @@ type Deployer struct {
 	authorizationEndpoint     string
 	serviceEnablementEndpoint string
 	skeEndpoint               string
+	iaasEndpoint              string
 
 	projectClient           projectClient
 	serviceAccountClient    serviceAccountClient
@@ -56,6 +60,7 @@ type Deployer struct {
 	serviceEnablementClient serviceEnablementClient
 	skeClient               skeClient
 	skeClientFactory        func(region, serviceAccount, endpoint string) (skeClient, error)
+	csiApplier              csiApplier
 }
 
 var _ types.NewDeployer = New
@@ -75,6 +80,7 @@ func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 		volumeSizeGiB:       defaultVolumeSizeGiB,
 		kubeconfigExpiresIn: defaultKubeconfigExpiration,
 		skeClientFactory:    newSKEClient,
+		csiApplier:          applyCSIManifestsNative,
 	}
 
 	fs := pflag.NewFlagSet(Name, pflag.ContinueOnError)

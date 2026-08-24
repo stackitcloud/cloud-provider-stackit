@@ -25,4 +25,5 @@ test/e2e/kubeconfig*
 
 # kubetest2
 _artifacts
+_artifacts-parallel
 _rundir

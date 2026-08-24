@@ -6,7 +6,7 @@ metadata:
 data:
   cloud.yaml: |-
     global:
-      projectId: REPLACE_WITH_PROJECTID
+      projectId: stackit-project-id
       region: eu01
     blockStorage:
       rescanOnResize: true
