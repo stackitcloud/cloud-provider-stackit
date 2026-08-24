@@ -69,8 +69,9 @@ type sdkServiceEnablementClient struct {
 }
 
 func apiClientOptions(serviceAccountKey, endpoint string) []sdkconfig.ConfigurationOption {
-	opts := []sdkconfig.ConfigurationOption{
-		sdkconfig.WithServiceAccountKey(serviceAccountKey),
+	var opts []sdkconfig.ConfigurationOption
+	if serviceAccountKey != "" {
+		opts = append(opts, sdkconfig.WithServiceAccountKey(serviceAccountKey))
 	}
 	if endpoint != "" {
 		opts = append(opts, sdkconfig.WithEndpoint(endpoint))
