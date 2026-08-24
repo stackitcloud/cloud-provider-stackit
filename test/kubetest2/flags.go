@@ -21,11 +21,13 @@ func bindFlags(fs *pflag.FlagSet, d *Deployer) {
 	fs.Int64Var(&d.volumeSizeGiB, "volume-size", defaultVolumeSizeGiB, "Root volume size in GiB for the SKE nodepool")
 	fs.StringVar(&d.volumeType, "volume-type", "", "Root volume type for the SKE nodepool")
 	fs.Int64Var(&d.kubeconfigExpiresIn, "kubeconfig-expiration-seconds", defaultKubeconfigExpiration, "Admin kubeconfig expiration in seconds")
+	fs.StringVar(&d.csiImageName, "csi-image-name", "", "Image name (repository) for the STACKIT CSI plugin")
+	fs.StringVar(&d.csiImageTag, "csi-image-tag", "", "Image tag for the STACKIT CSI plugin")
 }
 
 func (d *Deployer) validate() error {
 	klog.Infof(
-		"Validating deployer configuration: run_id=%q region=%q kubernetes_version=%q availability_zone=%q machine_type=%q node_image_name=%q node_image_version=%q node_count=%d nodepool_name=%q volume_size=%d volume_type=%q kubeconfig_expiration_seconds=%d",
+		"Validating deployer configuration: run_id=%q region=%q kubernetes_version=%q availability_zone=%q machine_type=%q node_image_name=%q node_image_version=%q node_count=%d nodepool_name=%q volume_size=%d volume_type=%q kubeconfig_expiration_seconds=%d csi_image_name=%q csi_image_tag=%q",
 		d.options.RunID(),
 		d.region,
 		d.kubernetesVersion,
@@ -38,6 +40,8 @@ func (d *Deployer) validate() error {
 		d.volumeSizeGiB,
 		d.volumeType,
 		d.kubeconfigExpiresIn,
+		d.csiImageName,
+		d.csiImageTag,
 	)
 
 	requiredFlags := map[string]string{
@@ -47,6 +51,8 @@ func (d *Deployer) validate() error {
 		"--machine-type":       d.machineType,
 		"--node-image-name":    d.nodeImageName,
 		"--node-image-version": d.nodeImageVersion,
+		"--csi-image-name":     d.csiImageName,
+		"--csi-image-tag":      d.csiImageTag,
 	}
 
 	for flagName, value := range requiredFlags {

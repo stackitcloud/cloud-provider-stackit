@@ -35,7 +35,8 @@ var _ = Describe("Up", func() {
 		}
 		d.authorizationClient = &fakeAuthorizationClient{
 			listMembersResult: []authorization.Member{
-				*authorization.NewMember(childProjectRole, serviceAccountEmail),
+				*authorization.NewMember(childProjectSKERole, serviceAccountEmail),
+				*authorization.NewMember(childProjectStorageRole, serviceAccountEmail),
 			},
 		}
 		d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}

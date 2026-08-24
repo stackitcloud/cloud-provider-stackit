@@ -46,16 +46,22 @@ type serviceAccountKeyCredentialsFile struct {
 	TokenEndpoint string  `json:"tokenEndpoint"`
 }
 
+var childProjectRoles = []string{
+	childProjectSKERole,
+	childProjectStorageRole,
+}
+
 // ensureServiceAccount idempotently resolves (or creates) the managed child
-// service account, grants it the SKE admin role, caches a service-account key
-// and initializes the SKE client from it. Depends on d.projectID being set.
+// service account, grants it the required project roles, caches a
+// service-account key and initializes the SKE client from it. Depends on
+// d.projectID being set.
 func (d *Deployer) ensureServiceAccount(ctx context.Context) error {
 	childServiceAccount, err := d.resolveManagedServiceAccount(ctx, d.projectID)
 	if err != nil {
 		return err
 	}
 
-	if err := d.ensureProjectServiceAccountRole(ctx, d.projectID, childServiceAccount.Email); err != nil {
+	if err := d.ensureProjectServiceAccountRoles(ctx, d.projectID, childServiceAccount.Email); err != nil {
 		return err
 	}
 
@@ -72,61 +78,65 @@ func (d *Deployer) resolveManagedServiceAccount(ctx context.Context, projectID s
 		return nil, fmt.Errorf("list service accounts in STACKIT project %q: %w", projectID, err)
 	}
 
-	matches := make([]managedServiceAccount, 0, 1)
 	for _, serviceAccount := range serviceAccounts {
 		if !d.matchesManagedServiceAccountEmail(serviceAccount.GetEmail()) {
 			continue
 		}
-		matches = append(matches, managedServiceAccount{
+		klog.Infof("Reusing managed service account=%q in project_id=%q", serviceAccount.GetEmail(), projectID)
+		return &managedServiceAccount{
 			Email:     serviceAccount.GetEmail(),
 			ProjectID: serviceAccount.GetProjectId(),
-		})
+		}, nil
 	}
 
-	switch len(matches) {
-	case 0:
-		klog.Infof("Creating managed service account=%q in project_id=%q", d.serviceAccountName(), projectID)
-		createdServiceAccount, err := d.serviceAccountClient.CreateServiceAccount(ctx, projectID, d.serviceAccountName())
-		if err != nil {
-			return nil, fmt.Errorf("create service account %q in STACKIT project %q: %w", d.serviceAccountName(), projectID, err)
-		}
-		return &managedServiceAccount{
-			Email:     createdServiceAccount.GetEmail(),
-			ProjectID: createdServiceAccount.GetProjectId(),
-		}, nil
-	case 1:
-		klog.Infof("Reusing managed service account=%q in project_id=%q", matches[0].Email, projectID)
-		return &matches[0], nil
-	default:
-		return nil, fmt.Errorf(
-			"found %d managed service accounts for run token %q in project %q",
-			len(matches),
-			d.runToken(),
-			projectID,
-		)
+	klog.Infof("Creating managed service account=%q in project_id=%q", d.serviceAccountName(), projectID)
+	createdServiceAccount, err := d.serviceAccountClient.CreateServiceAccount(ctx, projectID, d.serviceAccountName())
+	if err != nil {
+		return nil, fmt.Errorf("create service account %q in STACKIT project %q: %w", d.serviceAccountName(), projectID, err)
 	}
+	return &managedServiceAccount{
+		Email:     createdServiceAccount.GetEmail(),
+		ProjectID: createdServiceAccount.GetProjectId(),
+	}, nil
 }
 
-func (d *Deployer) ensureProjectServiceAccountRole(ctx context.Context, projectID, serviceAccountEmail string) error {
+func (d *Deployer) ensureProjectServiceAccountRoles(ctx context.Context, projectID, serviceAccountEmail string) error {
 	members, err := d.authorizationClient.ListMembers(ctx, projectResourceType, projectID)
 	if err != nil {
 		return fmt.Errorf("list members for STACKIT project %q: %w", projectID, err)
 	}
+
+	assignedRoles := make(map[string]struct{}, len(childProjectRoles))
 	for _, member := range members {
-		if member.GetSubject() == serviceAccountEmail && member.GetRole() == childProjectRole {
-			klog.Infof("Managed service account=%q already has role=%q in project_id=%q", serviceAccountEmail, childProjectRole, projectID)
-			return nil
+		if member.GetSubject() != serviceAccountEmail {
+			continue
 		}
+		assignedRoles[member.GetRole()] = struct{}{}
 	}
 
-	klog.Infof("Adding role=%q for managed service account=%q in project_id=%q", childProjectRole, serviceAccountEmail, projectID)
+	missingMembers := make([]authorization.Member, 0, len(childProjectRoles))
+	missingRoles := make([]string, 0, len(childProjectRoles))
+	for _, role := range childProjectRoles {
+		if _, ok := assignedRoles[role]; ok {
+			klog.Infof("Managed service account=%q already has role=%q in project_id=%q", serviceAccountEmail, role, projectID)
+			continue
+		}
+		missingRoles = append(missingRoles, role)
+		missingMembers = append(missingMembers, *authorization.NewMember(role, serviceAccountEmail))
+	}
+
+	if len(missingMembers) == 0 {
+		return nil
+	}
+
+	klog.Infof("Adding roles=%q for managed service account=%q in project_id=%q", strings.Join(missingRoles, ","), serviceAccountEmail, projectID)
 	if err := d.authorizationClient.AddMembers(
 		ctx,
 		projectID,
 		projectResourceType,
-		[]authorization.Member{*authorization.NewMember(childProjectRole, serviceAccountEmail)},
+		missingMembers,
 	); err != nil {
-		return fmt.Errorf("add role %q for service account %q in STACKIT project %q: %w", childProjectRole, serviceAccountEmail, projectID, err)
+		return fmt.Errorf("add roles %q for service account %q in STACKIT project %q: %w", strings.Join(missingRoles, ","), serviceAccountEmail, projectID, err)
 	}
 	return nil
 }
@@ -210,7 +220,8 @@ func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
 	if !found {
 		return false
 	}
-	return localPart == d.serviceAccountName()
+	name := d.serviceAccountName()
+	return localPart == name || strings.HasPrefix(localPart, name+"-")
 }
 
 func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyResponse) (string, error) {

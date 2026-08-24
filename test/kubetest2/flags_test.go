@@ -37,6 +37,8 @@ var _ = Describe("validate", func() {
 		Entry("zero volume size", func(d *Deployer) { d.volumeSizeGiB = 0 }, "--volume-size must be greater than 0"),
 		Entry("kubeconfig expiration too small", func(d *Deployer) { d.kubeconfigExpiresIn = minKubeconfigExpiration - 1 }, "--kubeconfig-expiration-seconds must be between"),
 		Entry("kubeconfig expiration too large", func(d *Deployer) { d.kubeconfigExpiresIn = maxKubeconfigExpiration + 1 }, "--kubeconfig-expiration-seconds must be between"),
+		Entry("missing csi image name", func(d *Deployer) { d.csiImageName = "" }, "--csi-image-name is required"),
+		Entry("missing csi image tag", func(d *Deployer) { d.csiImageTag = "" }, "--csi-image-tag is required"),
 		Entry("empty run id", func(d *Deployer) { d.options = fakeOptions{runID: "", runDir: d.options.RunDir()} }, "run-id must not be empty"),
 	)
 })

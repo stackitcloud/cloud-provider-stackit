@@ -36,6 +36,7 @@ func (d *Deployer) loadEnvironment() error {
 	d.authorizationEndpoint = strings.TrimSpace(os.Getenv("STACKIT_AUTHORIZATION_ENDPOINT"))
 	d.serviceEnablementEndpoint = strings.TrimSpace(os.Getenv("STACKIT_SERVICE_ENABLEMENT_ENDPOINT"))
 	d.skeEndpoint = strings.TrimSpace(os.Getenv("STACKIT_SKE_ENDPOINT"))
+	d.iaasEndpoint = strings.TrimSpace(os.Getenv("STACKIT_IAAS_ENDPOINT"))
 	d.kubeconfigPath = filepath.Join(d.options.RunDir(), "kubeconfig")
 	d.serviceAccountKeyPath = filepath.Join(d.options.RunDir(), "service-account-key.json")
 
@@ -49,12 +50,13 @@ func (d *Deployer) loadEnvironment() error {
 	)
 
 	klog.Infof(
-		"STACKIT API endpoint overrides: resource_manager=%q service_account=%q authorization=%q service_enablement=%q ske=%q",
+		"STACKIT API endpoint overrides: resource_manager=%q service_account=%q authorization=%q service_enablement=%q ske=%q iaas=%q",
 		d.resourceManagerEndpoint,
 		d.serviceAccountEndpoint,
 		d.authorizationEndpoint,
 		d.serviceEnablementEndpoint,
 		d.skeEndpoint,
+		d.iaasEndpoint,
 	)
 
 	return nil
