@@ -276,9 +276,6 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		})
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.GetId(), err)
-		if cs.Driver.deleteVolumesInErrorState {
-			cs.deleteVolumeInError(ctx, vol)
-		}
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
 	}
 
