@@ -45,8 +45,9 @@ if [[ -n "${PULL_NUMBER:=""}" ]]; then
 fi
 
 # tag for release builds
+# overwrite the tags, we don't need tags for branch or the date-commit_sha in released versions.
 if git_tag="$(git describe --tags --exact-match 2>/dev/null)"; then
-  tags+=("$git_tag")
+  tags=("$git_tag" "${git_tag%.*}")
 fi
 
 if [[ ${IS_DEV} == "true" ]]; then
