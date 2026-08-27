@@ -44,10 +44,14 @@ if [[ -n "${PULL_NUMBER:=""}" ]]; then
   tags+=("pr-${PULL_NUMBER}")
 fi
 
-# tag for release builds
-# overwrite the tags, we don't need tags for branch or the date-commit_sha in released versions.
+# Tag for release builds
+# Overwrite the tags, we don't need tags for branch or the date-commit_sha in released versions.
 if git_tag="$(git describe --tags --exact-match 2>/dev/null)"; then
-  tags=("$git_tag" "${git_tag%.*}")
+  tags=("$git_tag")
+  # For clean semver tags we also add a tag without patch version. To have a "latest" for each k8s version.
+  if [[ $git_tag =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    tags+=("${git_tag%.*}")
+  fi
 fi
 
 if [[ ${IS_DEV} == "true" ]]; then
