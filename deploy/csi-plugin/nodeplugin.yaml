@@ -21,7 +21,7 @@ spec:
       hostNetwork: true
       containers:
       - name: node-driver-registrar
-        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.16.0
         args:
         - "--csi-address=$(ADDRESS)"
         - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
@@ -41,7 +41,7 @@ spec:
         - name: registration-dir
           mountPath: /registration
       - name: liveness-probe
-        image: registry.k8s.io/sig-storage/livenessprobe:v2.17.0
+        image: registry.k8s.io/sig-storage/livenessprobe:v2.18.0
         args:
         - --csi-address=/csi/csi.sock
         volumeMounts:
@@ -53,7 +53,7 @@ spec:
           capabilities:
             add: ["SYS_ADMIN"]
           allowPrivilegeEscalation: true
-        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:release-v1.34
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:v1.36
         args:
         - /bin/stackit-csi-plugin
         - "--endpoint=$(CSI_ENDPOINT)"
