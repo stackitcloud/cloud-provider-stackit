@@ -23,7 +23,7 @@ var (
 	// using `go build -ldflags "-X github.com/stackitcloud/cloud-provider-stackit/pkg/csi/blockstorage.DriverName=..."`.
 	DriverName = "block-storage.csi.stackit.cloud"
 	// CSI spec version
-	specVersion = "1.12.0"
+	specVersion = "1.13.0"
 	Version     = "1.0.0"
 )
 
