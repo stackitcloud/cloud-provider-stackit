@@ -133,7 +133,7 @@ verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/$(REPO)/stackit-csi-plugin-dev:$(VERSION)
 
 .PHONY: test-e2e
-test-e2e: image-stackit-csi-plugin-test
+test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO)
 	go run ./test \
 	--up \
 	--test=ginkgo \
