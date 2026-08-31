@@ -252,6 +252,31 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("is not in available state"))
 		})
 
+		It("should delete an existing volume in error state when cleanup is enabled", func() {
+			req := &csi.CreateVolumeRequest{
+				Name:               "new volume",
+				VolumeCapabilities: stdVolCaps,
+				CapacityRange:      stdCapRange,
+			}
+			fakeCs.Driver.deleteVolumesInErrorState = true
+
+			iaasClient.EXPECT().GetVolumesByName(gomock.Any(), "new volume").Return([]iaas.Volume{
+				{
+					Id:               new("existing-error-volume-id"),
+					Name:             new("new volume"),
+					Size:             new(int64(20)),
+					Status:           new(stackitclient.VolumeErrorStatus),
+					AvailabilityZone: "eu01",
+				},
+			}, nil)
+			iaasClient.EXPECT().DeleteVolume(gomock.Any(), "existing-error-volume-id").Return(nil)
+
+			_, err := fakeCs.CreateVolume(context.Background(), req)
+			Expect(err).To(HaveOccurred())
+			Expect(status.Code(err)).To(Equal(codes.Internal))
+			Expect(err.Error()).To(ContainSubstring("is not in available state"))
+		})
+
 		It("should fail if more than one volume with the same name are available", func() {
 			req := &csi.CreateVolumeRequest{
 				Name:               "new volume",
