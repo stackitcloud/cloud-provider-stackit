@@ -47,14 +47,16 @@ type factory struct {
 	StackitProjectID      string
 	StackitAreaID         string
 	StackitOrganizationID string
+	StackitVPCID          string
 }
 
-func New(region, projectID, organizationID, areaID string) Factory {
+func New(region, projectID, organizationID, areaID, vpcID string) Factory {
 	return &factory{
 		StackitRegion:         region,
 		StackitProjectID:      projectID,
 		StackitOrganizationID: organizationID,
 		StackitAreaID:         areaID,
+		StackitVPCID:          vpcID,
 	}
 }
 
@@ -63,7 +65,15 @@ func (f factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBal
 }
 
 func (f factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
-	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, f.StackitOrganizationID, f.StackitAreaID, withDefaultOptions(options))
+	clientOpts := []ClientOption{}
+	if f.StackitOrganizationID != "" && f.StackitAreaID != "" {
+		clientOpts = append(clientOpts, WithArea(f.StackitOrganizationID, f.StackitAreaID))
+	}
+	if f.StackitVPCID != "" {
+		clientOpts = append(clientOpts, WithVPC(f.StackitVPCID))
+		clientOpts = append(clientOpts, UseVPCRoutes())
+	}
+	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options), clientOpts...)
 }
 
 func withDefaultOptions(options []sdkconfig.ConfigurationOption) []sdkconfig.ConfigurationOption {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	sdkconfig "github.com/stackitcloud/stackit-sdk-go/core/config"
+	iaasalpha "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2alpha1api"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -16,11 +17,11 @@ import (
 )
 
 type iaasClient struct {
-	Client    iaas.DefaultAPI
-	projectID string
-	orgID     string
-	areaID    string
-	region    string
+	Client      iaas.DefaultAPI
+	AlphaClient iaasalpha.DefaultAPI
+	opts        Options
+	projectID   string
+	region      string
 }
 
 type IaaSClient interface {
@@ -53,7 +54,7 @@ type IaaSClient interface {
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
 
-	ListRoutes(ctx context.Context, routingTableID string, labels map[string]string) ([]iaas.Route, error)
+	ListRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error)
 	AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error
 	GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error)
 	DeleteRoute(ctx context.Context, routingTableID string, routeID string) error
@@ -103,17 +104,54 @@ const (
 
 var volumeErrorStates = [...]string{"ERROR", "ERROR_RESIZING", "ERROR_DELETING"}
 
-func NewIaaSClient(region, projectID, orgID, areaID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
-	apiClient, err := iaas.NewAPIClient(options...)
+type Options struct {
+	useVPCRoutes bool
+	vpcID        string
+	areaID       string
+	orgID        string
+}
+
+type ClientOption func(o *Options)
+
+func WithVPC(id string) ClientOption {
+	return func(o *Options) {
+		o.vpcID = id
+	}
+}
+
+func UseVPCRoutes() ClientOption {
+	return func(o *Options) {
+		o.useVPCRoutes = true
+	}
+}
+
+func WithArea(orgID, areaID string) ClientOption {
+	return func(o *Options) {
+		o.orgID = orgID
+		o.areaID = areaID
+	}
+}
+
+func NewIaaSClient(region, projectID string, sdkOptions []sdkconfig.ConfigurationOption, clientOpts ...ClientOption) (IaaSClient, error) {
+	apiClient, err := iaas.NewAPIClient(sdkOptions...)
 	if err != nil {
 		return nil, err
 	}
+	alphaAPIClient, err := iaasalpha.NewAPIClient(sdkOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := Options{}
+	for _, clientOpt := range clientOpts {
+		clientOpt(&opts)
+	}
 	return &iaasClient{
-		Client:    apiClient.DefaultAPI,
-		projectID: projectID,
-		orgID:     orgID,
-		areaID:    areaID,
-		region:    region,
+		Client:      apiClient.DefaultAPI,
+		AlphaClient: alphaAPIClient.DefaultAPI,
+		opts:        opts,
+		projectID:   projectID,
+		region:      region,
 	}, nil
 }
 
@@ -600,38 +638,208 @@ func (i *iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, err
 	return diskUsed, nil
 }
 
-func (i *iaasClient) ListRoutes(ctx context.Context, routingTableID string, labels map[string]string) ([]iaas.Route, error) {
+func (i *iaasClient) ListRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error) {
 	return withResponseID(ctx, func(ctx context.Context) ([]iaas.Route, error) {
-		resp, err := i.Client.ListRoutesOfRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID).
-			LabelSelector(LabelSelector(labels)).
+		return i.listRoutes(ctx, routingTableID, labels)
+	})
+}
+
+func (i *iaasClient) listRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error) {
+	if i.opts.useVPCRoutes {
+		resp, err := i.AlphaClient.ListVPCStaticRoutes(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID).
+			LabelSelector(labels.Selector()).
 			Execute()
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetItems(), nil
-	})
+		return toIaasRoutes(resp.GetItems()), nil
+	}
+	resp, err := i.Client.ListRoutesOfRoutingTable(ctx, i.opts.orgID, i.opts.areaID, i.region, routingTableID).
+		LabelSelector(labels.Selector()).
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetItems(), nil
+}
+
+func toIaasRoutes(routes []iaasalpha.Route) []iaas.Route {
+	iaasRoutes := make([]iaas.Route, 0, len(routes))
+	for _, r := range routes {
+		destination := iaas.RouteDestination{}
+		if r.Destination.DestinationCIDRv4 != nil {
+			destination.DestinationCIDRv4 = &iaas.DestinationCIDRv4{
+				Type:  r.Destination.DestinationCIDRv4.Type,
+				Value: r.Destination.DestinationCIDRv4.Value,
+			}
+		}
+		if r.Destination.DestinationCIDRv6 != nil {
+			destination.DestinationCIDRv6 = &iaas.DestinationCIDRv6{
+				Type:  r.Destination.DestinationCIDRv6.Type,
+				Value: r.Destination.DestinationCIDRv6.Value,
+			}
+		}
+		nextHop := iaas.RouteNexthop{}
+		if r.Nexthop.NexthopBlackhole != nil {
+			nextHop.NexthopBlackhole = &iaas.NexthopBlackhole{
+				Type: r.Nexthop.NexthopBlackhole.Type,
+			}
+		}
+		if r.Nexthop.NexthopIPv4 != nil {
+			nextHop.NexthopIPv4 = &iaas.NexthopIPv4{
+				Type: r.Nexthop.NexthopIPv4.Type,
+			}
+		}
+		if r.Nexthop.NexthopIPv6 != nil {
+			nextHop.NexthopIPv6 = &iaas.NexthopIPv6{
+				Type: r.Nexthop.NexthopIPv6.Type,
+			}
+		}
+		if r.Nexthop.NexthopInternet != nil {
+			nextHop.NexthopInternet = &iaas.NexthopInternet{
+				Type: r.Nexthop.NexthopInternet.Type,
+			}
+		}
+		iaasRoutes = append(iaasRoutes, iaas.Route{
+			CreatedAt:            r.CreatedAt,
+			Destination:          destination,
+			Id:                   r.Id,
+			Labels:               r.Labels,
+			Nexthop:              nextHop,
+			UpdatedAt:            r.UpdatedAt,
+			AdditionalProperties: map[string]interface{}{},
+		})
+	}
+	return iaasRoutes
 }
 
 func (i *iaasClient) AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error {
-	payload := iaas.NewAddRoutesToRoutingTablePayload(routes)
 	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
-		_, err := i.Client.AddRoutesToRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID).
-			AddRoutesToRoutingTablePayload(*payload).
-			Execute()
+		err := i.addRoutes(ctx, routingTableID, routes)
 		return nil, err
 	})
 	return err
 }
 
+func (i *iaasClient) addRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error {
+	if i.opts.useVPCRoutes {
+		var errs error
+		for _, r := range routes {
+			alphaRoute := toAlphaRoute(r)
+			payload := iaasalpha.AddVPCStaticRoutePayload{
+				Destination: iaasalpha.AddVPCStaticRoutePayloadDestination(alphaRoute.Destination),
+				Labels:      alphaRoute.Labels,
+				Nexthop:     iaasalpha.AddVPCStaticRoutePayloadNexthop(alphaRoute.Nexthop),
+			}
+			fmt.Printf("destination: %#v\n", payload.Destination.DestinationCIDRv4)
+			fmt.Printf("nexthop: %#v\n", payload.Nexthop.NexthopIPv4)
+			_, err := i.AlphaClient.AddVPCStaticRoute(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID).
+				AddVPCStaticRoutePayload(payload).
+				Execute()
+			if err != nil {
+				errs = errors.Join(errs, err)
+			}
+		}
+		return errs
+	}
+
+	payload := iaas.NewAddRoutesToRoutingTablePayload(routes)
+	_, err := i.Client.AddRoutesToRoutingTable(ctx, i.opts.orgID, i.opts.areaID, i.region, routingTableID).
+		AddRoutesToRoutingTablePayload(*payload).
+		Execute()
+	return err
+}
+
+func toAlphaRoute(r iaas.Route) iaasalpha.Route {
+	destination := iaasalpha.RouteDestination{}
+	if r.Destination.DestinationCIDRv4 != nil {
+		destination.DestinationCIDRv4 = &iaasalpha.DestinationCIDRv4{
+			Type:  r.Destination.DestinationCIDRv4.Type,
+			Value: r.Destination.DestinationCIDRv4.Value,
+		}
+	}
+	if r.Destination.DestinationCIDRv6 != nil {
+		destination.DestinationCIDRv6 = &iaasalpha.DestinationCIDRv6{
+			Type:  r.Destination.DestinationCIDRv6.Type,
+			Value: r.Destination.DestinationCIDRv6.Value,
+		}
+	}
+	nextHop := iaasalpha.RouteNexthop{}
+	if r.Nexthop.NexthopBlackhole != nil {
+		nextHop.NexthopBlackhole = &iaasalpha.NexthopBlackhole{
+			Type: r.Nexthop.NexthopBlackhole.Type,
+		}
+	}
+	if r.Nexthop.NexthopIPv4 != nil {
+		nextHop.NexthopIPv4 = &iaasalpha.NexthopIPv4{
+			Type:  r.Nexthop.NexthopIPv4.Type,
+			Value: r.Nexthop.NexthopIPv4.Value,
+		}
+	}
+	if r.Nexthop.NexthopIPv6 != nil {
+		nextHop.NexthopIPv6 = &iaasalpha.NexthopIPv6{
+			Type:  r.Nexthop.NexthopIPv6.Type,
+			Value: r.Nexthop.NexthopIPv6.Value,
+		}
+	}
+	if r.Nexthop.NexthopInternet != nil {
+		nextHop.NexthopInternet = &iaasalpha.NexthopInternet{
+			Type: r.Nexthop.NexthopInternet.Type,
+		}
+	}
+	return iaasalpha.Route{
+		CreatedAt:            r.CreatedAt,
+		Destination:          destination,
+		Id:                   r.Id,
+		Labels:               r.Labels,
+		Nexthop:              nextHop,
+		UpdatedAt:            r.UpdatedAt,
+		AdditionalProperties: map[string]interface{}{},
+	}
+}
+
 func (i *iaasClient) GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error) {
 	return withResponseID(ctx, func(ctx context.Context) (*iaas.RoutingTable, error) {
-		return i.Client.GetRoutingTableOfArea(ctx, i.orgID, i.areaID, i.region, routingTableID).Execute()
+		return i.getRoutingTable(ctx, routingTableID)
 	})
+}
+
+func (i *iaasClient) getRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error) {
+	if i.opts.useVPCRoutes {
+		vpcRT, err := i.AlphaClient.GetVPCRoutingTable(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID).Execute()
+		if err != nil {
+			return nil, err
+		}
+		return toIaasRoutingTable(vpcRT), nil
+	}
+	return i.Client.GetRoutingTableOfArea(ctx, i.opts.orgID, i.opts.areaID, i.region, routingTableID).Execute()
+}
+
+func toIaasRoutingTable(vpcRT *iaasalpha.VPCRoutingTable) *iaas.RoutingTable {
+	return &iaas.RoutingTable{
+		CreatedAt:            vpcRT.CreatedAt,
+		Default:              new(false),
+		Description:          vpcRT.Description,
+		DynamicRoutes:        vpcRT.DynamicRoutes,
+		Id:                   vpcRT.Id,
+		Labels:               vpcRT.Labels,
+		Name:                 vpcRT.Name,
+		SystemRoutes:         vpcRT.SystemRoutes,
+		UpdatedAt:            vpcRT.UpdatedAt,
+		AdditionalProperties: vpcRT.AdditionalProperties,
+	}
 }
 
 func (i *iaasClient) DeleteRoute(ctx context.Context, routingTableID, routeID string) error {
 	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
-		return nil, i.Client.DeleteRouteFromRoutingTable(ctx, i.orgID, i.areaID, i.region, routingTableID, routeID).Execute()
+		return nil, i.deleteRoute(ctx, routingTableID, routeID)
 	})
 	return err
+}
+
+func (i *iaasClient) deleteRoute(ctx context.Context, routingTableID, routeID string) error {
+	if i.opts.useVPCRoutes {
+		return i.AlphaClient.DeleteVPCStaticRoute(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID, routeID).Execute()
+	}
+	return i.Client.DeleteRouteFromRoutingTable(ctx, i.opts.orgID, i.opts.areaID, i.region, routingTableID, routeID).Execute()
 }

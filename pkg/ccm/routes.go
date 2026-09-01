@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
+	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +31,7 @@ const (
 )
 
 type Routes struct {
-	iaasClient     client.IaaSClient
+	iaasClient     stackitclient.IaaSClient
 	routingTableID string
 }
 
@@ -41,7 +41,7 @@ func (r *Routes) CreateRoute(ctx context.Context, clusterName, nameHint string, 
 	if err != nil {
 		return err
 	}
-	routes, err := r.routesFromCloudprovider(nameHint, clusterName, route)
+	routes, err := r.routesFromCloudprovider(route)
 	if err != nil {
 		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
 	}
@@ -73,7 +73,7 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	if err != nil {
 		return err
 	}
-	routes, err := r.routesFromCloudprovider("", clusterName, route)
+	routes, err := r.routesFromCloudprovider(route)
 	if err != nil {
 		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
 	}
@@ -103,7 +103,7 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	rt, err := r.iaasClient.GetRoutingTable(ctx, r.routingTableID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting routing table: %w", err)
 	}
 
 	routes, err := r.getExistingRoutes(ctx, clusterName, "", "", rt.GetId())
@@ -111,10 +111,10 @@ func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		return nil, fmt.Errorf("getting existing routes: %w", err)
 	}
 
-	return r.routesToCloudprovider(routes), nil
+	return routes.ToCloudProvider(), nil
 }
 
-func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, targetNode, routingTableID string) ([]route, error) {
+func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, targetNode, routingTableID string) (routes, error) {
 	labels := routeLabels(nameHint, clusterName, targetNode)
 	iaasRoutes, err := r.iaasClient.ListRoutes(ctx, routingTableID, labels)
 	if err != nil {
@@ -131,7 +131,7 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 	return routes, nil
 }
 
-func (r *Routes) routesFromCloudprovider(nameHint, clusterName string, cloudroute *cloudprovider.Route) ([]route, error) {
+func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (routes, error) {
 	var routes []route
 	for _, nodeAddr := range cloudroute.TargetNodeAddresses {
 		if nodeAddr.Type != v1.NodeInternalIP {
@@ -206,11 +206,14 @@ func (r *Routes) routeFromIaas(iaasRoute iaas.Route) (route, error) {
 	}, nil
 }
 
-func (r *Routes) routesToCloudprovider(routes []route) []*cloudprovider.Route {
+// routes is a slice of route to allow methods
+type routes []route
+
+func (r routes) ToCloudProvider() []*cloudprovider.Route {
 	nodeToAddr := map[string][]v1.NodeAddress{}
 	nodeBlackhole := map[string]bool{}
 	nodeToDestCIDR := map[string]string{}
-	for _, route := range routes {
+	for _, route := range r {
 		nodeName := route.NodeName
 		var nextHop string
 		if !route.Blackhole {
@@ -242,6 +245,8 @@ func (r *Routes) routesToCloudprovider(routes []route) []*cloudprovider.Route {
 	return cpRoutes
 }
 
+// route represents the internal data representation of routes.
+// It can be used to convert to [iaas.Route] as well as to [cloudprovider.Route]
 type route struct {
 	NodeName        string
 	NextHop         netip.Addr
@@ -324,10 +329,8 @@ func (r route) iaasNextHop() (iaas.RouteNexthop, error) {
 	return nextHop, nil
 }
 
-type iaaslabels map[string]string
-
-func routeLabels(nameHint, clusterName, targetNode string) iaaslabels {
-	l := iaaslabels{
+func routeLabels(nameHint, clusterName, targetNode string) stackitclient.Labels {
+	l := stackitclient.Labels{
 		labelKeyClusterName: clusterName,
 	}
 	if targetNode != "" {
@@ -338,12 +341,4 @@ func routeLabels(nameHint, clusterName, targetNode string) iaaslabels {
 		l[labelKeyRouteNameHint] = nameHint
 	}
 	return l
-}
-
-func (l iaaslabels) ToSDK() map[string]any {
-	sdkLabels := make(map[string]any, len(l))
-	for k, v := range l {
-		sdkLabels[k] = v
-	}
-	return sdkLabels
 }
