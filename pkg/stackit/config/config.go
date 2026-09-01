@@ -7,6 +7,7 @@ import (
 type GlobalOpts struct {
 	ProjectID      string       `yaml:"projectId"`
 	AreaID         string       `yaml:"areaId"`
+	VPCID          string       `yaml:"vpcId"`
 	OrganizationID string       `yaml:"organizationId"`
 	Region         string       `yaml:"region"`
 	APIEndpoints   APIEndpoints `yaml:"apiEndpoints"`
