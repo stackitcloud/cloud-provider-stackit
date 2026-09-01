@@ -2,6 +2,7 @@
 .idea
 /dev
 /secrets
+bin/
 /hack/tools/bin/*
 !/hack/tools/bin/.gitkeep
 cover.out
