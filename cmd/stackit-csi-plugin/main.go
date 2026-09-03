@@ -23,14 +23,15 @@ import (
 )
 
 var (
-	endpoint                 string
-	cloudConfig              string
-	cluster                  string
-	metricsAddress           string
-	provideControllerService bool
-	provideNodeService       bool
-	legacyStorageMode        bool
-	legacyVolumeCreation     bool
+	endpoint                  string
+	cloudConfig               string
+	cluster                   string
+	metricsAddress            string
+	provideControllerService  bool
+	provideNodeService        bool
+	legacyStorageMode         bool
+	legacyVolumeCreation      bool
+	deleteVolumesInErrorState bool
 )
 
 func main() {
@@ -85,6 +86,7 @@ func main() {
 	cmd.PersistentFlags().BoolVar(&legacyStorageMode, "legacy-storage-mode", false,
 		"Configures the CSI to listen to the legacy storage driverName cinder.csi.openstack.org instead")
 	cmd.PersistentFlags().BoolVar(&legacyVolumeCreation, "legacy-volume-creation", true, "Enable or disable support for creating volumes with the old driverName (cinder.csi.openstack.org)")
+	cmd.PersistentFlags().BoolVar(&deleteVolumesInErrorState, "delete-volumes-in-error", false, "Delete volumes in error state when creating")
 
 	stackitclient.AddExtraFlags(pflag.CommandLine)
 
@@ -115,6 +117,10 @@ func handle(ctx context.Context) {
 
 	if !legacyVolumeCreation {
 		driverOpts.BlockVolumeCreation = true
+	}
+
+	if deleteVolumesInErrorState {
+		driverOpts.DeleteVolumesInErrorState = true
 	}
 
 	d := blockstorage.NewDriver(driverOpts)
