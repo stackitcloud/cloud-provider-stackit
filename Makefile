@@ -136,6 +136,7 @@ verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO)
 	go run ./test \
 	--up \
+	--down \
 	--test=ginkgo \
 	--run-id "$(E2E_RUN_ID)" \
 	--rundir "_rundir" \
