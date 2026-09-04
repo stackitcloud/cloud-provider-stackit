@@ -25,7 +25,7 @@ type sdkSKEClient struct {
 func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
 	klog.Infof("Creating SKE API client for region=%q with service_account_bytes=%d", region, len(serviceAccount))
 
-	apiClient, err := ske.NewAPIClient(apiClientOptions(serviceAccount, endpoint)...)
+	apiClient, err := ske.NewAPIClient(apiClientOptions(serviceAccount, "", endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create SKE client: %w", err)
 	}

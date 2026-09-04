@@ -68,10 +68,13 @@ type sdkServiceEnablementClient struct {
 	api *serviceenablement.APIClient
 }
 
-func apiClientOptions(serviceAccountKey, endpoint string) []sdkconfig.ConfigurationOption {
+func apiClientOptions(serviceAccountKey, serviceAccountEmail, endpoint string) []sdkconfig.ConfigurationOption {
 	var opts []sdkconfig.ConfigurationOption
-	if serviceAccountKey != "" {
+	switch {
+	case serviceAccountKey != "":
 		opts = append(opts, sdkconfig.WithServiceAccountKey(serviceAccountKey))
+	case serviceAccountEmail != "":
+		opts = append(opts, sdkconfig.WithWorkloadIdentityFederationAuth(), sdkconfig.WithServiceAccountEmail(serviceAccountEmail))
 	}
 	if endpoint != "" {
 		opts = append(opts, sdkconfig.WithEndpoint(endpoint))
@@ -86,32 +89,32 @@ func apiEndpointURL(cfg *sdkconfig.Configuration) string {
 	return cfg.Servers[0].URL
 }
 
-func newProjectClient(serviceAccountKey, endpoint string) (projectClient, error) {
-	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
+func newProjectClient(serviceAccountKey, serviceAccountEmail, endpoint string) (projectClient, error) {
+	apiClient, err := resourcemanager.NewAPIClient(apiClientOptions(serviceAccountKey, serviceAccountEmail, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Resource Manager client: %w", err)
 	}
 	return &sdkProjectClient{api: apiClient}, nil
 }
 
-func newServiceAccountClient(serviceAccountKey, endpoint string) (serviceAccountClient, error) {
-	apiClient, err := serviceaccount.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
+func newServiceAccountClient(serviceAccountKey, serviceAccountEmail, endpoint string) (serviceAccountClient, error) {
+	apiClient, err := serviceaccount.NewAPIClient(apiClientOptions(serviceAccountKey, serviceAccountEmail, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Service Account client: %w", err)
 	}
 	return &sdkServiceAccountClient{api: apiClient}, nil
 }
 
-func newAuthorizationClient(serviceAccountKey, endpoint string) (authorizationClient, error) {
-	apiClient, err := authorization.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
+func newAuthorizationClient(serviceAccountKey, serviceAccountEmail, endpoint string) (authorizationClient, error) {
+	apiClient, err := authorization.NewAPIClient(apiClientOptions(serviceAccountKey, serviceAccountEmail, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Authorization client: %w", err)
 	}
 	return &sdkAuthorizationClient{api: apiClient}, nil
 }
 
-func newServiceEnablementClient(serviceAccountKey, endpoint string) (serviceEnablementClient, error) {
-	apiClient, err := serviceenablement.NewAPIClient(apiClientOptions(serviceAccountKey, endpoint)...)
+func newServiceEnablementClient(serviceAccountKey, serviceAccountEmail, endpoint string) (serviceEnablementClient, error) {
+	apiClient, err := serviceenablement.NewAPIClient(apiClientOptions(serviceAccountKey, serviceAccountEmail, endpoint)...)
 	if err != nil {
 		return nil, fmt.Errorf("create Service Enablement client: %w", err)
 	}
@@ -213,22 +216,22 @@ func (c *sdkServiceEnablementClient) WaitForServiceEnabled(ctx context.Context, 
 
 func (d *Deployer) initializeBootstrapClients() error {
 	if err := initializeBootstrapClient(d.projectClient != nil, &d.projectClient, func() (projectClient, error) {
-		return newProjectClient(d.serviceAccount, d.resourceManagerEndpoint)
+		return newProjectClient(d.serviceAccount, d.projectMemberEmail, d.resourceManagerEndpoint)
 	}); err != nil {
 		return err
 	}
 	if err := initializeBootstrapClient(d.serviceAccountClient != nil, &d.serviceAccountClient, func() (serviceAccountClient, error) {
-		return newServiceAccountClient(d.serviceAccount, d.serviceAccountEndpoint)
+		return newServiceAccountClient(d.serviceAccount, d.projectMemberEmail, d.serviceAccountEndpoint)
 	}); err != nil {
 		return err
 	}
 	if err := initializeBootstrapClient(d.authorizationClient != nil, &d.authorizationClient, func() (authorizationClient, error) {
-		return newAuthorizationClient(d.serviceAccount, d.authorizationEndpoint)
+		return newAuthorizationClient(d.serviceAccount, d.projectMemberEmail, d.authorizationEndpoint)
 	}); err != nil {
 		return err
 	}
 	if err := initializeBootstrapClient(d.serviceEnablementClient != nil, &d.serviceEnablementClient, func() (serviceEnablementClient, error) {
-		return newServiceEnablementClient(d.serviceAccount, d.serviceEnablementEndpoint)
+		return newServiceEnablementClient(d.serviceAccount, d.projectMemberEmail, d.serviceEnablementEndpoint)
 	}); err != nil {
 		return err
 	}
