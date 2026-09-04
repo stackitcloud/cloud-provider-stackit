@@ -14,6 +14,8 @@ MOCKGEN_VERSION ?= v0.6.0
 APKO_VERSION ?= v1.2.43
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.19.1
+# renovate: datasource=go depName=sigs.k8s.io/kubetest2
+KUBETEST2_VERSION ?= v0.0.0-20260510045745-558f16b589d1
 
 KUBERNETES_TEST_VERSION ?= v1.36.2
 
@@ -57,3 +59,7 @@ KUBERNETES_TEST := $(TOOLS_BIN_DIR)/e2e.test
 KUBERNETES_TEST_GINKGO := $(TOOLS_BIN_DIR)/ginkgo
 $(KUBERNETES_TEST): $(call tool_version_file,$(KUBERNETES_TEST),$(KUBERNETES_TEST_VERSION))
 	curl --location https://dl.k8s.io/$(KUBERNETES_TEST_VERSION)/kubernetes-test-$(OS)-$(ARCH).tar.gz | tar -C $(TOOLS_BIN_DIR) --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+
+KUBETEST2_TESTER_GINKGO := $(TOOLS_BIN_DIR)/kubetest2-tester-ginkgo
+$(KUBETEST2_TESTER_GINKGO): $(call tool_version_file,$(KUBETEST2_TESTER_GINKGO),$(KUBETEST2_VERSION))
+	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@$(KUBETEST2_VERSION)
