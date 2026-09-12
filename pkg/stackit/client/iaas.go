@@ -49,12 +49,13 @@ type IaaSClient interface {
 	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
-	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
+	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, vol **iaas.Volume, tStatus []string, backoff *wait.Backoff) error
 }
 
 const (
 	VolumeAvailableStatus    = "AVAILABLE"
 	VolumeAttachedStatus     = "ATTACHED"
+	VolumeErrorStatus        = "ERROR"
 	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
@@ -542,25 +543,31 @@ func (i *iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string
 	return nil
 }
 
-func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
+func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, vol **iaas.Volume, tStatus []string, backoff *wait.Backoff) error {
+	volID := (*vol).GetId()
+
 	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
-		vol, err := i.GetVolume(ctx, volumeID)
+		updatedVol, err := i.GetVolume(ctx, volID)
 		if err != nil {
 			return false, err
 		}
-		if slices.Contains(tStatus, *vol.Status) {
+
+		// Update vol so we can skip having another request
+		*vol = updatedVol
+
+		if slices.Contains(tStatus, updatedVol.GetStatus()) {
 			return true, nil
 		}
 		for _, eState := range volumeErrorStates {
-			if *vol.Status == eState {
-				return false, fmt.Errorf("volume is in error state: %s", *vol.Status)
+			if updatedVol.GetStatus() == eState {
+				return false, fmt.Errorf("volume is in error state: %s", updatedVol.GetStatus())
 			}
 		}
 		return false, nil
 	})
 
 	if wait.Interrupted(waitErr) {
-		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volID, tStatus)
 	}
 
 	return waitErr
