@@ -61,6 +61,15 @@ func IsInvalidError(err error) bool {
 	return oAPIError.StatusCode == http.StatusBadRequest
 }
 
+func IsConflict(err error) bool {
+	oAPIError, ok := genericOpenAPIError(err)
+	if !ok {
+		return false
+	}
+
+	return oAPIError.StatusCode == http.StatusConflict
+}
+
 func genericOpenAPIError(err error) (*oapiError.GenericOpenAPIError, bool) {
 	var oAPIError *oapiError.GenericOpenAPIError
 	if ok := errors.As(err, &oAPIError); !ok {

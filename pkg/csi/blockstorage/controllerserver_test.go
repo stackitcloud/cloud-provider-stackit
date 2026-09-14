@@ -654,18 +654,44 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		})
 	})
 	Describe("ControllerPublishVolume", func() {
-		It("should successfully attach volume to node", func() {
+		It("should attach the volume without any pre-checks", func() {
 			req := &csi.ControllerPublishVolumeRequest{
 				VolumeId:         "fake",
 				NodeId:           "fake",
 				VolumeCapability: stdVolCap,
 			}
-			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{Status: new("AVAILABLE")}, nil)
-			iaasClient.EXPECT().GetServer(gomock.Any(), "fake").Return(&iaas.Server{}, nil)
-			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(req.VolumeId, nil)
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(nil)
 			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should verify the attachment when the attach API reports a conflict", func() {
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "fake",
+				NodeId:           "fake",
+				VolumeCapability: stdVolCap,
+			}
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusConflict,
+			})
+			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
+			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should return not found when the attach API reports not found", func() {
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "fake",
+				NodeId:           "fake",
+				VolumeCapability: stdVolCap,
+			}
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
+			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
+			Expect(err).To(HaveOccurred())
+			Expect(status.Code(err)).To(Equal(codes.NotFound))
 		})
 
 		It("should return resource exhausted when node cannot attach more disks", func() {
@@ -674,9 +700,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				NodeId:           "fake",
 				VolumeCapability: stdVolCap,
 			}
-			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{Status: new("AVAILABLE")}, nil)
-			iaasClient.EXPECT().GetServer(gomock.Any(), req.NodeId).Return(&iaas.Server{}, nil)
-			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return("", &oapierror.GenericOpenAPIError{
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
 				StatusCode: http.StatusForbidden,
 				Body:       []byte("maximum allowed number of disk devices"),
 			})
@@ -688,14 +712,25 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		})
 	})
 	Describe("ControllerUnpublishVolume", func() {
-		It("should successfully detach volume from node", func() {
+		It("should detach the volume without a server pre-check", func() {
 			req := &csi.ControllerUnpublishVolumeRequest{
 				VolumeId: "fake",
 				NodeId:   "fake",
 			}
-			iaasClient.EXPECT().GetServer(gomock.Any(), "fake").Return(&iaas.Server{}, nil)
 			iaasClient.EXPECT().DetachVolume(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			iaasClient.EXPECT().WaitDiskDetached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
+			_, err := fakeCs.ControllerUnpublishVolume(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should treat a not-found detach as success", func() {
+			req := &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "fake",
+				NodeId:   "fake",
+			}
+			iaasClient.EXPECT().DetachVolume(gomock.Any(), req.NodeId, req.VolumeId).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
 			_, err := fakeCs.ControllerUnpublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
 		})
