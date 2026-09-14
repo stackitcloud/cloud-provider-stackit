@@ -43,12 +43,11 @@ func (m *MockIaaSClient) EXPECT() *MockIaaSClientMockRecorder {
 }
 
 // AttachVolume mocks base method.
-func (m *MockIaaSClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload v2api.AddVolumeToServerPayload) (string, error) {
+func (m *MockIaaSClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload v2api.AddVolumeToServerPayload) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AttachVolume", ctx, serverID, volumeID, payload)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // AttachVolume indicates an expected call of AttachVolume.
@@ -64,19 +63,19 @@ type MockIaaSClientAttachVolumeCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockIaaSClientAttachVolumeCall) Return(arg0 string, arg1 error) *MockIaaSClientAttachVolumeCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockIaaSClientAttachVolumeCall) Return(arg0 error) *MockIaaSClientAttachVolumeCall {
+	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientAttachVolumeCall) Do(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) (string, error)) *MockIaaSClientAttachVolumeCall {
+func (c *MockIaaSClientAttachVolumeCall) Do(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) error) *MockIaaSClientAttachVolumeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientAttachVolumeCall) DoAndReturn(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) (string, error)) *MockIaaSClientAttachVolumeCall {
+func (c *MockIaaSClientAttachVolumeCall) DoAndReturn(f func(context.Context, string, string, v2api.AddVolumeToServerPayload) error) *MockIaaSClientAttachVolumeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
