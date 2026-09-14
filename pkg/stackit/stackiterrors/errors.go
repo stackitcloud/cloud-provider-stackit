@@ -40,16 +40,20 @@ func IgnoreNotFound(err error) error {
 	return err
 }
 
-// WrapErrorWithResponseID wraps the error with the X-Request-Id but only if the error is not nil
-func WrapErrorWithResponseID(err error, reqID string) error {
+// WrapError wraps the error with an identifier but only if the error is not nil.
+func WrapError(err error, name, id string) error {
 	if err == nil {
 		return nil
 	}
-	// if the request id is empty we don't wrap the error
-	if reqID == "" {
+	if id == "" {
 		return err
 	}
-	return fmt.Errorf("[%s:%s]: %w", wait.XRequestIDHeader, reqID, err)
+	return fmt.Errorf("[%s:%s]: %w", name, id, err)
+}
+
+// WrapErrorWithResponseID wraps the error with the X-Request-Id.
+func WrapErrorWithResponseID(err error, reqID string) error {
+	return WrapError(err, wait.XRequestIDHeader, reqID)
 }
 
 func IsInvalidError(err error) bool {
