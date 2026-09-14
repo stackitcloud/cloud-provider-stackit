@@ -16,9 +16,10 @@ func withResponseID[T any](ctx context.Context, call func(context.Context) (T, e
 	resp, err := call(ctx)
 	if err != nil {
 		var zero T
+		err = stackiterrors.WrapError(err, "X-Trace-Id", runtime.GetTraceId(ctx))
 		if httpResp != nil {
 			reqID := httpResp.Header.Get(sdkWait.XRequestIDHeader)
-			return zero, stackiterrors.WrapErrorWithResponseID(err, reqID)
+			err = stackiterrors.WrapErrorWithResponseID(err, reqID)
 		}
 		return zero, err
 	}
