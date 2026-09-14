@@ -95,6 +95,23 @@ var _ = Describe("Errors", func() {
 		})
 	})
 
+	Describe("WrapError", func() {
+		It("wraps the error with the provided identifier", func() {
+			err := errors.New("test error")
+			expected := fmt.Errorf("[X-Trace-Id:12345]: %w", err)
+			Expect(WrapError(err, "X-Trace-Id", "12345")).To(Equal(expected))
+		})
+
+		It("returns the original error when the identifier is empty", func() {
+			err := errors.New("test error")
+			Expect(WrapError(err, "trace-id", "")).To(Equal(err))
+		})
+
+		It("returns nil when the error is nil", func() {
+			Expect(WrapError(nil, "trace-id", "12345")).To(Succeed())
+		})
+	})
+
 	Describe("IsInvalidError", func() {
 		Context("when error is a BadRequest error", func() {
 			It("should return true", func() {
