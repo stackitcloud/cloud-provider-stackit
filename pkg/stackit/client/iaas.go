@@ -12,7 +12,6 @@ import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 type iaasClient struct {
@@ -461,7 +460,7 @@ func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context
 		}
 		for _, eState := range volumeErrorStates {
 			if volume.GetStatus() == eState {
-				return false, fmt.Errorf("volume is in Error State : %s", ptr.Deref(volume.Status, ""))
+				return false, fmt.Errorf("volume is in Error State : %s", volume.GetStatus())
 			}
 		}
 		return false, nil
