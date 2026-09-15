@@ -237,10 +237,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	// The encryption config is already set for volumes created from snapshot or volume. We MUST never set it when
-	// restoring from snapshot or volume.
-	// This is not true for volumeSourceType == Backup. The encryptionConfig must be set BUT the parameters can be different.
-	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackitclient.BackupSource) {
+	// A volume created from a content source (backup, snapshot or volume) inherits its
+	// encryption from that source; IaaS sets it. We MUST never send EncryptionParameters
+	// for such a restore. Only a fresh volume (i.e. without a source source) takes encryption parameters.
+	if volParams.Encrypted != nil && volumeSourceType == "" {
 		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")

@@ -82,6 +82,80 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.Volume.CapacityBytes).To(Equal(util.GIBIBYTE * 20))
 		})
 
+		It("should set encryption parameters for a fresh encrypted volume", func() {
+			req := &csi.CreateVolumeRequest{
+				Name:               "encrypted volume",
+				VolumeCapabilities: stdVolCaps,
+				CapacityRange:      stdCapRange,
+				Parameters: map[string]string{
+					"encrypted":         "true",
+					"type":              "perf1",
+					"kmsServiceAccount": "sa",
+					"kmsKeyID":          "kid",
+					"kmsKeyringID":      "krid",
+					"kmsKeyVersion":     "1",
+				},
+			}
+
+			iaasClient.EXPECT().GetVolumesByName(gomock.Any(), "encrypted volume").Return([]iaas.Volume{}, nil)
+
+			var captured iaas.CreateVolumePayload
+			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					captured = payload
+					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
+				})
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+
+			_, err := fakeCs.CreateVolume(context.Background(), req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(captured.Source).To(BeNil())
+			Expect(captured.EncryptionParameters).ToNot(BeNil())
+			Expect(captured.EncryptionParameters.KekKeyId).To(Equal("kid"))
+		})
+
+		It("should never set encryption parameters when restoring from a backup source", func() {
+			req := &csi.CreateVolumeRequest{
+				Name:               "backup restore",
+				VolumeCapabilities: stdVolCaps,
+				CapacityRange:      stdCapRange,
+				Parameters: map[string]string{
+					"encrypted":         "true",
+					"type":              "perf1",
+					"kmsServiceAccount": "sa",
+					"kmsKeyID":          "kid",
+					"kmsKeyringID":      "krid",
+					"kmsKeyVersion":     "1",
+				},
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Snapshot{
+						Snapshot: &csi.VolumeContentSource_SnapshotSource{SnapshotId: "source-id"},
+					},
+				},
+			}
+
+			iaasClient.EXPECT().GetVolumesByName(gomock.Any(), "backup restore").Return([]iaas.Volume{}, nil)
+			// Snapshot lookup misses, so the source is resolved as a backup.
+			iaasClient.EXPECT().GetSnapshot(gomock.Any(), "source-id").
+				Return(nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound})
+			iaasClient.EXPECT().GetBackup(gomock.Any(), "source-id").
+				Return(&iaas.Backup{Id: new("source-id"), Status: new(stackitclient.SnapshotReadyStatus)}, nil)
+
+			var captured iaas.CreateVolumePayload
+			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					captured = payload
+					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
+				})
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+
+			_, err := fakeCs.CreateVolume(context.Background(), req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(captured.Source).ToNot(BeNil())
+			Expect(captured.Source.Type).To(Equal(string(stackitclient.BackupSource)))
+			Expect(captured.EncryptionParameters).To(BeNil())
+		})
+
 		It("should not accept an empty volume name", func() {
 			req := &csi.CreateVolumeRequest{
 				Name: "",
