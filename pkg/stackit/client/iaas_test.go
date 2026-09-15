@@ -538,29 +538,33 @@ var _ = Describe("Volume", func() {
 	})
 
 	Context("Attach/Detach Volume", func() {
-		It("AttachVolume calls API when not already attached", func() {
-			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), volumeID).
-				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
-			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), ServerId: nil}, nil)
-
+		It("AttachVolume calls the API directly without any pre-checks", func() {
 			mockIaaSClient.EXPECT().AddVolumeToServer(gomock.Any(), gomock.Any(), gomock.Any(), serverID, volumeID).
 				Return(iaas.ApiAddVolumeToServerRequest{ApiService: mockIaaSClient})
 			mockIaaSClient.EXPECT().AddVolumeToServerExecute(gomock.Any()).Return(
 				&iaas.VolumeAttachment{VolumeId: new(volumeID), ServerId: new(serverID)}, nil)
 
-			id, err := client.AttachVolume(context.Background(), serverID, volumeID, iaas.AddVolumeToServerPayload{})
+			err := client.AttachVolume(context.Background(), serverID, volumeID, iaas.AddVolumeToServerPayload{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(id).To(Equal(volumeID))
 		})
 
-		It("DetachVolume fails if status is not Available", func() {
-			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
-			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Name: new("volume-1"), Id: new(volumeID), Status: new("CREATING")}, nil)
+		It("DetachVolume calls the API directly without any pre-checks", func() {
+			mockIaaSClient.EXPECT().RemoveVolumeFromServer(gomock.Any(), gomock.Any(), gomock.Any(), serverID, volumeID).
+				Return(iaas.ApiRemoveVolumeFromServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().RemoveVolumeFromServerExecute(gomock.Any()).Return(nil)
+
+			err := client.DetachVolume(context.Background(), serverID, volumeID)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("DetachVolume wraps the API error", func() {
+			mockIaaSClient.EXPECT().RemoveVolumeFromServer(gomock.Any(), gomock.Any(), gomock.Any(), serverID, volumeID).
+				Return(iaas.ApiRemoveVolumeFromServerRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().RemoveVolumeFromServerExecute(gomock.Any()).Return(fmt.Errorf("boom"))
 
 			err := client.DetachVolume(context.Background(), serverID, volumeID)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("its status is CREATING"))
+			Expect(err.Error()).To(ContainSubstring("failed to detach volume"))
 		})
 	})
 
@@ -602,6 +606,59 @@ var _ = Describe("Volume", func() {
 			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(nil, fmt.Errorf("timeout"))
 
 			err := client.WaitDiskAttached(context.Background(), serverID, volumeID)
+			Expect(err).To(HaveOccurred())
+		})
+
+		DescribeTable("WaitDiskAttached succeeds once the volume is attached and usable",
+			func(status string) {
+				mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+				mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).
+					Return(&iaas.Volume{Id: new(volumeID), ServerId: new(serverID), Status: new(status)}, nil)
+
+				Expect(client.WaitDiskAttached(context.Background(), serverID, volumeID)).To(Succeed())
+			},
+			Entry("ATTACHED", VolumeAttachedStatus),
+			Entry("IN_USE", VolumeInUseStatus),
+		)
+
+		It("WaitDiskAttached fails fast when the volume is attached to another server", func() {
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).
+				Return(&iaas.Volume{Id: new(volumeID), ServerId: new("other-server"), Status: new(VolumeAttachedStatus)}, nil)
+
+			err := client.WaitDiskAttached(context.Background(), serverID, volumeID)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("attached to server other-server"))
+		})
+
+		It("WaitDiskAttached fails fast when the volume is in an error state", func() {
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).
+				Return(&iaas.Volume{Id: new(volumeID), ServerId: new(serverID), Status: new("ERROR")}, nil)
+
+			err := client.WaitDiskAttached(context.Background(), serverID, volumeID)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error state ERROR"))
+		})
+
+		It("WaitDiskDetached succeeds once the server association is cleared", func() {
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).
+				Return(&iaas.Volume{Id: new(volumeID), ServerId: nil, Status: new(VolumeAvailableStatus)}, nil)
+
+			Expect(client.WaitDiskDetached(context.Background(), serverID, volumeID)).To(Succeed())
+		})
+
+		It("WaitDiskDetached propagates a GetVolume error", func() {
+			mockIaaSClient.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(nil, fmt.Errorf("boom"))
+
+			err := client.WaitDiskDetached(context.Background(), serverID, volumeID)
 			Expect(err).To(HaveOccurred())
 		})
 	})

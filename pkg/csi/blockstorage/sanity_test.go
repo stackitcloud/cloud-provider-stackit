@@ -65,7 +65,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 			createdVolumes := make(map[string]*iaas.Volume)
 			createdSnapshots := make(map[string]*iaas.Snapshot)
 			createdBackups := make(map[string]*iaas.Backup)
-			createdInstances := make(map[string]*iaas.Server)
+			createdInstances := map[string]*iaas.Server{FakeInstanceID: {}}
 
 			// --- Mock Mounter Setup ---
 			mountPoints := make([]mountutils.MountPoint, 0)
@@ -323,14 +323,18 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // instanceID
 				gomock.Any(), // volumeID
 				gomock.Any(), // payload
-			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string, _ iaas.AddVolumeToServerPayload) (string, error) {
+			).DoAndReturn(func(_ context.Context, instanceID string, volumeID string, _ iaas.AddVolumeToServerPayload) error {
+				// IaaS validates volume and server existence and returns not-found for either.
+				if _, ok := createdInstances[instanceID]; !ok {
+					return &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
+				}
 				vol, ok := createdVolumes[volumeID]
 				if !ok {
-					return "", &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
+					return &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound}
 				}
 				vol.ServerId = new(instanceID)
 				vol.Status = new("ATTACHED")
-				return *vol.Id, nil
+				return nil
 			}).AnyTimes()
 
 			iaasClient.EXPECT().WaitDiskAttached(

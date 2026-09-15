@@ -123,4 +123,33 @@ var _ = Describe("Errors", func() {
 			})
 		})
 	})
+
+	Describe("IsConflict", func() {
+		Context("when error is a Conflict error", func() {
+			It("should return true", func() {
+				err := &oapiError.GenericOpenAPIError{StatusCode: http.StatusConflict}
+				Expect(IsConflict(err)).To(BeTrue())
+			})
+		})
+
+		Context("when error is not a Conflict error", func() {
+			It("should return false", func() {
+				err := &oapiError.GenericOpenAPIError{StatusCode: http.StatusInternalServerError}
+				Expect(IsConflict(err)).To(BeFalse())
+			})
+		})
+
+		Context("when error is not an OAPI error", func() {
+			It("should return false", func() {
+				err := errors.New("some error")
+				Expect(IsConflict(err)).To(BeFalse())
+			})
+		})
+
+		Context("when error is nil", func() {
+			It("should return false", func() {
+				Expect(IsConflict(nil)).To(BeFalse())
+			})
+		})
+	})
 })
