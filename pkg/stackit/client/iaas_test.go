@@ -10,6 +10,7 @@ import (
 	oapiError "github.com/stackitcloud/stackit-sdk-go/core/oapierror"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	mock "github.com/stackitcloud/cloud-provider-stackit/pkg/mock/iaas"
 )
@@ -591,6 +592,20 @@ var _ = Describe("Volume", func() {
 
 			err := client.WaitVolumeTargetStatus(context.Background(), volumeID, []string{"available"})
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("WaitVolumeTargetStatusWithCustomBackoff returns the refreshed volume", func() {
+			mockIaaSClient.EXPECT().
+				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+			updatedVolume := &iaas.Volume{Id: new(volumeID), Status: new("available")}
+			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(updatedVolume, nil)
+
+			volume, err := client.WaitVolumeTargetStatusWithCustomBackoff(
+				context.Background(), volumeID, []string{"available"}, wait.Backoff{Steps: 1},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(volume).To(BeIdenticalTo(updatedVolume))
 		})
 
 		It("WaitDiskAttached returns error on timeout", func() {

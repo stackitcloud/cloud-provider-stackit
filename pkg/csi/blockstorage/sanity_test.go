@@ -142,7 +142,7 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 
 			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(
 				gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-			).Return(nil).AnyTimes()
+			).Return(nil, nil).AnyTimes()
 
 			iaasClient.EXPECT().ExpandVolume(
 				gomock.Any(), // context
