@@ -295,6 +295,9 @@ func (cs *controllerServer) deleteVolumeInError(ctx context.Context, vol *iaas.V
 		return
 	}
 
+	// only check for "ERROR" status
+	// these are unknown issue worth a recreation of the volume
+	// other errors are defined and not solveable by a recreation
 	if vol.GetStatus() != stackitclient.VolumeErrorStatus {
 		return
 	}
