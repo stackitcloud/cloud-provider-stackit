@@ -271,12 +271,15 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	targetStatus := []string{stackitclient.VolumeAvailableStatus}
 	// Recheck after: 0s (immediate), 20s, 45.6s, 78.36s, 120.31s
-	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, &vol, targetStatus,
-		&wait.Backoff{
+	updatedVol, err := cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, vol.GetId(), targetStatus,
+		wait.Backoff{
 			Duration: 20 * time.Second,
 			Steps:    5,
 			Factor:   1.28,
 		})
+	if updatedVol != nil {
+		vol = updatedVol
+	}
 	if err != nil {
 		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.GetId(), err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", *vol.Id, err))
@@ -302,7 +305,7 @@ func (cs *controllerServer) deleteVolumeInError(ctx context.Context, vol *iaas.V
 		klog.Errorf("Failed to delete erroneous volume %s: %v", vol.GetId(), deleteErr)
 		return
 	}
-	
+
 	klog.Infof("Successfully deleted erroneous volume %s", vol.GetId())
 }
 
