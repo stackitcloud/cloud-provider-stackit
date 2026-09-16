@@ -82,6 +82,80 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			Expect(resp.Volume.CapacityBytes).To(Equal(util.GIBIBYTE * 20))
 		})
 
+		It("should set encryption parameters for a fresh encrypted volume", func() {
+			req := &csi.CreateVolumeRequest{
+				Name:               "encrypted volume",
+				VolumeCapabilities: stdVolCaps,
+				CapacityRange:      stdCapRange,
+				Parameters: map[string]string{
+					"encrypted":         "true",
+					"type":              "perf1",
+					"kmsServiceAccount": "sa",
+					"kmsKeyID":          "kid",
+					"kmsKeyringID":      "krid",
+					"kmsKeyVersion":     "1",
+				},
+			}
+
+			iaasClient.EXPECT().GetVolumesByName(gomock.Any(), "encrypted volume").Return([]iaas.Volume{}, nil)
+
+			var captured iaas.CreateVolumePayload
+			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					captured = payload
+					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
+				})
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+
+			_, err := fakeCs.CreateVolume(context.Background(), req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(captured.Source).To(BeNil())
+			Expect(captured.EncryptionParameters).ToNot(BeNil())
+			Expect(captured.EncryptionParameters.KekKeyId).To(Equal("kid"))
+		})
+
+		It("should never set encryption parameters when restoring from a backup source", func() {
+			req := &csi.CreateVolumeRequest{
+				Name:               "backup restore",
+				VolumeCapabilities: stdVolCaps,
+				CapacityRange:      stdCapRange,
+				Parameters: map[string]string{
+					"encrypted":         "true",
+					"type":              "perf1",
+					"kmsServiceAccount": "sa",
+					"kmsKeyID":          "kid",
+					"kmsKeyringID":      "krid",
+					"kmsKeyVersion":     "1",
+				},
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Snapshot{
+						Snapshot: &csi.VolumeContentSource_SnapshotSource{SnapshotId: "source-id"},
+					},
+				},
+			}
+
+			iaasClient.EXPECT().GetVolumesByName(gomock.Any(), "backup restore").Return([]iaas.Volume{}, nil)
+			// Snapshot lookup misses, so the source is resolved as a backup.
+			iaasClient.EXPECT().GetSnapshot(gomock.Any(), "source-id").
+				Return(nil, &oapierror.GenericOpenAPIError{StatusCode: http.StatusNotFound})
+			iaasClient.EXPECT().GetBackup(gomock.Any(), "source-id").
+				Return(&iaas.Backup{Id: new("source-id"), Status: new(stackitclient.SnapshotReadyStatus)}, nil)
+
+			var captured iaas.CreateVolumePayload
+			iaasClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
+					captured = payload
+					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
+				})
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+
+			_, err := fakeCs.CreateVolume(context.Background(), req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(captured.Source).ToNot(BeNil())
+			Expect(captured.Source.Type).To(Equal(string(stackitclient.BackupSource)))
+			Expect(captured.EncryptionParameters).To(BeNil())
+		})
+
 		It("should not accept an empty volume name", func() {
 			req := &csi.CreateVolumeRequest{
 				Name: "",
@@ -654,18 +728,44 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		})
 	})
 	Describe("ControllerPublishVolume", func() {
-		It("should successfully attach volume to node", func() {
+		It("should attach the volume without any pre-checks", func() {
 			req := &csi.ControllerPublishVolumeRequest{
 				VolumeId:         "fake",
 				NodeId:           "fake",
 				VolumeCapability: stdVolCap,
 			}
-			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{Status: new("AVAILABLE")}, nil)
-			iaasClient.EXPECT().GetServer(gomock.Any(), "fake").Return(&iaas.Server{}, nil)
-			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(req.VolumeId, nil)
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(nil)
 			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should verify the attachment when the attach API reports a conflict", func() {
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "fake",
+				NodeId:           "fake",
+				VolumeCapability: stdVolCap,
+			}
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusConflict,
+			})
+			iaasClient.EXPECT().WaitDiskAttached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
+			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should return not found when the attach API reports not found", func() {
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "fake",
+				NodeId:           "fake",
+				VolumeCapability: stdVolCap,
+			}
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
+			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
+			Expect(err).To(HaveOccurred())
+			Expect(status.Code(err)).To(Equal(codes.NotFound))
 		})
 
 		It("should return resource exhausted when node cannot attach more disks", func() {
@@ -674,9 +774,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				NodeId:           "fake",
 				VolumeCapability: stdVolCap,
 			}
-			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{Status: new("AVAILABLE")}, nil)
-			iaasClient.EXPECT().GetServer(gomock.Any(), req.NodeId).Return(&iaas.Server{}, nil)
-			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return("", &oapierror.GenericOpenAPIError{
+			iaasClient.EXPECT().AttachVolume(gomock.Any(), req.NodeId, req.VolumeId, gomock.Any()).Return(&oapierror.GenericOpenAPIError{
 				StatusCode: http.StatusForbidden,
 				Body:       []byte("maximum allowed number of disk devices"),
 			})
@@ -688,14 +786,25 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 		})
 	})
 	Describe("ControllerUnpublishVolume", func() {
-		It("should successfully detach volume from node", func() {
+		It("should detach the volume without a server pre-check", func() {
 			req := &csi.ControllerUnpublishVolumeRequest{
 				VolumeId: "fake",
 				NodeId:   "fake",
 			}
-			iaasClient.EXPECT().GetServer(gomock.Any(), "fake").Return(&iaas.Server{}, nil)
 			iaasClient.EXPECT().DetachVolume(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
 			iaasClient.EXPECT().WaitDiskDetached(gomock.Any(), req.NodeId, req.VolumeId).Return(nil)
+			_, err := fakeCs.ControllerUnpublishVolume(context.Background(), req)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		It("should treat a not-found detach as success", func() {
+			req := &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "fake",
+				NodeId:   "fake",
+			}
+			iaasClient.EXPECT().DetachVolume(gomock.Any(), req.NodeId, req.VolumeId).Return(&oapierror.GenericOpenAPIError{
+				StatusCode: http.StatusNotFound,
+			})
 			_, err := fakeCs.ControllerUnpublishVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
 		})

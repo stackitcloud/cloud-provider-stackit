@@ -237,10 +237,10 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	// The encryption config is already set for volumes created from snapshot or volume. We MUST never set it when
-	// restoring from snapshot or volume.
-	// This is not true for volumeSourceType == Backup. The encryptionConfig must be set BUT the parameters can be different.
-	if volParams.Encrypted != nil && (volumeSourceType == "" || volumeSourceType == stackitclient.BackupSource) {
+	// A volume created from a content source (backup, snapshot or volume) inherits its
+	// encryption from that source; IaaS sets it. We MUST never send EncryptionParameters
+	// for such a restore. Only a fresh volume (i.e. without a source source) takes encryption parameters.
+	if volParams.Encrypted != nil && volumeSourceType == "" {
 		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")
@@ -351,45 +351,26 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Error(codes.InvalidArgument, "[ControllerPublishVolume] Volume capability must be provided")
 	}
 
-	vol, err := cloud.GetVolume(ctx, volumeID)
-	if err != nil {
-		if stackiterrors.IsNotFound(err) {
-			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Volume %s not found", volumeID)
-		}
-		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] get volume failed with error %v", err)
-	}
-
-	_, err = cloud.GetServer(ctx, instanceID)
-	if err != nil {
-		if stackiterrors.IsNotFound(err) {
-			return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] Instance %s not found", instanceID)
-		}
-		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] GetInstanceByID failed with error %v", err)
-	}
-
-	// If Volume is already mounted to target instanceID, return OK
-	if vol.ServerId != nil && *vol.ServerId == instanceID {
-		return &csi.ControllerPublishVolumeResponse{}, nil
-	}
-
-	if vol.GetStatus() != stackitclient.VolumeAvailableStatus {
-		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Volume %s is not in an READY state. Got:%s Want:%s", volumeID, vol.GetStatus(), stackitclient.VolumeAvailableStatus)
-	}
-
+	// No pre-checks: IaaS validates the request (volume/server existence, state,
+	// attach limits) and returns the corresponding error from the attach API.
 	payload := iaas.AddVolumeToServerPayload{
 		DeleteOnTermination: new(false),
 	}
-	_, err = cloud.AttachVolume(ctx, instanceID, volumeID, payload)
-	if err != nil {
-		// Trigger's an immediate `NodeGetInfo` RPC call when MutableCSINodeAllocatableCount is enabled
-		if stackiterrors.IsTooManyDevicesError(err) {
-			return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
-		}
+	switch err := cloud.AttachVolume(ctx, instanceID, volumeID, payload); {
+	case err == nil:
+	case stackiterrors.IsTooManyDevicesError(err):
+		return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
+	case stackiterrors.IsNotFound(err):
+		return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] volume %s or server %s not found: %v", volumeID, instanceID, err)
+	case stackiterrors.IsConflict(err):
+		// The attachment already exists. WaitDiskAttached verifies whether the attachment is ours before we report success.
+		klog.V(4).Infof("[ControllerPublishVolume] AttachVolume %s on %s conflicted, verifying attachment state: %v", volumeID, instanceID, err)
+	default:
 		klog.Errorf("Failed to AttachVolume: %v", err)
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error %v", err)
 	}
 
-	err = cloud.WaitDiskAttached(ctx, instanceID, volumeID)
+	err := cloud.WaitDiskAttached(ctx, instanceID, volumeID)
 	if err != nil {
 		klog.Errorf("Failed to WaitDiskAttached: %v", err)
 		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] failed to attach volume: %v", err)
@@ -412,16 +393,10 @@ func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	if volumeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "[ControllerUnpublishVolume] Volume ID must be provided")
 	}
-	_, err := cloud.GetServer(ctx, instanceID)
-	if err != nil {
-		if stackiterrors.IsNotFound(err) {
-			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because node %s does not exist", volumeID, instanceID)
-			return &csi.ControllerUnpublishVolumeResponse{}, nil
-		}
-		return nil, status.Errorf(codes.Internal, "[ControllerUnpublishVolume] GetInstanceByID failed with error %v", err)
-	}
 
-	err = cloud.DetachVolume(ctx, instanceID, volumeID)
+	// No server existence pre-check: IaaS returns not-found when the server (or the
+	// attachment) is already gone, which we treat as a successful detach below.
+	err := cloud.DetachVolume(ctx, instanceID, volumeID)
 	if err != nil {
 		if stackiterrors.IsNotFound(err) {
 			klog.V(3).Infof("ControllerUnpublishVolume assuming volume %s is detached, because it does not exist", volumeID)
