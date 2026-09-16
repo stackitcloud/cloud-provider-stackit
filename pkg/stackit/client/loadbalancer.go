@@ -40,7 +40,7 @@ func NewLoadBalancingClient(region, projectID string, options []sdkconfig.Config
 }
 
 func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *loadbalancer.CreateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+	return execute(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
 		return l.Client.
 			CreateLoadBalancer(ctx, l.projectID, l.region).
 			CreateLoadBalancerPayload(*payload).
@@ -50,7 +50,7 @@ func (l *loadBalancingClient) CreateLoadBalancer(ctx context.Context, payload *l
 }
 
 func (l *loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]any, error) {
+	_, err := execute(ctx, func(ctx context.Context) (map[string]any, error) {
 		return l.Client.
 			DeleteLoadBalancer(ctx, l.projectID, l.region, lbName).
 			Execute()
@@ -59,7 +59,7 @@ func (l *loadBalancingClient) DeleteLoadBalancer(ctx context.Context, lbName str
 }
 
 func (l *loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string) (*loadbalancer.LoadBalancer, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+	return execute(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
 		return l.Client.
 			GetLoadBalancer(ctx, l.projectID, l.region, lbName).
 			Execute()
@@ -67,7 +67,7 @@ func (l *loadBalancingClient) GetLoadBalancer(ctx context.Context, lbName string
 }
 
 func (l *loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName string, updates *loadbalancer.UpdateLoadBalancerPayload) (*loadbalancer.LoadBalancer, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
+	return execute(ctx, func(ctx context.Context) (*loadbalancer.LoadBalancer, error) {
 		return l.Client.
 			UpdateLoadBalancer(ctx, l.projectID, l.region, lbName).
 			UpdateLoadBalancerPayload(*updates).
@@ -76,7 +76,7 @@ func (l *loadBalancingClient) UpdateLoadBalancer(ctx context.Context, lbName str
 }
 
 func (l *loadBalancingClient) UpdateTargetPool(ctx context.Context, name, targetPoolName string, payload loadbalancer.UpdateTargetPoolPayload) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (*loadbalancer.TargetPool, error) {
+	_, err := execute(ctx, func(ctx context.Context) (*loadbalancer.TargetPool, error) {
 		return l.Client.
 			UpdateTargetPool(ctx, l.projectID, l.region, name, targetPoolName).
 			UpdateTargetPoolPayload(payload).
@@ -86,7 +86,7 @@ func (l *loadBalancingClient) UpdateTargetPool(ctx context.Context, name, target
 }
 
 func (l *loadBalancingClient) CreateCredentials(ctx context.Context, payload loadbalancer.CreateCredentialsPayload) (*loadbalancer.CreateCredentialsResponse, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.CreateCredentialsResponse, error) {
+	return execute(ctx, func(ctx context.Context) (*loadbalancer.CreateCredentialsResponse, error) {
 		return l.Client.
 			CreateCredentials(ctx, l.projectID, l.region).
 			CreateCredentialsPayload(payload).
@@ -96,7 +96,7 @@ func (l *loadBalancingClient) CreateCredentials(ctx context.Context, payload loa
 }
 
 func (l *loadBalancingClient) ListCredentials(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
+	return execute(ctx, func(ctx context.Context) (*loadbalancer.ListCredentialsResponse, error) {
 		return l.Client.
 			ListCredentials(ctx, l.projectID, l.region).
 			Execute()
@@ -104,7 +104,7 @@ func (l *loadBalancingClient) ListCredentials(ctx context.Context) (*loadbalance
 }
 
 func (l *loadBalancingClient) UpdateCredentials(ctx context.Context, credentialsRef string, payload loadbalancer.UpdateCredentialsPayload) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (*loadbalancer.UpdateCredentialsResponse, error) {
+	_, err := execute(ctx, func(ctx context.Context) (*loadbalancer.UpdateCredentialsResponse, error) {
 		return l.Client.
 			UpdateCredentials(ctx, l.projectID, l.region, credentialsRef).
 			UpdateCredentialsPayload(payload).
@@ -114,7 +114,7 @@ func (l *loadBalancingClient) UpdateCredentials(ctx context.Context, credentials
 }
 
 func (l *loadBalancingClient) DeleteCredentials(ctx context.Context, credentialsRef string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (map[string]any, error) {
+	_, err := execute(ctx, func(ctx context.Context) (map[string]any, error) {
 		return l.Client.
 			DeleteCredentials(ctx, l.projectID, l.region, credentialsRef).
 			Execute()
