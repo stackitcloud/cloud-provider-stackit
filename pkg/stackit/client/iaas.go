@@ -109,19 +109,19 @@ func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOp
 }
 
 func (i *iaasClient) GetServer(ctx context.Context, serverID string) (*iaas.Server, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Server, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Server, error) {
 		return i.Client.GetServer(ctx, i.projectID, i.region, serverID).Execute()
 	})
 }
 
 func (i *iaasClient) GetServerWithDetails(ctx context.Context, serverID string) (*iaas.Server, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Server, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Server, error) {
 		return i.Client.GetServer(ctx, i.projectID, i.region, serverID).Details(true).Execute()
 	})
 }
 
 func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*[]iaas.Server, error) {
+	return execute(ctx, func(ctx context.Context) (*[]iaas.Server, error) {
 		resp, err := i.Client.ListServers(ctx, i.projectID, i.region).Details(true).Execute()
 		if err != nil {
 			return nil, err
@@ -133,7 +133,7 @@ func (i *iaasClient) ListServers(ctx context.Context) (*[]iaas.Server, error) {
 
 //nolint:gocritic // Payload is passed by value to match the shared IaaSClient interface.
 func (i *iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnapshotPayload) (*iaas.Snapshot, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.
 			CreateSnapshot(ctx, i.projectID, i.region).
 			CreateSnapshotPayload(payload).
@@ -142,7 +142,7 @@ func (i *iaasClient) CreateSnapshot(ctx context.Context, payload iaas.CreateSnap
 }
 
 func (i *iaasClient) ListSnapshots(ctx context.Context, filters map[string]string) ([]iaas.Snapshot, string, error) {
-	resp, err := withResponseID(ctx, func(ctx context.Context) (*iaas.SnapshotListResponse, error) {
+	resp, err := execute(ctx, func(ctx context.Context) (*iaas.SnapshotListResponse, error) {
 		return i.Client.ListSnapshotsInProject(ctx, i.projectID, i.region).Execute()
 	})
 	if err != nil {
@@ -155,14 +155,14 @@ func (i *iaasClient) ListSnapshots(ctx context.Context, filters map[string]strin
 }
 
 func (i *iaasClient) DeleteSnapshot(ctx context.Context, snapshotID string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+	_, err := execute(ctx, func(ctx context.Context) (any, error) {
 		return nil, i.Client.DeleteSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
 	})
 	return err
 }
 
 func (i *iaasClient) GetSnapshot(ctx context.Context, snapshotID string) (*iaas.Snapshot, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.GetSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
 	})
 }
@@ -197,7 +197,7 @@ func (i *iaasClient) WaitSnapshotReady(ctx context.Context, snapshotID string) (
 }
 
 func (i *iaasClient) snapshotIsReady(ctx context.Context, snapshotID string) (bool, error) {
-	snapshot, err := withResponseID(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
+	snapshot, err := execute(ctx, func(ctx context.Context) (*iaas.Snapshot, error) {
 		return i.Client.GetSnapshot(ctx, i.projectID, i.region, snapshotID).Execute()
 	})
 	if err != nil {
@@ -213,7 +213,7 @@ func (i *iaasClient) CreateBackup(ctx context.Context, name, volID, snapshotID s
 		return nil, err
 	}
 
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Backup, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Backup, error) {
 		return i.Client.
 			CreateBackup(ctx, i.projectID, i.region).
 			CreateBackupPayload(payload).
@@ -257,7 +257,7 @@ func BuildCreateBackupPayload(name, volID, snapshotID string, tags map[string]st
 }
 
 func (i *iaasClient) ListBackups(ctx context.Context, filters map[string]string) ([]iaas.Backup, error) {
-	resp, err := withResponseID(ctx, func(ctx context.Context) (*iaas.BackupListResponse, error) {
+	resp, err := execute(ctx, func(ctx context.Context) (*iaas.BackupListResponse, error) {
 		return i.Client.ListBackups(ctx, i.projectID, i.region).Execute()
 	})
 	if err != nil {
@@ -270,14 +270,14 @@ func (i *iaasClient) ListBackups(ctx context.Context, filters map[string]string)
 }
 
 func (i *iaasClient) DeleteBackup(ctx context.Context, backupID string) error {
-	_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+	_, err := execute(ctx, func(ctx context.Context) (any, error) {
 		return nil, i.Client.DeleteBackup(ctx, i.projectID, i.region, backupID).Execute()
 	})
 	return err
 }
 
 func (i *iaasClient) GetBackup(ctx context.Context, backupID string) (*iaas.Backup, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Backup, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Backup, error) {
 		return i.Client.GetBackup(ctx, i.projectID, i.region, backupID).Execute()
 	})
 }
@@ -341,7 +341,7 @@ func (i *iaasClient) backupIsReady(ctx context.Context, backupID string) (bool, 
 func (i *iaasClient) CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error) {
 	payload.Description = new(VolumeDescription)
 
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Volume, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Volume, error) {
 		return i.Client.CreateVolume(ctx, i.projectID, i.region).CreateVolumePayload(payload).Execute()
 	})
 }
@@ -355,7 +355,7 @@ func (i *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 		return fmt.Errorf("cannot delete the volume %q, it's still attached to a node", volumeID)
 	}
 
-	_, err = withResponseID(ctx, func(ctx context.Context) (any, error) {
+	_, err = execute(ctx, func(ctx context.Context) (any, error) {
 		return nil, i.Client.DeleteVolume(ctx, i.projectID, i.region, volumeID).Execute()
 	})
 	return err
@@ -372,7 +372,7 @@ func (i *iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string
 		return *volume.Id, nil
 	}
 
-	_, err = withResponseID(ctx, func(ctx context.Context) (any, error) {
+	_, err = execute(ctx, func(ctx context.Context) (any, error) {
 		return i.Client.
 			AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
 			AddVolumeToServerPayload(payload).
@@ -386,13 +386,13 @@ func (i *iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string
 }
 
 func (i *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
-	return withResponseID(ctx, func(ctx context.Context) (*iaas.Volume, error) {
+	return execute(ctx, func(ctx context.Context) (*iaas.Volume, error) {
 		return i.Client.GetVolume(ctx, i.projectID, i.region, volumeID).Execute()
 	})
 }
 
 func (i *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error) {
-	resp, err := withResponseID(ctx, func(ctx context.Context) (*iaas.VolumeListResponse, error) {
+	resp, err := execute(ctx, func(ctx context.Context) (*iaas.VolumeListResponse, error) {
 		return i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
 	})
 	if err != nil {
@@ -407,7 +407,7 @@ func (i *iaasClient) GetVolumesByName(ctx context.Context, volName string) ([]ia
 
 func (i *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error) {
 	// TODO: Add support for pagination when IaaS adds it
-	resp, err := withResponseID(ctx, func(ctx context.Context) (*iaas.VolumeListResponse, error) {
+	resp, err := execute(ctx, func(ctx context.Context) (*iaas.VolumeListResponse, error) {
 		return i.Client.ListVolumes(ctx, i.projectID, i.region).Execute()
 	})
 	if err != nil {
@@ -420,7 +420,7 @@ func (i *iaasClient) ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.V
 func (i *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error {
 	switch volumeStatus {
 	case VolumeAttachedStatus, VolumeAvailableStatus:
-		_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+		_, err := execute(ctx, func(ctx context.Context) (any, error) {
 			return nil, i.Client.
 				ResizeVolume(ctx, i.projectID, i.region, volumeID).
 				ResizeVolumePayload(payload).
@@ -525,7 +525,7 @@ func (i *iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string
 	}
 
 	if volume.ServerId != nil && *volume.ServerId == serverID {
-		_, err := withResponseID(ctx, func(ctx context.Context) (any, error) {
+		_, err := execute(ctx, func(ctx context.Context) (any, error) {
 			err := i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
 			if err != nil {
 				return nil, fmt.Errorf("failed to detach volume %s from compute %s : %w", *volume.Name, serverID, err)
