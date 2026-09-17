@@ -973,11 +973,12 @@ func (c *MockIaaSClientWaitVolumeTargetStatusCall) DoAndReturn(f func(context.Co
 }
 
 // WaitVolumeTargetStatusWithCustomBackoff mocks base method.
-func (m *MockIaaSClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
+func (m *MockIaaSClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*v2api.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitVolumeTargetStatusWithCustomBackoff", ctx, volumeID, tStatus, backoff)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*v2api.Volume)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // WaitVolumeTargetStatusWithCustomBackoff indicates an expected call of WaitVolumeTargetStatusWithCustomBackoff.
@@ -993,19 +994,19 @@ type MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Return(arg0 error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Return(arg0 *v2api.Volume, arg1 error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Do(f func(context.Context, string, []string, *wait.Backoff) error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) Do(f func(context.Context, string, []string, wait.Backoff) (*v2api.Volume, error)) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) DoAndReturn(f func(context.Context, string, []string, *wait.Backoff) error) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
+func (c *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall) DoAndReturn(f func(context.Context, string, []string, wait.Backoff) (*v2api.Volume, error)) *MockIaaSClientWaitVolumeTargetStatusWithCustomBackoffCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
