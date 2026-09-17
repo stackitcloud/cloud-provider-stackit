@@ -132,9 +132,13 @@ verify-image-stackit-csi-plugin: image-stackit-csi-plugin
 	@echo "verifying binaries in image"
 	@docker run -v ./tools/csi-deps-check.sh:/tools/csi-deps-check.sh --entrypoint=/tools/csi-deps-check.sh $(REGISTRY)/$(REPO)/stackit-csi-plugin-dev:$(VERSION)
 
+KUBETEST2_STACKIT := $(TOOLS_BIN_DIR)/kubetest2-stackit
+$(KUBETEST2_STACKIT): go.mod go.sum $(shell find ./test ./pkg -name '*.go' 2>/dev/null)
+	go build -trimpath -o $@ ./test
+
 .PHONY: test-e2e
-test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO)
-	go run ./test \
+test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_STACKIT)
+	$(KUBETEST2_STACKIT) \
 	--up \
 	--down \
 	--test=ginkgo \
