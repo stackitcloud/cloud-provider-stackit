@@ -162,7 +162,8 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_S
 	--skip-regex="\[Feature:|\[Disruptive\]|\[Serial\]" \
 	--ginkgo-args="-v" \
 	--parallel="$(E2E_PARALLEL_NODES)" \
-	--test-args="--storage.testdriver=$(CURDIR)/_rundir/$(E2E_RUN_ID)/csi-testdriver.yaml"
+	--test-args="--storage.testdriver=$(CURDIR)/_rundir/$(E2E_RUN_ID)/csi-testdriver.yaml" \
+	--timeout="90m"
 
 # generate mock types for the following services (space-separated list)
 .PHONY: mocks
