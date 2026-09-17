@@ -124,7 +124,7 @@ verify-e2e-csi: $(KUBERNETES_TEST)
   	-focus=$(FOCUS) \
 	-skip=$(SKIP) \
   	$(KUBERNETES_TEST) -- \
-    -storage.testdriver=$(PWD)/test/csi-plugin/block-storage.yaml
+    -storage.testdriver=$(CURDIR)/test/csi-plugin/block-storage.yaml
 
 verify-image-stackit-csi-plugin: LOCAL = true
 verify-image-stackit-csi-plugin: APKO_EXTRA_PACKAGES = busybox
@@ -139,7 +139,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO)
 	--down \
 	--test=ginkgo \
 	--run-id "$(E2E_RUN_ID)" \
-	--rundir "_rundir" \
+	--rundir "$(CURDIR)/_rundir" \
 	--region "eu01" \
 	--kubernetes-version "$(E2E_K8S_VERSION)" \
 	--availability-zone "eu01-1" \
@@ -158,7 +158,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO)
 	--skip-regex="\[Feature:|\[Disruptive\]|\[Serial\]" \
 	--ginkgo-args="-v" \
 	--parallel="$(E2E_PARALLEL_NODES)" \
-	--test-args="--storage.testdriver=$(PWD)/_rundir/$(E2E_RUN_ID)/csi-testdriver.yaml"
+	--test-args="--storage.testdriver=$(CURDIR)/_rundir/$(E2E_RUN_ID)/csi-testdriver.yaml"
 
 # generate mock types for the following services (space-separated list)
 .PHONY: mocks
