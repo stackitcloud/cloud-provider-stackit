@@ -138,7 +138,7 @@ $(KUBETEST2_STACKIT): go.mod go.sum $(shell find ./test ./pkg -name '*.go' 2>/de
 
 .PHONY: test-e2e
 test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_STACKIT)
-	$(KUBETEST2_STACKIT) \
+	exec $(KUBETEST2_STACKIT) \
 	--up \
 	--down \
 	--test=ginkgo \
