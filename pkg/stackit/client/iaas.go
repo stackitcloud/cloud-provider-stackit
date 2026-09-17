@@ -12,7 +12,6 @@ import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 type iaasClient struct {
@@ -49,12 +48,13 @@ type IaaSClient interface {
 	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
-	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
+	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*iaas.Volume, error)
 }
 
 const (
 	VolumeAvailableStatus    = "AVAILABLE"
 	VolumeAttachedStatus     = "ATTACHED"
+	VolumeErrorStatus        = "ERROR"
 	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
@@ -440,17 +440,27 @@ func (i *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string
 		Steps:    operationFinishSteps,
 	}
 
+	_, err := i.WaitVolumeTargetStatusWithCustomBackoff(ctx, volumeID, tStatus, backoff)
+	return err
+}
+
+func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*iaas.Volume, error) {
+	var lastVolume *iaas.Volume
+
 	waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		vol, err := i.GetVolume(ctx, volumeID)
+		volume, err := i.GetVolume(ctx, volumeID)
 		if err != nil {
 			return false, err
 		}
-		if slices.Contains(tStatus, *vol.Status) {
+
+		lastVolume = volume
+
+		if slices.Contains(tStatus, volume.GetStatus()) {
 			return true, nil
 		}
 		for _, eState := range volumeErrorStates {
-			if *vol.Status == eState {
-				return false, fmt.Errorf("volume is in Error State : %s", ptr.Deref(vol.Status, ""))
+			if volume.GetStatus() == eState {
+				return false, fmt.Errorf("volume is in Error State : %s", volume.GetStatus())
 			}
 		}
 		return false, nil
@@ -460,7 +470,7 @@ func (i *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string
 		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
 	}
 
-	return waitErr
+	return lastVolume, waitErr
 }
 
 func (i *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
@@ -540,30 +550,6 @@ func (i *iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string
 	}
 
 	return nil
-}
-
-func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
-	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
-		vol, err := i.GetVolume(ctx, volumeID)
-		if err != nil {
-			return false, err
-		}
-		if slices.Contains(tStatus, *vol.Status) {
-			return true, nil
-		}
-		for _, eState := range volumeErrorStates {
-			if *vol.Status == eState {
-				return false, fmt.Errorf("volume is in error state: %s", *vol.Status)
-			}
-		}
-		return false, nil
-	})
-
-	if wait.Interrupted(waitErr) {
-		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
-	}
-
-	return waitErr
 }
 
 // diskIsAttached queries if a volume is attached to a compute instance
