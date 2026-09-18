@@ -362,10 +362,10 @@ func projectResponseFixture(name, projectID, containerID string, labels map[stri
 	return project
 }
 
-func serviceAccountFixture(email, projectID string) *serviceaccount.ServiceAccount {
+func serviceAccountFixture(email string) *serviceaccount.ServiceAccount {
 	serviceAccountObject := serviceaccount.NewServiceAccountWithDefaults()
 	serviceAccountObject.SetEmail(email)
-	serviceAccountObject.SetProjectId(projectID)
+	serviceAccountObject.SetProjectId("project-123")
 	serviceAccountObject.SetId("service-account-id")
 	serviceAccountObject.SetInternal(false)
 	return serviceAccountObject

@@ -30,7 +30,7 @@ var _ = Describe("Up", func() {
 		serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
 		d.serviceAccountClient = &fakeServiceAccountClient{
 			listResult: []serviceaccount.ServiceAccount{
-				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+				*serviceAccountFixture(serviceAccountEmail),
 			},
 		}
 		d.authorizationClient = &fakeAuthorizationClient{

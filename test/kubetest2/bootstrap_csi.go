@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
 	memory "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -153,11 +153,11 @@ func renderKustomize(dir string) ([]*unstructured.Unstructured, error) {
 }
 
 func decodeYAMLToUnstructured(yamlBytes []byte) ([]*unstructured.Unstructured, error) {
-	decoder := k8syaml.NewYAMLOrJSONDecoder(bytes.NewReader(yamlBytes), 4096)
+	decoder := utilyaml.NewYAMLOrJSONDecoder(bytes.NewReader(yamlBytes), 4096)
 	var objects []*unstructured.Unstructured
 
 	for {
-		var rawObj map[string]interface{}
+		var rawObj map[string]any
 		err := decoder.Decode(&rawObj)
 		if err != nil {
 			if err == io.EOF {

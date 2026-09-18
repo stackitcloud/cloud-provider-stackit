@@ -49,7 +49,7 @@ var _ = Describe("ensureServiceAccount", func() {
 		serviceAccountEmail := d.serviceAccountName() + "-aBc2defg@sa.stackit.cloud"
 		serviceAccountClient := &fakeServiceAccountClient{
 			listResult: []serviceaccount.ServiceAccount{
-				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+				*serviceAccountFixture(serviceAccountEmail),
 			},
 		}
 		authorizationClient := &fakeAuthorizationClient{
@@ -81,7 +81,7 @@ var _ = Describe("ensureServiceAccount", func() {
 		serviceAccountEmail := d.serviceAccountName() + "-aBc2defg@sa.stackit.cloud"
 		serviceAccountClient := &fakeServiceAccountClient{
 			listResult: []serviceaccount.ServiceAccount{
-				*serviceAccountFixture(serviceAccountEmail, "project-123"),
+				*serviceAccountFixture(serviceAccountEmail),
 			},
 			createKeyResult: createServiceAccountKeyResponseFixture(serviceAccountEmail),
 		}
@@ -121,7 +121,7 @@ var _ = Describe("ensureServiceAccount", func() {
 
 		serviceAccountEmail := d.serviceAccountName() + "-aBc2defg@sa.stackit.cloud"
 		serviceAccountClient := &fakeServiceAccountClient{
-			createResult:    serviceAccountFixture(serviceAccountEmail, "project-123"),
+			createResult:    serviceAccountFixture(serviceAccountEmail),
 			createKeyResult: createServiceAccountKeyResponseFixture(serviceAccountEmail),
 		}
 		authorizationClient := &fakeAuthorizationClient{}
