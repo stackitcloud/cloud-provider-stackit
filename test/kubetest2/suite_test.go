@@ -101,9 +101,9 @@ func (c *fakeProjectClient) WaitForProjectDeleted(_ context.Context, projectID s
 }
 
 type fakeServiceAccountClient struct {
-	listResult []serviceaccount.ServiceAccount
+	listResult  []serviceaccount.ServiceAccount
 	listResults [][]serviceaccount.ServiceAccount
-	listErr    error
+	listErr     error
 
 	createResult *serviceaccount.ServiceAccount
 	createErr    error
