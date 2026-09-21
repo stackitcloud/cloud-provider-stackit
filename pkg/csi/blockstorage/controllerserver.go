@@ -241,6 +241,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// encryption from that source; IaaS sets it. We MUST never send EncryptionParameters
 	// for such a restore. Only a fresh volume (i.e. without a source source) takes encryption parameters.
 	if volParams.Encrypted != nil && volumeSourceType == "" {
+		klog.V(1).Infof("CreateVolume: setting up encryption parameters, encrypted: %v", volParams.Encrypted)
 		encrypted, err := strconv.ParseBool(*volParams.Encrypted)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "parameter encrypted must be of type boolean")
@@ -250,6 +251,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 				return nil, status.Errorf(codes.InvalidArgument, "Failed to set volume encryption parameters: %v", err)
 			}
 		}
+	} else {
+		klog.V(1).Infof("CreateVolume: no encryption parameters for volume source type %v", volumeSourceType)
 	}
 
 	vol, err := cloud.CreateVolume(ctx, *opts)
