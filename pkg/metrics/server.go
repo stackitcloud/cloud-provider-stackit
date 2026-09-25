@@ -13,7 +13,7 @@ import (
 
 func Run(ctx context.Context, metricsAddr string) error {
 	if metricsAddr == "" {
-		return errors.New("metrics address is empty")
+		return nil
 	}
 
 	klog.Infof("Starting prometheus listener on address %s", metricsAddr)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -46,13 +45,13 @@ func main() {
 	additionalFlags := cliflag.NamedFlagSets{}
 
 	// setup context
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer cancel()
 
 	// setup metrics
 	metricsAddressFlag = additionalFlags.FlagSet("metrics").String("metrics-address", defaultMetricsAddress, "set the prometheus metrics endpoint")
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer(ctx), controllerInitializers, controllerAliases, additionalFlags, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer(ctx), controllerInitializers, controllerAliases, additionalFlags, ctx.Done())
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	logs.InitLogs()
 	defer logs.FlushLogs()

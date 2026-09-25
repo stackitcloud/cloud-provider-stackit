@@ -27,13 +27,28 @@ $(BUILD_IMAGES): $(SOURCES) ensure-bin-dir
 		-trimpath \
 		-ldflags $(LDFLAGS) \
 		-o bin/$@ \
-		cmd/$@/main.go
+		./cmd/$@/main.go
 
 ensure-bin-dir:
 	@mkdir bin || true
 
 .PHONY: images
 images: $(foreach image,$(BUILD_IMAGES),image-$(image))
+
+CCM_CONTROLLERS ?= node-route-controller
+CCM_CLUSTER_NAME ?= kubernetes
+CCM_CLUSTER_CIDR ?= 100.64.0.0/13
+run-cloud-controller-manager: cloud-controller-manager 
+	STACKIT_SERVICE_ACCOUNT_TOKEN=$$(stackit auth get-access-token -o pretty) \
+		bin/cloud-controller-manager --cloud-provider=stackit \
+		--cluster-name=$(CCM_CLUSTER_NAME) \
+		--controllers=$(CCM_CONTROLLERS) \
+		--cloud-config=dev/config.yaml \
+		--cluster-cidr $(CCM_CLUSTER_CIDR) \
+		--secure-port=0 \
+		--metrics-address="" \
+		--leader-elect=false \
+		--kubeconfig=$${KUBECONFIG}
 
 # lazy reference, evaluated when called
 LOCAL = false
