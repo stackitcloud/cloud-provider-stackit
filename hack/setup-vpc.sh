@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
+PROJECT_ID=$1
+
+if [[ -z $PROJECT_ID ]]; then
+  echo "must provide project ID as arg 1"
+  exit 1
+fi
+
 IAAS_API=${IAAS_API:="iaas.api.stackit.cloud"}
 REGION=${REGION:="eu01"}
 CLUSTER=${CLUSTER:="kubernetes"}
