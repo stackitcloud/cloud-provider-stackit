@@ -120,9 +120,9 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 	if err != nil {
 		return nil, err
 	}
-	routes := make([]route, 0, len(iaasRoutes))
+	routes := make([]*route, 0, len(iaasRoutes))
 	for _, iaasRoute := range iaasRoutes {
-		route, err := r.routeFromIaas(iaasRoute)
+		route, err := routeFromIaas(&iaasRoute)
 		if err != nil {
 			return nil, fmt.Errorf("casting route from iaas.Route: %w", err)
 		}
@@ -131,8 +131,10 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 	return routes, nil
 }
 
+// routesFromCloudprovider parses [cloudprovider.Route] into the in-memory route representation.
+// A [cloudprovider.Route] can results in multiple in-memory routes since we need 1 route per node IP
 func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (routes, error) {
-	var routes []route
+	var routes []*route
 	for _, nodeAddr := range cloudroute.TargetNodeAddresses {
 		if nodeAddr.Type != v1.NodeInternalIP {
 			continue
@@ -147,7 +149,7 @@ func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (route
 		if err != nil {
 			return nil, fmt.Errorf("parsing route destinationCIDR %s: %w", cloudroute.DestinationCIDR, err)
 		}
-		routes = append(routes, route{
+		routes = append(routes, &route{
 			Blackhole:       cloudroute.Blackhole,
 			DestinationCIDR: destinationCIDR,
 			NodeName:        string(cloudroute.TargetNode),
@@ -157,57 +159,17 @@ func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (route
 	return routes, nil
 }
 
-func (r *Routes) routeFromIaas(iaasRoute iaas.Route) (route, error) {
-	dest := iaasRoute.GetDestination()
-	var destinationString string
-	if dest.DestinationCIDRv4 != nil {
-		destinationString = dest.DestinationCIDRv4.Value
-	}
-	if dest.DestinationCIDRv6 != nil {
-		destinationString = dest.DestinationCIDRv6.Value
-	}
-	var destinationPrefix netip.Prefix
-	if destinationString != "" {
-		var err error
-		destinationPrefix, err = netip.ParsePrefix(destinationString)
-		if err != nil {
-			return route{}, fmt.Errorf("parsing destination CIDR %s: %w ", destinationString, err)
-		}
-	}
-
-	var nodeName string
-	nodeNameInterface, ok := iaasRoute.GetLabels()[labelKeyRouteNodeName]
-	if ok {
-		nodeName = nodeNameInterface.(string)
-	}
-
-	nextHop := iaasRoute.GetNexthop()
-	var nextHopString string
-	if nextHop.NexthopIPv4 != nil {
-		nextHopString = nextHop.NexthopIPv4.Value
-	}
-	if nextHop.NexthopIPv6 != nil {
-		nextHopString = nextHop.NexthopIPv6.Value
-	}
-	var nextHopAddr netip.Addr
-	if nextHopString != "" {
-		var err error
-		nextHopAddr, err = netip.ParseAddr(nextHopString)
-		if err != nil {
-			return route{}, fmt.Errorf("parsing nextHop %s: %w ", nextHopString, err)
-		}
-	}
-
-	return route{
-		Blackhole:       iaasRoute.GetNexthop().NexthopBlackhole != nil,
-		DestinationCIDR: destinationPrefix,
-		NodeName:        nodeName,
-		NextHop:         nextHopAddr,
-	}, nil
+// route represents the internal data representation of routes.
+// It can be used to convert to [iaas.Route] as well as to [cloudprovider.Route]
+type route struct {
+	NodeName        string
+	NextHop         netip.Addr
+	Blackhole       bool
+	DestinationCIDR netip.Prefix
 }
 
 // routes is a slice of route to allow methods
-type routes []route
+type routes []*route
 
 func (r routes) ToCloudProvider() []*cloudprovider.Route {
 	nodeToAddr := map[string][]v1.NodeAddress{}
@@ -215,21 +177,18 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 	nodeToDestCIDR := map[string]string{}
 	for _, route := range r {
 		nodeName := route.NodeName
-		var nextHop string
-		if !route.Blackhole {
-			nextHop = route.NextHop.String()
+		nodeBlackhole[nodeName] = route.Blackhole
+		addrs, ok := nodeToAddr[nodeName]
+		if !ok {
+			addrs = []v1.NodeAddress{}
 		}
-
-		if nextHop == "" {
-			nodeBlackhole[nodeName] = true
-			nodeToAddr[nodeName] = []v1.NodeAddress{}
-		} else {
-			addr := v1.NodeAddress{
+		if !route.NextHop.IsUnspecified() {
+			addrs = append(addrs, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,
-				Address: nextHop,
-			}
-			nodeToAddr[nodeName] = append(nodeToAddr[nodeName], addr)
+				Address: route.NextHop.String(),
+			})
 		}
+		nodeToAddr[nodeName] = addrs
 		nodeToDestCIDR[nodeName] = route.DestinationCIDR.String()
 	}
 
@@ -245,27 +204,18 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 	return cpRoutes
 }
 
-// route represents the internal data representation of routes.
-// It can be used to convert to [iaas.Route] as well as to [cloudprovider.Route]
-type route struct {
-	NodeName        string
-	NextHop         netip.Addr
-	Blackhole       bool
-	DestinationCIDR netip.Prefix
-}
-
-func (r route) String() string {
+func (r *route) String() string {
 	sb := new(strings.Builder)
 	fmt.Fprintf(sb, "node=%s, nextHop=%s ", r.NodeName, r.NextHop)
 	if r.Blackhole {
 		fmt.Fprint(sb, "blackhole")
 	} else {
-		fmt.Fprint(sb, "destinationCIDR=%s", r.DestinationCIDR)
+		fmt.Fprintf(sb, "destinationCIDR=%s", r.DestinationCIDR)
 	}
 	return sb.String()
 }
 
-func (r route) ToIaasRoute(nameHint, clusterName string) (iaas.Route, error) {
+func (r *route) ToIaasRoute(nameHint, clusterName string) (iaas.Route, error) {
 	nextHop, err := r.iaasNextHop()
 	if err != nil {
 		return iaas.Route{}, err
@@ -283,7 +233,7 @@ func (r route) ToIaasRoute(nameHint, clusterName string) (iaas.Route, error) {
 	}, nil
 }
 
-func (r route) iaasRouteDestination() (iaas.RouteDestination, error) {
+func (r *route) iaasRouteDestination() (iaas.RouteDestination, error) {
 	var dest iaas.RouteDestination
 
 	switch len(r.DestinationCIDR.Addr().AsSlice()) {
@@ -303,7 +253,7 @@ func (r route) iaasRouteDestination() (iaas.RouteDestination, error) {
 	return dest, nil
 }
 
-func (r route) iaasNextHop() (iaas.RouteNexthop, error) {
+func (r *route) iaasNextHop() (iaas.RouteNexthop, error) {
 	nextHop := iaas.RouteNexthop{}
 	if r.Blackhole {
 		nextHop.NexthopBlackhole = &iaas.NexthopBlackhole{
@@ -327,6 +277,55 @@ func (r route) iaasNextHop() (iaas.RouteNexthop, error) {
 	}
 
 	return nextHop, nil
+}
+
+func routeFromIaas(iaasRoute *iaas.Route) (*route, error) {
+	dest := iaasRoute.GetDestination()
+	var destinationString string
+	if dest.DestinationCIDRv4 != nil {
+		destinationString = dest.DestinationCIDRv4.Value
+	}
+	if dest.DestinationCIDRv6 != nil {
+		destinationString = dest.DestinationCIDRv6.Value
+	}
+	var destinationPrefix netip.Prefix
+	if destinationString != "" {
+		var err error
+		destinationPrefix, err = netip.ParsePrefix(destinationString)
+		if err != nil {
+			return nil, fmt.Errorf("parsing destination CIDR %s: %w ", destinationString, err)
+		}
+	}
+
+	var nodeName string
+	nodeNameInterface, ok := iaasRoute.GetLabels()[labelKeyRouteNodeName]
+	if ok {
+		nodeName = nodeNameInterface.(string)
+	}
+
+	nextHop := iaasRoute.GetNexthop()
+	var nextHopString string
+	if nextHop.NexthopIPv4 != nil {
+		nextHopString = nextHop.NexthopIPv4.Value
+	}
+	if nextHop.NexthopIPv6 != nil {
+		nextHopString = nextHop.NexthopIPv6.Value
+	}
+	var nextHopAddr netip.Addr
+	if nextHopString != "" {
+		var err error
+		nextHopAddr, err = netip.ParseAddr(nextHopString)
+		if err != nil {
+			return nil, fmt.Errorf("parsing nextHop %s: %w ", nextHopString, err)
+		}
+	}
+
+	return &route{
+		Blackhole:       iaasRoute.GetNexthop().NexthopBlackhole != nil,
+		DestinationCIDR: destinationPrefix,
+		NodeName:        nodeName,
+		NextHop:         nextHopAddr,
+	}, nil
 }
 
 func routeLabels(nameHint, clusterName, targetNode string) stackitclient.Labels {
