@@ -9,7 +9,7 @@ import (
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -136,7 +136,7 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (routes, error) {
 	var routes []*route
 	for _, nodeAddr := range cloudroute.TargetNodeAddresses {
-		if nodeAddr.Type != v1.NodeInternalIP {
+		if nodeAddr.Type != corev1.NodeInternalIP {
 			continue
 		}
 
@@ -172,7 +172,7 @@ type route struct {
 type routes []*route
 
 func (r routes) ToCloudProvider() []*cloudprovider.Route {
-	nodeToAddr := map[string][]v1.NodeAddress{}
+	nodeToAddr := map[string][]corev1.NodeAddress{}
 	nodeBlackhole := map[string]bool{}
 	nodeToDestCIDR := map[string]string{}
 	for _, route := range r {
@@ -180,11 +180,11 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 		nodeBlackhole[nodeName] = route.Blackhole
 		addrs, ok := nodeToAddr[nodeName]
 		if !ok {
-			addrs = []v1.NodeAddress{}
+			addrs = []corev1.NodeAddress{}
 		}
 		if !route.NextHop.IsUnspecified() {
-			addrs = append(addrs, v1.NodeAddress{
-				Type:    v1.NodeInternalIP,
+			addrs = append(addrs, corev1.NodeAddress{
+				Type:    corev1.NodeInternalIP,
 				Address: route.NextHop.String(),
 			})
 		}

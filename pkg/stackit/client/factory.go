@@ -60,11 +60,11 @@ func New(region, projectID, organizationID, areaID, vpcID string) Factory {
 	}
 }
 
-func (f factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBalancingClient, error) {
+func (f *factory) LoadBalancing(options []sdkconfig.ConfigurationOption) (LoadBalancingClient, error) {
 	return NewLoadBalancingClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options))
 }
 
-func (f factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
+func (f *factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	clientOpts := []Option{}
 	if f.StackitOrganizationID != "" && f.StackitAreaID != "" {
 		clientOpts = append(clientOpts, WithArea(f.StackitOrganizationID, f.StackitAreaID))
