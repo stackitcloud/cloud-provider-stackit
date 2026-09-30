@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-type Labels map[string]string
+type LabelMap map[string]string
 
-func (l Labels) ToSDK() map[string]any {
+func (l LabelMap) ToSDK() map[string]any {
 	sdkLabels := make(map[string]any, len(l))
 	for k, v := range l {
 		sdkLabels[k] = v
@@ -15,7 +15,7 @@ func (l Labels) ToSDK() map[string]any {
 	return sdkLabels
 }
 
-func (l Labels) Selector() string {
+func (l LabelMap) Selector() string {
 	sb := strings.Builder{}
 	for k, v := range l {
 		// prevents trailing comma at the end

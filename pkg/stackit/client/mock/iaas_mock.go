@@ -778,7 +778,7 @@ func (c *MockIaaSClientListBackupsCall) DoAndReturn(f func(context.Context, map[
 }
 
 // ListRoutes mocks base method.
-func (m *MockIaaSClient) ListRoutes(ctx context.Context, routingTableID string, labels client.Labels) ([]v2api.Route, error) {
+func (m *MockIaaSClient) ListRoutes(ctx context.Context, routingTableID string, labels client.LabelMap) ([]v2api.Route, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListRoutes", ctx, routingTableID, labels)
 	ret0, _ := ret[0].([]v2api.Route)
@@ -805,13 +805,13 @@ func (c *MockIaaSClientListRoutesCall) Return(arg0 []v2api.Route, arg1 error) *M
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientListRoutesCall) Do(f func(context.Context, string, client.Labels) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
+func (c *MockIaaSClientListRoutesCall) Do(f func(context.Context, string, client.LabelMap) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientListRoutesCall) DoAndReturn(f func(context.Context, string, client.Labels) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
+func (c *MockIaaSClientListRoutesCall) DoAndReturn(f func(context.Context, string, client.LabelMap) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

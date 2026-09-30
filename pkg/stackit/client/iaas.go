@@ -53,7 +53,7 @@ type IaaSClient interface {
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*iaas.Volume, error)
 
-	ListRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error)
+	ListRoutes(ctx context.Context, routingTableID string, labels LabelMap) ([]iaas.Route, error)
 	AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error
 	GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error)
 	DeleteRoute(ctx context.Context, routingTableID string, routeID string) error
@@ -624,13 +624,13 @@ func (i *iaasClient) diskIsUsed(ctx context.Context, volumeID string) (bool, err
 	return diskUsed, nil
 }
 
-func (i *iaasClient) ListRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error) {
+func (i *iaasClient) ListRoutes(ctx context.Context, routingTableID string, labels LabelMap) ([]iaas.Route, error) {
 	return execute(ctx, func(ctx context.Context) ([]iaas.Route, error) {
 		return i.listRoutes(ctx, routingTableID, labels)
 	})
 }
 
-func (i *iaasClient) listRoutes(ctx context.Context, routingTableID string, labels Labels) ([]iaas.Route, error) {
+func (i *iaasClient) listRoutes(ctx context.Context, routingTableID string, labels LabelMap) ([]iaas.Route, error) {
 	if i.opts.useVPCRoutes {
 		resp, err := i.AlphaClient.ListVPCStaticRoutes(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID).
 			LabelSelector(labels.Selector()).

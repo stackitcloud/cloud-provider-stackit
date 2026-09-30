@@ -53,7 +53,7 @@ var _ = Describe("Routes", func() {
 					Blackhole:       false,
 				}
 
-				expectedLabels := stackitclient.Labels{
+				expectedLabels := stackitclient.LabelMap{
 					labelKeyRouteNameHint: "foo",
 					labelKeyRouteNodeName: "my-node",
 					labelKeyClusterName:   clusterName,
@@ -95,7 +95,7 @@ var _ = Describe("Routes", func() {
 							Value: "10.0.0.0/24",
 						},
 					},
-					Labels: stackitclient.Labels{
+					Labels: stackitclient.LabelMap{
 						labelKeyRouteNameHint: "foo",
 						labelKeyRouteNodeName: "node1",
 						labelKeyClusterName:   clusterName,
@@ -115,7 +115,7 @@ var _ = Describe("Routes", func() {
 							Value: "10.0.1.0/24",
 						},
 					},
-					Labels: stackitclient.Labels{
+					Labels: stackitclient.LabelMap{
 						labelKeyRouteNameHint: "bar",
 						labelKeyRouteNodeName: "node2",
 						labelKeyClusterName:   clusterName,
@@ -129,7 +129,7 @@ var _ = Describe("Routes", func() {
 				},
 			}
 			mockClient.EXPECT().GetRoutingTable(ctx, routingTableID).Return(&iaas.RoutingTable{Id: new(routingTableID)}, nil)
-			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.Labels{
+			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.LabelMap{
 				labelKeyClusterName: clusterName,
 			}).Times(1).Return(existingIaasRoutes, nil)
 
@@ -173,7 +173,7 @@ var _ = Describe("Routes", func() {
 							Value: "10.0.1.0/24",
 						},
 					},
-					Labels: stackitclient.Labels{
+					Labels: stackitclient.LabelMap{
 						labelKeyRouteNameHint: "bar",
 						labelKeyRouteNodeName: "node1",
 						labelKeyClusterName:   clusterName,
@@ -187,7 +187,7 @@ var _ = Describe("Routes", func() {
 				},
 			}
 			mockClient.EXPECT().GetRoutingTable(ctx, routingTableID).Return(&iaas.RoutingTable{Id: new(routingTableID)}, nil)
-			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.Labels{
+			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.LabelMap{
 				labelKeyClusterName:   clusterName,
 				labelKeyRouteNodeName: "node1",
 			}).Times(1).Return(existingIaasRoutes, nil)
