@@ -96,8 +96,8 @@ test-cover: ## Run tests with coverage.
 ##@ Verification
 
 .PHONY: lint
-lint: $(GOLANGCI_LINT) ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run ./...
+lint: $(GOLANGCI_LINT) ## Run golangci-lint against code. Use GOOS=linux since otherwise we will have wrong lints for linux only code
+	GOOS=linux $(GOLANGCI_LINT) run ./...
 
 .PHONY: check
 check: lint test ## Check everything (lint + test).
