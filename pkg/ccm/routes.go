@@ -328,8 +328,8 @@ func routeFromIaas(iaasRoute *iaas.Route) (*route, error) {
 	}, nil
 }
 
-func routeLabels(nameHint, clusterName, targetNode string) stackitclient.Labels {
-	l := stackitclient.Labels{
+func routeLabels(nameHint, clusterName, targetNode string) stackitclient.LabelMap {
+	l := stackitclient.LabelMap{
 		labelKeyClusterName: clusterName,
 	}
 	if targetNode != "" {
