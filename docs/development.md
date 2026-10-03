@@ -18,3 +18,25 @@ make images
 ```
 
 The pushed image name and tag are logged to the console.
+
+## Cloud controller manager
+
+### Get started
+
+To run the cloud controller manager locally on your machine, make sure to target the cluster first.
+
+Run `make run-cloud-controller-manager` to start the controller. It requires you to create a config at `./dev/config.yaml` for the cloud-controller-manager. See [./migration/configuration.md] for config reference.
+This requires you to have the STACKIT CLI installed. The make target will issue a short-lived access-token using the STACKIT CLI. It's valid for only a short period of time.
+
+You can override certain configuration settings for the controller using make variables. The variables are prefixed with `CCM_` and represent the corresponding cloud-controller-manager flag.
+Defaults:
+```
+CCM_CONTROLLERS ?= node-route-controller
+CCM_CLUSTER_NAME ?= kubernetes
+CCM_CLUSTER_CIDR ?= 100.64.0.0/13
+```
+
+#### Route controller
+
+To test the route controller, you can create a new VPC, routing Table and network using the provided script in `hack/setup-vpc.sh <PROJECT_ID>`.
+The script will override your `dev/config.yaml` with the newly created VPC, routing table and network IDs.
