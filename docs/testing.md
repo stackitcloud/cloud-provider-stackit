@@ -236,7 +236,7 @@ You can apply this manifest using `kubectl apply -f <filename.yaml>` or ensuring
 
 The test configuration file allows for granular control over which specific tests are executed. This is useful for debugging or targeting a subset of features.
 
-- **Configuration File:** `test/e2e/csi/block-storage.yaml`
+- **Configuration File:** `test/csi-plugin/block-storage.yaml`
 - **Action:** Modify this YAML file to include or exclude specific test cases, adjust parameters, or change timeout settings for the E2E runs. This allows for focused testing without running the entire suite.
 
 ### Full Example
