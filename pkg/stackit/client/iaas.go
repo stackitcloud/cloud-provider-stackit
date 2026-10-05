@@ -45,26 +45,23 @@ type IaaSClient interface {
 	GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error)
 	ListVolumes(ctx context.Context, _ int, _ string) ([]iaas.Volume, string, error)
 	ExpandVolume(ctx context.Context, volumeID, volumeStatus string, payload iaas.ResizeVolumePayload) error
-	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
+	WaitVolumeResized(ctx context.Context, volumeID string, sizeGB int64) error
 	WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID, volumeID string) error
 	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*iaas.Volume, error)
 }
 
 const (
-	VolumeAvailableStatus    = "AVAILABLE"
-	VolumeAttachedStatus     = "ATTACHED"
-	VolumeErrorStatus        = "ERROR"
-	operationFinishInitDelay = 1 * time.Second
-	operationFinishFactor    = 1.1
-	operationFinishSteps     = 10
-	diskAttachInitDelay      = 1 * time.Second
-	diskAttachFactor         = 1.2
-	diskAttachSteps          = 15
-	diskDetachInitDelay      = 1 * time.Second
-	diskDetachFactor         = 1.2
-	diskDetachSteps          = 13
-	VolumeDescription        = "Created by STACKIT CSI driver"
+	VolumeAvailableStatus = "AVAILABLE"
+	VolumeAttachedStatus  = "ATTACHED"
+	VolumeErrorStatus     = "ERROR"
+	diskAttachInitDelay   = 1 * time.Second
+	diskAttachFactor      = 1.2
+	diskAttachSteps       = 15
+	diskDetachInitDelay   = 1 * time.Second
+	diskDetachFactor      = 1.2
+	diskDetachSteps       = 13
+	VolumeDescription     = "Created by STACKIT CSI driver"
 )
 
 const (
@@ -95,6 +92,14 @@ const (
 )
 
 var volumeErrorStates = [...]string{"ERROR", "ERROR_BACKING-UP", "ERROR_DELETING", "ERROR_RESIZING", "ERROR_RESTORING-BACKUP", "ERROR_KMS-ENCRYPTION-PARAMS"}
+
+var volumeResizedStatuses = []string{VolumeAvailableStatus, VolumeAttachedStatus}
+
+var volumeResizeBackoff = wait.Backoff{
+	Duration: 20 * time.Second,
+	Factor:   1.28,
+	Steps:    5,
+}
 
 func NewIaaSClient(region, projectID string, options []sdkconfig.ConfigurationOption) (IaaSClient, error) {
 	apiClient, err := iaas.NewAPIClient(options...)
@@ -433,44 +438,45 @@ func (i *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus st
 	}
 }
 
-func (i *iaasClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
-	backoff := wait.Backoff{
-		Duration: operationFinishInitDelay,
-		Factor:   operationFinishFactor,
-		Steps:    operationFinishSteps,
+func (i *iaasClient) WaitVolumeResized(ctx context.Context, volumeID string, sizeGB int64) error {
+	resized := func(v *iaas.Volume) bool {
+		return slices.Contains(volumeResizedStatuses, v.GetStatus()) && v.GetSize() >= sizeGB
 	}
-
-	_, err := i.WaitVolumeTargetStatusWithCustomBackoff(ctx, volumeID, tStatus, backoff)
+	volume, err := i.waitVolume(ctx, volumeID, volumeResizeBackoff, resized)
+	if wait.Interrupted(err) {
+		return fmt.Errorf("volume %s has size %d GiB after resize, requested %d GiB: the storage backend probably rejected the resize", volumeID, volume.GetSize(), sizeGB)
+	}
 	return err
 }
 
 func (i *iaasClient) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff wait.Backoff) (*iaas.Volume, error) {
-	var lastVolume *iaas.Volume
+	inTargetStatus := func(v *iaas.Volume) bool {
+		return slices.Contains(tStatus, v.GetStatus())
+	}
+	volume, err := i.waitVolume(ctx, volumeID, backoff, inTargetStatus)
+	if wait.Interrupted(err) {
+		err = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+	}
+	return volume, err
+}
 
-	waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
+func (i *iaasClient) waitVolume(ctx context.Context, volumeID string, backoff wait.Backoff, done func(*iaas.Volume) bool) (*iaas.Volume, error) {
+	var lastVolume *iaas.Volume
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		volume, err := i.GetVolume(ctx, volumeID)
 		if err != nil {
 			return false, err
 		}
-
 		lastVolume = volume
-
-		if slices.Contains(tStatus, volume.GetStatus()) {
+		if done(volume) {
 			return true, nil
 		}
-		for _, eState := range volumeErrorStates {
-			if volume.GetStatus() == eState {
-				return false, fmt.Errorf("volume is in Error State : %s", volume.GetStatus())
-			}
+		if slices.Contains(volumeErrorStates[:], volume.GetStatus()) {
+			return false, fmt.Errorf("volume is in Error State : %s", volume.GetStatus())
 		}
 		return false, nil
 	})
-
-	if wait.Interrupted(waitErr) {
-		waitErr = fmt.Errorf("timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
-	}
-
-	return lastVolume, waitErr
+	return lastVolume, err
 }
 
 func (i *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID string) error {
