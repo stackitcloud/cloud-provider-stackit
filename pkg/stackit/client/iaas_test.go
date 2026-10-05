@@ -584,14 +584,54 @@ var _ = Describe("Volume", func() {
 	})
 
 	Context("Waiting Logic", func() {
-		It("WaitVolumeTargetStatus returns nil when target status is reached", func() {
-			mockIaaSClient.EXPECT().
-				GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
-			mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).Return(&iaas.Volume{Id: new(volumeID), Status: new("available")}, nil)
+		Describe("WaitVolumeResized", func() {
+			expectVolume := func(status string, size int64) {
+				mockIaaSClient.EXPECT().
+					GetVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(iaas.ApiGetVolumeRequest{ApiService: mockIaaSClient})
+				mockIaaSClient.EXPECT().GetVolumeExecute(gomock.Any()).
+					Return(&iaas.Volume{Id: new(volumeID), Status: new(status), Size: new(size)}, nil)
+			}
 
-			err := client.WaitVolumeTargetStatus(context.Background(), volumeID, []string{"available"})
-			Expect(err).ToNot(HaveOccurred())
+			BeforeEach(func() {
+				defaultBackoff := volumeResizeBackoff
+				volumeResizeBackoff = wait.Backoff{Steps: 2}
+				DeferCleanup(func() { volumeResizeBackoff = defaultBackoff })
+			})
+
+			DescribeTable("returns nil when the volume is usable and has at least the requested size",
+				func(status string, size int64) {
+					expectVolume(status, size)
+
+					err := client.WaitVolumeResized(context.Background(), volumeID, 20)
+					Expect(err).ToNot(HaveOccurred())
+				},
+				Entry("attached, exact size", VolumeAttachedStatus, int64(20)),
+				Entry("available, larger size", VolumeAvailableStatus, int64(21)),
+			)
+
+			It("keeps polling while the volume is resizing", func() {
+				expectVolume("RESIZING", 10)
+				expectVolume(VolumeAvailableStatus, 20)
+
+				err := client.WaitVolumeResized(context.Background(), volumeID, 20)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("returns an error with both sizes when the size is not reached", func() {
+				expectVolume(VolumeAvailableStatus, 10)
+				expectVolume(VolumeAvailableStatus, 10)
+
+				err := client.WaitVolumeResized(context.Background(), volumeID, 20)
+				Expect(err).To(MatchError(ContainSubstring("has size 10 GiB after resize, requested 20 GiB")))
+			})
+
+			It("fails fast when the volume is in an error state", func() {
+				expectVolume("ERROR_RESIZING", 10)
+
+				err := client.WaitVolumeResized(context.Background(), volumeID, 20)
+				Expect(err).To(MatchError(ContainSubstring("ERROR_RESIZING")))
+			})
 		})
 
 		It("WaitVolumeTargetStatusWithCustomBackoff returns the refreshed volume", func() {

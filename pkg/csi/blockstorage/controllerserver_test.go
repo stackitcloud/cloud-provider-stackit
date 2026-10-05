@@ -24,12 +24,11 @@ import (
 
 var _ = Describe("ControllerServer test", Ordered, func() {
 	var (
-		fakeCs             *controllerServer
-		iaasClient         *stackitclientmock.MockIaaSClient
-		FakeEndpoint       = "tcp://127.0.0.1:10000"
-		FakeCluster        = "cluster"
-		expandTargetStatus = []string{stackitclient.VolumeAvailableStatus, stackitclient.VolumeAttachedStatus}
-		stdCapRange        = &csi.CapacityRange{
+		fakeCs       *controllerServer
+		iaasClient   *stackitclientmock.MockIaaSClient
+		FakeEndpoint = "tcp://127.0.0.1:10000"
+		FakeCluster  = "cluster"
+		stdCapRange  = &csi.CapacityRange{
 			RequiredBytes: util.GIBIBYTE * 20,
 		}
 		stdSnapParams = map[string]string{
@@ -758,7 +757,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 				Status: new(stackitclient.VolumeAvailableStatus),
 			}, nil)
 			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, stackitclient.VolumeAvailableStatus, iaas.ResizeVolumePayload{Size: volSizeGB}).Return(nil)
-			iaasClient.EXPECT().WaitVolumeTargetStatus(gomock.Any(), req.VolumeId, expandTargetStatus).Return(nil)
+			iaasClient.EXPECT().WaitVolumeResized(gomock.Any(), req.VolumeId, volSizeGB).Return(nil)
 			_, err := fakeCs.ControllerExpandVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
 		})
