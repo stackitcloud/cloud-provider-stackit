@@ -438,6 +438,10 @@ func (i *iaasClient) ExpandVolume(ctx context.Context, volumeID, volumeStatus st
 	}
 }
 
+// WaitVolumeResized waits until the volume is AVAILABLE or ATTACHED and has a size of at least sizeGB.
+// ResizeVolume is asynchronous: when the storage backend rejects a resize, the volume returns to
+// AVAILABLE or ATTACHED with its old size. WaitVolumeResized then returns an error after the backoff
+// ends, so the caller does not report the resize as successful.
 func (i *iaasClient) WaitVolumeResized(ctx context.Context, volumeID string, sizeGB int64) error {
 	resized := func(v *iaas.Volume) bool {
 		return slices.Contains(volumeResizedStatuses, v.GetStatus()) && v.GetSize() >= sizeGB
