@@ -1010,24 +1010,24 @@ func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.Internal, "GetVolume failed with error %v", err)
 	}
 
-	if *volume.Size >= volSizeGB {
+	if volume.GetSize() >= volSizeGB {
 		// a volume was already resized
-		klog.V(2).Infof("Volume %q has been already expanded to %d, requested %d", volumeID, volume.Size, volSizeGB)
+		klog.V(2).Infof("Volume %q has been already expanded to %d, requested %d", volumeID, volume.GetSize(), volSizeGB)
 		return &csi.ControllerExpandVolumeResponse{
-			CapacityBytes:         *volume.Size * util.GIBIBYTE,
+			CapacityBytes:         volume.GetSize() * util.GIBIBYTE,
 			NodeExpansionRequired: true,
 		}, nil
 	}
 
-	err = cloud.ExpandVolume(ctx, volumeID, *volume.Status, iaas.ResizeVolumePayload{Size: volSizeGB})
+	err = cloud.ExpandVolume(ctx, volumeID, volume.GetStatus(), iaas.ResizeVolumePayload{Size: volSizeGB})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q to size %v: %v", volumeID, volSizeGB, err)
 	}
 
 	err = cloud.WaitVolumeResized(ctx, volumeID, volSizeGB)
 	if err != nil {
-		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", volumeID, err)
-		return nil, status.Errorf(codes.Internal, "[ControllerExpandVolume] Volume %s not in target state after resize operation: %v", volumeID, err)
+		klog.Errorf("Failed to WaitVolumeResized of volume %s: %v", volumeID, err)
+		return nil, status.Errorf(codes.Internal, "[ControllerExpandVolume] Volume %s not expanded to %d GiB: %v", volumeID, volSizeGB, err)
 	}
 
 	klog.V(4).Infof("ControllerExpandVolume resized volume %v to size %v", volumeID, volSizeGB)

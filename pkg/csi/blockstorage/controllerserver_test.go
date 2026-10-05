@@ -761,6 +761,40 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			_, err := fakeCs.ControllerExpandVolume(context.Background(), req)
 			Expect(err).To(Not(HaveOccurred()))
 		})
+		It("should return error when the volume does not reach the requested size", func() {
+			req := &csi.ControllerExpandVolumeRequest{
+				VolumeId:      "fake",
+				CapacityRange: stdCapRange,
+			}
+			volSizeGB := util.RoundUpSize(req.GetCapacityRange().GetRequiredBytes(), util.GIBIBYTE)
+			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
+				Size:   new(int64(10)),
+				Status: new(stackitclient.VolumeAvailableStatus),
+			}, nil)
+			iaasClient.EXPECT().ExpandVolume(gomock.Any(), req.VolumeId, stackitclient.VolumeAvailableStatus, iaas.ResizeVolumePayload{Size: volSizeGB}).Return(nil)
+			iaasClient.EXPECT().WaitVolumeResized(gomock.Any(), req.VolumeId, volSizeGB).Return(fmt.Errorf("volume fake has size 10 GiB after resize, requested 20 GiB"))
+
+			_, err := fakeCs.ControllerExpandVolume(context.Background(), req)
+			Expect(err).To(HaveOccurred())
+			Expect(status.Convert(err).Code()).To(Equal(codes.Internal))
+			Expect(status.Convert(err).Message()).To(ContainSubstring("Volume fake not expanded to 20 GiB"))
+			Expect(status.Convert(err).Message()).To(ContainSubstring("has size 10 GiB after resize"))
+		})
+		It("should not resize a volume that already has the requested size", func() {
+			req := &csi.ControllerExpandVolumeRequest{
+				VolumeId:      "fake",
+				CapacityRange: stdCapRange,
+			}
+			iaasClient.EXPECT().GetVolume(gomock.Any(), req.VolumeId).Return(&iaas.Volume{
+				Size:   new(int64(20)),
+				Status: new(stackitclient.VolumeAvailableStatus),
+			}, nil)
+
+			resp, err := fakeCs.ControllerExpandVolume(context.Background(), req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.GetCapacityBytes()).To(Equal(20 * util.GIBIBYTE))
+			Expect(resp.GetNodeExpansionRequired()).To(BeTrue())
+		})
 		It("should return error when volume status is not available", func() {
 			req := &csi.ControllerExpandVolumeRequest{
 				VolumeId:      "fake",
