@@ -934,40 +934,40 @@ func (c *MockIaaSClientWaitSnapshotReadyCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// WaitVolumeTargetStatus mocks base method.
-func (m *MockIaaSClient) WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error {
+// WaitVolumeResized mocks base method.
+func (m *MockIaaSClient) WaitVolumeResized(ctx context.Context, volumeID string, sizeGB int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitVolumeTargetStatus", ctx, volumeID, tStatus)
+	ret := m.ctrl.Call(m, "WaitVolumeResized", ctx, volumeID, sizeGB)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// WaitVolumeTargetStatus indicates an expected call of WaitVolumeTargetStatus.
-func (mr *MockIaaSClientMockRecorder) WaitVolumeTargetStatus(ctx, volumeID, tStatus any) *MockIaaSClientWaitVolumeTargetStatusCall {
+// WaitVolumeResized indicates an expected call of WaitVolumeResized.
+func (mr *MockIaaSClientMockRecorder) WaitVolumeResized(ctx, volumeID, sizeGB any) *MockIaaSClientWaitVolumeResizedCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitVolumeTargetStatus", reflect.TypeOf((*MockIaaSClient)(nil).WaitVolumeTargetStatus), ctx, volumeID, tStatus)
-	return &MockIaaSClientWaitVolumeTargetStatusCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitVolumeResized", reflect.TypeOf((*MockIaaSClient)(nil).WaitVolumeResized), ctx, volumeID, sizeGB)
+	return &MockIaaSClientWaitVolumeResizedCall{Call: call}
 }
 
-// MockIaaSClientWaitVolumeTargetStatusCall wrap *gomock.Call
-type MockIaaSClientWaitVolumeTargetStatusCall struct {
+// MockIaaSClientWaitVolumeResizedCall wrap *gomock.Call
+type MockIaaSClientWaitVolumeResizedCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockIaaSClientWaitVolumeTargetStatusCall) Return(arg0 error) *MockIaaSClientWaitVolumeTargetStatusCall {
+func (c *MockIaaSClientWaitVolumeResizedCall) Return(arg0 error) *MockIaaSClientWaitVolumeResizedCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientWaitVolumeTargetStatusCall) Do(f func(context.Context, string, []string) error) *MockIaaSClientWaitVolumeTargetStatusCall {
+func (c *MockIaaSClientWaitVolumeResizedCall) Do(f func(context.Context, string, int64) error) *MockIaaSClientWaitVolumeResizedCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientWaitVolumeTargetStatusCall) DoAndReturn(f func(context.Context, string, []string) error) *MockIaaSClientWaitVolumeTargetStatusCall {
+func (c *MockIaaSClientWaitVolumeResizedCall) DoAndReturn(f func(context.Context, string, int64) error) *MockIaaSClientWaitVolumeResizedCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
