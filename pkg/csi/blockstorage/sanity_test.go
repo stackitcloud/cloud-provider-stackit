@@ -149,12 +149,17 @@ var _ = Describe("CSI sanity test", Ordered, func() {
 				gomock.Any(), // volumeID
 				gomock.Any(), // status
 				gomock.Any(), // size
-			).Return(nil).AnyTimes()
+			).DoAndReturn(func(_ context.Context, volumeID, _ string, payload iaas.ResizeVolumePayload) error {
+				if vol, ok := createdVolumes[volumeID]; ok {
+					vol.Size = new(payload.Size)
+				}
+				return nil
+			}).AnyTimes()
 
-			iaasClient.EXPECT().WaitVolumeTargetStatus(
+			iaasClient.EXPECT().WaitVolumeResized(
 				gomock.Any(), // context
 				gomock.Any(), // volumeID
-				gomock.Any(), // tStatus
+				gomock.Any(), // sizeGB
 			).Return(nil).AnyTimes()
 
 			// --- 2. Mock IaaS Client (Snapshots) ---
