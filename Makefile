@@ -11,7 +11,7 @@ PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
 GOOS ?= $(shell uname -s | tr "[:upper:]" "[:lower:]")
 GOARCH ?= $(shell uname -m)
-LDFLAGS ?= "-s -w"
+LDFLAGS ?= -s -w
 
 .PHONY: all
 all: verify

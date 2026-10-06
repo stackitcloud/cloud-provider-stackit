@@ -75,7 +75,6 @@ var _ = Describe("Routes", func() {
 						},
 					},
 				}
-				mockClient.EXPECT().GetRoutingTable(ctx, routingTableID).Return(&iaas.RoutingTable{Id: new(routingTableID)}, nil)
 				mockClient.EXPECT().ListRoutes(ctx, routingTableID, expectedLabels).Times(1).Return([]iaas.Route{}, nil)
 				mockClient.EXPECT().AddRoutes(ctx, routingTableID, expectedIaasRoutes).Times(1).Return(nil)
 
@@ -128,7 +127,6 @@ var _ = Describe("Routes", func() {
 					},
 				},
 			}
-			mockClient.EXPECT().GetRoutingTable(ctx, routingTableID).Return(&iaas.RoutingTable{Id: new(routingTableID)}, nil)
 			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.LabelMap{
 				labelKeyClusterName: clusterName,
 			}).Times(1).Return(existingIaasRoutes, nil)
@@ -162,8 +160,9 @@ var _ = Describe("Routes", func() {
 	})
 
 	Describe("#DeleteRoute", func() {
-		It("should only delete routes for the node", func(ctx context.Context) {
+		It("should delete all routes", func(ctx context.Context) {
 			routeID := "12345"
+			routeIDSecondIP := "8765"
 			existingIaasRoutes := []iaas.Route{
 				{
 					Id: &routeID,
@@ -181,17 +180,38 @@ var _ = Describe("Routes", func() {
 					Nexthop: iaas.RouteNexthop{
 						NexthopIPv4: &iaas.NexthopIPv4{
 							Type:  "ipv4",
-							Value: "192.168.0.5",
+							Value: "192.168.0.2",
+						},
+					},
+				},
+				// second internal IP of node 1
+				{
+					Id: &routeIDSecondIP,
+					Destination: iaas.RouteDestination{
+						DestinationCIDRv4: &iaas.DestinationCIDRv4{
+							Type:  "cidrv4",
+							Value: "10.0.1.0/24",
+						},
+					},
+					Labels: stackitclient.LabelMap{
+						labelKeyRouteNameHint: "bar",
+						labelKeyRouteNodeName: "node1",
+						labelKeyClusterName:   clusterName,
+					}.ToSDK(),
+					Nexthop: iaas.RouteNexthop{
+						NexthopIPv4: &iaas.NexthopIPv4{
+							Type:  "ipv4",
+							Value: "192.168.6.25",
 						},
 					},
 				},
 			}
-			mockClient.EXPECT().GetRoutingTable(ctx, routingTableID).Return(&iaas.RoutingTable{Id: new(routingTableID)}, nil)
 			mockClient.EXPECT().ListRoutes(ctx, routingTableID, stackitclient.LabelMap{
 				labelKeyClusterName:   clusterName,
 				labelKeyRouteNodeName: "node1",
 			}).Times(1).Return(existingIaasRoutes, nil)
 			mockClient.EXPECT().DeleteRoute(gomock.Any(), routingTableID, routeID).Times(1).Return(nil)
+			mockClient.EXPECT().DeleteRoute(gomock.Any(), routingTableID, routeIDSecondIP).Times(1).Return(nil)
 
 			cpRoute := &cloudprovider.Route{
 				TargetNode: "node1",
@@ -200,11 +220,16 @@ var _ = Describe("Routes", func() {
 						Type:    corev1.NodeInternalIP,
 						Address: "192.168.0.2",
 					},
+					{
+						Type:    corev1.NodeInternalIP,
+						Address: "192.168.6.25",
+					},
 				},
-				DestinationCIDR: "10.0.0.0/24",
+				DestinationCIDR: "10.0.1.0/24",
 				Blackhole:       false,
 			}
 			Expect(r.DeleteRoute(ctx, clusterName, cpRoute)).To(Succeed())
 		})
 	})
+
 })

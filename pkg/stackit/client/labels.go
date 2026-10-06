@@ -2,6 +2,8 @@ package client
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -17,12 +19,18 @@ func (l LabelMap) ToSDK() map[string]any {
 
 func (l LabelMap) Selector() string {
 	sb := strings.Builder{}
-	for k, v := range l {
+	for _, key := range l.sortedKeys() {
+		val := l[key]
 		// prevents trailing comma at the end
 		if sb.Len() > 0 {
 			sb.WriteString(",")
 		}
-		fmt.Fprintf(&sb, "%s=%s", k, v)
+		fmt.Fprintf(&sb, "%s=%s", key, val)
 	}
 	return sb.String()
+}
+
+// sortedKeys returns a sorted list of all label keys. This is used in [LabelMap.Selector] to ensure the selector query is deterministic.
+func (l LabelMap) sortedKeys() []string {
+	return slices.Sorted(maps.Keys(l))
 }

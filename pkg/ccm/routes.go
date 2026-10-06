@@ -2,13 +2,13 @@ package ccm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
 
 	stackitclient "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
-	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,16 +37,12 @@ type Routes struct {
 
 // CreateRoute implements [cloudprovider.Routes].
 func (r *Routes) CreateRoute(ctx context.Context, clusterName, nameHint string, route *cloudprovider.Route) error {
-	rt, err := r.iaasClient.GetRoutingTable(ctx, r.routingTableID)
-	if err != nil {
-		return err
-	}
 	routes, err := r.routesFromCloudprovider(route)
 	if err != nil {
 		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
 	}
 
-	existingRoutes, err := r.getExistingRoutes(ctx, clusterName, nameHint, string(route.TargetNode), rt.GetId())
+	existingRoutes, err := r.getExistingRoutes(ctx, clusterName, nameHint, string(route.TargetNode), r.routingTableID)
 	if err != nil {
 		return fmt.Errorf("getting existing routes: %w", err)
 	}
@@ -61,52 +57,51 @@ func (r *Routes) CreateRoute(ctx context.Context, clusterName, nameHint string, 
 		newIaasRoutes = append(newIaasRoutes, newIaasRoute)
 	}
 
-	if err := r.iaasClient.AddRoutes(ctx, rt.GetId(), newIaasRoutes); err != nil {
+	if len(newRoutes) == 0 {
+		return nil
+	}
+
+	if err := r.iaasClient.AddRoutes(ctx, r.routingTableID, newIaasRoutes); err != nil {
 		return fmt.Errorf("adding routes %s: %w", newRoutes, err)
 	}
 	return nil
 }
 
 // DeleteRoute implements [cloudprovider.Routes].
-func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
-	rt, err := r.iaasClient.GetRoutingTable(ctx, r.routingTableID)
+func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, cloudproviderRoute *cloudprovider.Route) error {
+	labels := routeLabels("", clusterName, string(cloudproviderRoute.TargetNode))
+	iaasRoutes, err := r.iaasClient.ListRoutes(ctx, r.routingTableID, labels)
 	if err != nil {
 		return err
 	}
-	routes, err := r.routesFromCloudprovider(route)
+
+	existingRoutes := map[route]string{}
+	for _, iaasRoute := range iaasRoutes {
+		route, err := routeFromIaas(&iaasRoute)
+		if err != nil {
+			return err
+		}
+		existingRoutes[*route] = iaasRoute.GetId()
+	}
+
+	routes, err := r.routesFromCloudprovider(cloudproviderRoute)
 	if err != nil {
 		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
 	}
-
-	g, gctx := errgroup.WithContext(ctx)
+	var deleteErr error
 	for _, route := range routes {
-		g.Go(func() error {
-			labels := routeLabels("", clusterName, route.NodeName)
-			iaasRoutes, err := r.iaasClient.ListRoutes(ctx, rt.GetId(), labels)
-			if err != nil {
-				return fmt.Errorf("listing routes: %w", err)
-			}
-
-			for _, iaasRoute := range iaasRoutes {
-				if err := r.iaasClient.DeleteRoute(gctx, rt.GetId(), iaasRoute.GetId()); err != nil {
-					return fmt.Errorf("deleting route %s: %w", route, err)
-				}
-			}
-			return nil
-		})
+		id, ok := existingRoutes[route]
+		if ok {
+			deleteErr = errors.Join(err, r.iaasClient.DeleteRoute(ctx, r.routingTableID, id))
+		}
 	}
 
-	return g.Wait()
+	return deleteErr
 }
 
 // ListRoutes implements [cloudprovider.Routes].
 func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
-	rt, err := r.iaasClient.GetRoutingTable(ctx, r.routingTableID)
-	if err != nil {
-		return nil, fmt.Errorf("getting routing table: %w", err)
-	}
-
-	routes, err := r.getExistingRoutes(ctx, clusterName, "", "", rt.GetId())
+	routes, err := r.getExistingRoutes(ctx, clusterName, "", "", r.routingTableID)
 	if err != nil {
 		return nil, fmt.Errorf("getting existing routes: %w", err)
 	}
@@ -120,13 +115,13 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 	if err != nil {
 		return nil, err
 	}
-	routes := make([]*route, 0, len(iaasRoutes))
+	routes := make(routes, 0, len(iaasRoutes))
 	for _, iaasRoute := range iaasRoutes {
 		route, err := routeFromIaas(&iaasRoute)
 		if err != nil {
 			return nil, fmt.Errorf("casting route from iaas.Route: %w", err)
 		}
-		routes = append(routes, route)
+		routes = append(routes, *route)
 	}
 	return routes, nil
 }
@@ -134,7 +129,11 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 // routesFromCloudprovider parses [cloudprovider.Route] into the in-memory route representation.
 // A [cloudprovider.Route] can results in multiple in-memory routes since we need 1 route per node IP
 func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (routes, error) {
-	var routes []*route
+	var routes routes
+	destinationCIDR, err := netip.ParsePrefix(cloudroute.DestinationCIDR)
+	if err != nil {
+		return nil, fmt.Errorf("parsing route destinationCIDR %s: %w", cloudroute.DestinationCIDR, err)
+	}
 	for _, nodeAddr := range cloudroute.TargetNodeAddresses {
 		if nodeAddr.Type != corev1.NodeInternalIP {
 			continue
@@ -145,15 +144,17 @@ func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (route
 			return nil, fmt.Errorf("parsing node address %s: %w", nodeAddr.Address, err)
 		}
 
-		destinationCIDR, err := netip.ParsePrefix(cloudroute.DestinationCIDR)
-		if err != nil {
-			return nil, fmt.Errorf("parsing route destinationCIDR %s: %w", cloudroute.DestinationCIDR, err)
-		}
-		routes = append(routes, &route{
-			Blackhole:       cloudroute.Blackhole,
+		routes = append(routes, route{
 			DestinationCIDR: destinationCIDR,
 			NodeName:        string(cloudroute.TargetNode),
 			NextHop:         nodeAddrIP,
+		})
+	}
+	if cloudroute.Blackhole {
+		routes = append(routes, route{
+			Blackhole:       true,
+			DestinationCIDR: destinationCIDR,
+			NodeName:        string(cloudroute.TargetNode),
 		})
 	}
 	return routes, nil
@@ -169,12 +170,12 @@ type route struct {
 }
 
 // routes is a slice of route to allow methods
-type routes []*route
+type routes []route
 
 func (r routes) ToCloudProvider() []*cloudprovider.Route {
 	nodeToAddr := map[string][]corev1.NodeAddress{}
 	nodeBlackhole := map[string]bool{}
-	nodeToDestCIDR := map[string]string{}
+	nodeToDestCIDRs := map[string][]string{}
 	for _, route := range r {
 		nodeName := route.NodeName
 		nodeBlackhole[nodeName] = route.Blackhole
@@ -189,22 +190,28 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 			})
 		}
 		nodeToAddr[nodeName] = addrs
-		nodeToDestCIDR[nodeName] = route.DestinationCIDR.String()
+		nodeToDestCIDRs[nodeName] = append(nodeToDestCIDRs[nodeName], route.DestinationCIDR.String())
 	}
 
 	cpRoutes := make([]*cloudprovider.Route, 0, len(nodeToAddr))
 	for node, addrs := range nodeToAddr {
-		cpRoutes = append(cpRoutes, &cloudprovider.Route{
-			TargetNode:          types.NodeName(node),
-			Blackhole:           nodeBlackhole[node],
-			DestinationCIDR:     nodeToDestCIDR[node],
-			TargetNodeAddresses: addrs,
-		})
+		for _, destCIDR := range nodeToDestCIDRs[node] {
+			cpRoutes = append(cpRoutes, &cloudprovider.Route{
+				TargetNode:          types.NodeName(node),
+				Blackhole:           nodeBlackhole[node],
+				DestinationCIDR:     destCIDR,
+				TargetNodeAddresses: addrs,
+				// EnableNodeAddresses = true will make the route controller reconcile routes if node.Status.Address changes.
+				// Since this will trigger create - delete calls if we return TargetNodeAddresses that miss certain Addresses (like Hostname),
+				// we will not leverage this feature as we cannot get all Addresses from the routes only.
+				EnableNodeAddresses: false,
+			})
+		}
 	}
 	return cpRoutes
 }
 
-func (r *route) String() string {
+func (r route) String() string {
 	sb := new(strings.Builder)
 	fmt.Fprintf(sb, "node=%s, nextHop=%s ", r.NodeName, r.NextHop)
 	if r.Blackhole {

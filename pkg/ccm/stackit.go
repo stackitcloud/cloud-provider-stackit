@@ -165,10 +165,13 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	ccm := CloudControllerManager{
 		loadBalancer: lb,
 		instances:    instances,
-		routes: &Routes{
+	}
+
+	if cfg.Route.RoutingTableID != "" {
+		ccm.routes = &Routes{
 			iaasClient:     iaasClient,
 			routingTableID: cfg.Route.RoutingTableID,
-		},
+		}
 	}
 	return &ccm, nil
 }
@@ -203,6 +206,9 @@ func (ccm *CloudControllerManager) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (ccm *CloudControllerManager) Routes() (cloudprovider.Routes, bool) {
+	if ccm.routes == nil {
+		return nil, false
+	}
 	return ccm.routes, true
 }
 

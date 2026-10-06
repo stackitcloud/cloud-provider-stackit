@@ -55,7 +55,6 @@ type IaaSClient interface {
 
 	ListRoutes(ctx context.Context, routingTableID string, labels LabelMap) ([]iaas.Route, error)
 	AddRoutes(ctx context.Context, routingTableID string, routes []iaas.Route) error
-	GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error)
 	DeleteRoute(ctx context.Context, routingTableID string, routeID string) error
 }
 
@@ -673,12 +672,14 @@ func toIaasRoutes(routes []iaasalpha.Route) []iaas.Route {
 		}
 		if r.Nexthop.NexthopIPv4 != nil {
 			nextHop.NexthopIPv4 = &iaas.NexthopIPv4{
-				Type: r.Nexthop.NexthopIPv4.Type,
+				Type:  r.Nexthop.NexthopIPv4.Type,
+				Value: r.Nexthop.NexthopIPv4.Value,
 			}
 		}
 		if r.Nexthop.NexthopIPv6 != nil {
 			nextHop.NexthopIPv6 = &iaas.NexthopIPv6{
-				Type: r.Nexthop.NexthopIPv6.Type,
+				Type:  r.Nexthop.NexthopIPv6.Type,
+				Value: r.Nexthop.NexthopIPv6.Value,
 			}
 		}
 		if r.Nexthop.NexthopInternet != nil {
@@ -777,38 +778,6 @@ func toAlphaRoute(r *iaas.Route) iaasalpha.Route {
 		Labels:      r.Labels,
 		Nexthop:     nextHop,
 		UpdatedAt:   r.UpdatedAt,
-	}
-}
-
-func (i *iaasClient) GetRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error) {
-	return execute(ctx, func(ctx context.Context) (*iaas.RoutingTable, error) {
-		return i.getRoutingTable(ctx, routingTableID)
-	})
-}
-
-func (i *iaasClient) getRoutingTable(ctx context.Context, routingTableID string) (*iaas.RoutingTable, error) {
-	if i.opts.useVPCRoutes {
-		vpcRT, err := i.AlphaClient.GetVPCRoutingTable(ctx, i.projectID, i.opts.vpcID, i.region, routingTableID).Execute()
-		if err != nil {
-			return nil, err
-		}
-		return toIaasRoutingTable(vpcRT), nil
-	}
-	return i.Client.GetRoutingTableOfArea(ctx, i.opts.orgID, i.opts.areaID, i.region, routingTableID).Execute()
-}
-
-func toIaasRoutingTable(vpcRT *iaasalpha.VPCRoutingTable) *iaas.RoutingTable {
-	return &iaas.RoutingTable{
-		CreatedAt:            vpcRT.CreatedAt,
-		Default:              new(false),
-		Description:          vpcRT.Description,
-		DynamicRoutes:        vpcRT.DynamicRoutes,
-		Id:                   vpcRT.Id,
-		Labels:               vpcRT.Labels,
-		Name:                 vpcRT.Name,
-		SystemRoutes:         vpcRT.SystemRoutes,
-		UpdatedAt:            vpcRT.UpdatedAt,
-		AdditionalProperties: vpcRT.AdditionalProperties,
 	}
 }
 

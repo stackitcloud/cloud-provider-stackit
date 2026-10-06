@@ -24,15 +24,15 @@ print_fail() {
 
 wait_for_network_ready() {
   id=$1
-  status=$(stackit -p $PROJECT_ID network describe $id -o json | jq -r .status)
+  status=$(stackit -p "$PROJECT_ID" network describe "$id" -o json | jq -r .status)
   local max_attempts=10
   local attempts=0
   while [[ $status != "CREATED" ]]; do
-    status=$(stackit -p $PROJECT_ID network describe $id -o json | jq -r .status)
+    status=$(stackit -p "$PROJECT_ID" network describe "$id" -o json | jq -r .status)
     echo "waiting for network $id to get ready, got status $status"
     sleep 1
-    attempts=$attempts+1
-    if [ $attempts -eq $max_attempts]; then
+    ((attempts++))
+    if [ "$attempts" -eq "$max_attempts" ]; then
       echo "max attempts reached for network getting ready, got status $status"
       exit 1
     fi
@@ -43,7 +43,7 @@ wait_for_network_ready() {
 trap print_fail ERR
 
 echo "> checking if vpc exists"
-VPC_ID=$(stackit curl -X GET --fail "${base_url}"/vpcs?label_selector=cluster=$CLUSTER | jq -r .items[].id)
+VPC_ID=$(stackit curl -X GET --fail "${base_url}"/vpcs?label_selector=cluster="$CLUSTER" | jq -r .items[].id)
 if [[ -z $VPC_ID ]]; then
   echo "> vpc missing, creating one"
   cat <<EOF >$payload_file
@@ -73,7 +73,7 @@ EOF
 )
 
 echo "> checking if network range exists"
-NETWORK_RANGE_ID=$(stackit curl -X GET "$base_url"/vpcs/"${VPC_ID}"/regions/"${REGION}"/network-ranges?label_selector=cluster=$CLUSTER | jq -r .items[].id)
+NETWORK_RANGE_ID=$(stackit curl -X GET "$base_url"/vpcs/"${VPC_ID}"/regions/"${REGION}"/network-ranges?label_selector=cluster="$CLUSTER" | jq -r .items[].id)
 if [[ -z $NETWORK_RANGE_ID ]]; then
   echo "> network range missing, creating one"
   cat <<EOF >$payload_file
@@ -93,7 +93,7 @@ EOF
 fi
 
 echo "> checking if routing table exists"
-RT_ID=$(stackit curl -X GET "$base_url"/vpcs/"${VPC_ID}"/regions/"${REGION}"/routing-tables?label_selector=cluster=kubernetes | jq -r .items[].id)
+RT_ID=$(stackit curl -X GET "$base_url"/vpcs/"${VPC_ID}"/regions/"${REGION}"/routing-tables?label_selector=cluster="$CLUSTER" | jq -r .items[].id)
 if [[ -z $RT_ID ]]; then
   cat <<EOF >$payload_file
 {
@@ -108,7 +108,7 @@ EOF
 fi
 
 echo "> checking if network exists"
-NETWORK_ID=$(stackit -p $PROJECT_ID network list --label-selector cluster=$CLUSTER -o json | jq -r .[].id)
+NETWORK_ID=$(stackit -p "$PROJECT_ID" network list --label-selector cluster="$CLUSTER" -o json | jq -r .[].id)
 if [[ -z $NETWORK_ID ]]; then
   cat <<EOF >$payload_file
 {
@@ -128,8 +128,8 @@ EOF
   stackit curl --fail -X POST -H "Content-Type: application/json" --data "@$payload_file" "$base_url"/regions/"$REGION"/networks --output $response_file
   NETWORK_ID=$(cat $response_file | jq -r .id)
 fi
-wait_for_network_ready $NETWORK_ID
-NETWORK_PREFIX=$(stackit -p $PROJECT_ID network describe $NETWORK_ID -o json | jq -r .ipv4.prefixes)
+wait_for_network_ready "$NETWORK_ID"
+NETWORK_PREFIX=$(stackit -p "$PROJECT_ID" network describe "$NETWORK_ID" -o json | jq -r .ipv4.prefixes)
 
 echo "> vpc id: $VPC_ID"
 echo "> network range ID: $NETWORK_RANGE_ID"
