@@ -6,7 +6,6 @@ The cloud controller manager implements the [Kubernetes cloud-controller-manager
 
 ### Route controller
 
-Route controller is used to 
 > The route controller is responsible for configuring routes in the cloud appropriately so that containers on different nodes in your Kubernetes cluster can communicate with each other.
 
 For more information check the [Kubernetes documentation](https://kubernetes.io/docs/concepts/architecture/cloud-controller/#route-controller).
@@ -38,7 +37,7 @@ global:
 #### Multiple clusters in the same routing table
 
 To be able to make multiple clusters support native routing of Pod IPs regard the following limitations:
-- Pod CIDRs of all clusters (`--cluster-cidr` flag in cloud-controller-manager) must be dissect, overlapping ranges may result misbehavior. The route-controller may add a route with the same pod CIDR using a different nexthop.
+- Pod CIDRs of all clusters (`--cluster-cidr` flag in cloud-controller-manager) must be disjoint, overlapping ranges may result misbehavior. The route-controller may add a route with the same pod CIDR using a different nexthop.
 - Unique cluster name (`--cluster-name`). Each cloud-controller-manager must use a unique cluster name as the routes are managed based on cluster name.
 
 ### Node controller
