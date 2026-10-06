@@ -11,6 +11,8 @@
 - [Configuration](#configuration)
   - [Topology Support](#topology-support)
   - [Volume Encryption](#volume-encryption)
+  - [Volume Snapshots](#volume-snapshots)
+  - [Volume Expansion](#volume-expansion)
 
 ## Overview
 
@@ -163,3 +165,32 @@ parameters:
     This creates a full, independent copy of the volume's data in a **separate repository**.
     - **Best for:** True disaster recovery and long-term data protection.
     - **Note:** This operation is slower as it copies all data to a different location.
+
+### Volume Expansion
+
+To expand volumes, the StorageClass must allow it:
+
+```YAML
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: expandable-storage
+provisioner: block-storage.csi.stackit.cloud
+allowVolumeExpansion: true
+```
+
+To expand a volume, increase the storage request of the PVC:
+
+```bash
+kubectl patch pvc my-pvc -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+```
+
+Volumes can be expanded while they are attached to a running Pod (online) or while they are not in use (offline). The driver resizes the volume first and then the filesystem on the node. For an offline volume, the filesystem is resized when a Pod mounts the volume again. Volumes cannot be shrunk.
+
+The driver reports an expansion as successful only after the volume has the requested size. The STACKIT storage backend can reject a resize after it accepted the request, for example when it has not enough capacity. In this case:
+
+- The PVC keeps its old capacity (`status.capacity`).
+- The PVC gets a `VolumeResizeFailed` warning event with a message like `volume <id> has size 10 GiB after resize, requested 20 GiB`.
+- Kubernetes retries the expansion automatically with an increasing delay. No action is necessary when the backend has capacity again.
+
+Use `kubectl describe pvc my-pvc` to see the events.
