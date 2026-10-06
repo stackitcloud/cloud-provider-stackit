@@ -11,7 +11,7 @@ PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
 GOOS ?= $(shell uname -s | tr "[:upper:]" "[:lower:]")
 GOARCH ?= $(shell uname -m)
-LDFLAGS ?= "-s -w"
+LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
 E2E_PARALLEL_NODES ?= 4

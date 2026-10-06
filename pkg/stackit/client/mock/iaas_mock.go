@@ -504,45 +504,6 @@ func (c *MockIaaSClientGetBackupCall) DoAndReturn(f func(context.Context, string
 	return c
 }
 
-// GetRoutingTable mocks base method.
-func (m *MockIaaSClient) GetRoutingTable(ctx context.Context, routingTableID string) (*v2api.RoutingTable, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRoutingTable", ctx, routingTableID)
-	ret0, _ := ret[0].(*v2api.RoutingTable)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRoutingTable indicates an expected call of GetRoutingTable.
-func (mr *MockIaaSClientMockRecorder) GetRoutingTable(ctx, routingTableID any) *MockIaaSClientGetRoutingTableCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoutingTable", reflect.TypeOf((*MockIaaSClient)(nil).GetRoutingTable), ctx, routingTableID)
-	return &MockIaaSClientGetRoutingTableCall{Call: call}
-}
-
-// MockIaaSClientGetRoutingTableCall wrap *gomock.Call
-type MockIaaSClientGetRoutingTableCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockIaaSClientGetRoutingTableCall) Return(arg0 *v2api.RoutingTable, arg1 error) *MockIaaSClientGetRoutingTableCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockIaaSClientGetRoutingTableCall) Do(f func(context.Context, string) (*v2api.RoutingTable, error)) *MockIaaSClientGetRoutingTableCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockIaaSClientGetRoutingTableCall) DoAndReturn(f func(context.Context, string) (*v2api.RoutingTable, error)) *MockIaaSClientGetRoutingTableCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetServer mocks base method.
 func (m *MockIaaSClient) GetServer(ctx context.Context, serverID string) (*v2api.Server, error) {
 	m.ctrl.T.Helper()
