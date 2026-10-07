@@ -93,7 +93,7 @@ spec:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       - name: stackit-csi-plugin
-        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:v1.36
+        image: ghcr.io/stackitcloud/cloud-provider-stackit/stackit-csi-plugin:v1.37
         args:
         - /bin/stackit-csi-plugin
         - "--endpoint=$(CSI_ENDPOINT)"
