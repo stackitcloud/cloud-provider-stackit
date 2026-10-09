@@ -13,7 +13,7 @@ import (
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
 	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
-	"github.com/stackitcloud/stackit-sdk-go/services/ske"
+	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 	"sigs.k8s.io/kubetest2/pkg/types"
 )
 
@@ -251,7 +251,7 @@ func (c *fakeSKEClient) ListProviderOptions(_ context.Context, _ string) (*ske.P
 	return c.providerOptions, c.providerOptionsErr
 }
 
-func (c *fakeSKEClient) CreateOrUpdateCluster(_ context.Context, projectID, region, name string, _ ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error) {
+func (c *fakeSKEClient) CreateOrUpdateCluster(_ context.Context, projectID, region, name string, _ *ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error) {
 	c.lastCreateProjectID = projectID
 	c.lastCreateRegion = region
 	c.lastCreateClusterName = name
@@ -333,7 +333,7 @@ func providerOptionsFixture() *ske.ProviderOptions {
 func healthyClusterFixture() *ske.Cluster {
 	cluster := ske.NewClusterWithDefaults()
 	status := ske.NewClusterStatus()
-	status.SetAggregated(ske.CLUSTERSTATUSSTATE_HEALTHY)
+	status.SetAggregated(ske.CLUSTERSTATUSSTATE_STATE_HEALTHY)
 	cluster.SetStatus(*status)
 	return cluster
 }

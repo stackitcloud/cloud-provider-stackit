@@ -11,7 +11,7 @@ import (
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	serviceaccount "github.com/stackitcloud/stackit-sdk-go/services/serviceaccount/v2api"
 	serviceenablement "github.com/stackitcloud/stackit-sdk-go/services/serviceenablement/v2api"
-	"github.com/stackitcloud/stackit-sdk-go/services/ske"
+	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 )
 
 var _ = Describe("Up", func() {

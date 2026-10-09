@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/stackitcloud/stackit-sdk-go/services/ske"
+	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 	"k8s.io/klog/v2"
 )
 
@@ -88,7 +88,7 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 	return nil
 }
 
-func (d *Deployer) clusterPayload() ske.CreateOrUpdateClusterPayload {
+func (d *Deployer) clusterPayload() *ske.CreateOrUpdateClusterPayload {
 	klog.Infof(
 		"Building SKE cluster payload: cluster=%q kubernetes_version=%q availability_zone=%q machine_type=%q image=%q/%q node_count=%d nodepool=%q volume_size=%d volume_type=%q",
 		d.clusterName(),
@@ -106,7 +106,7 @@ func (d *Deployer) clusterPayload() ske.CreateOrUpdateClusterPayload {
 	clusterKubernetes := ske.NewKubernetes(d.kubernetesVersion)
 	nodeImage := ske.NewImage(d.nodeImageName, d.nodeImageVersion)
 	nodeMachine := ske.NewMachine(*nodeImage, d.machineType)
-	nodeVolume := ske.NewVolume(d.volumeSizeGiB)
+	nodeVolume := ske.NewVolume(int32(d.volumeSizeGiB))
 	if d.volumeType != "" {
 		nodeVolume.SetType(d.volumeType)
 	}
@@ -114,15 +114,15 @@ func (d *Deployer) clusterPayload() ske.CreateOrUpdateClusterPayload {
 	nodepool := ske.NewNodepool(
 		[]string{d.availabilityZone},
 		*nodeMachine,
-		d.nodeCount,
-		d.nodeCount,
+		int32(d.nodeCount),
+		int32(d.nodeCount),
 		d.nodepoolName,
 		*nodeVolume,
 	)
 	nodepool.SetAllowSystemComponents(true)
 
 	payload := ske.NewCreateOrUpdateClusterPayload(*clusterKubernetes, []ske.Nodepool{*nodepool})
-	return *payload
+	return payload
 }
 
 func containsKubernetesVersion(options *ske.ProviderOptions, version string) bool {
