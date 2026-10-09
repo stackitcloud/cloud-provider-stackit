@@ -175,7 +175,7 @@ E2E_DEPLOY_CCM_IMAGE="ghcr.io/stackitcloud/cloud-provider-stackit/cloud-controll
 
 The CSI E2E test suite validates the full functionality of the CSI driver. Tests are divided into parallel and sequential execution sets to accommodate different operational requirements, particularly for stateful operations like snapshots.
 
-> :warning: Make sure that the kubernetes version of the e2e test (hack/tools.mk@KUBERNETES_TEST_VERSION) matches your kubernetes version!
+> :warning: Make sure that the kubernetes version of the e2e test (hack/tools.mk@KUBERNETES_TEST_VERSION) matches your kubernetes version, per default it uses the kubernetes version from the go.mod.
 
 ### Parallel E2E Test Suite
 
