@@ -28,6 +28,7 @@ The minor versions of `cloud-provider-stackit` are specifically aligned with the
 * `v1.34.x`
 * `v1.35.x`
 * `v1.36.x`
+* `v1.37.x`
 
 ## User Documentation
 
