@@ -173,34 +173,15 @@ type route struct {
 type routes []route
 
 func (r routes) ToCloudProvider() []*cloudprovider.Route {
-	nodeToAddr := map[string][]corev1.NodeAddress{}
-	nodeBlackhole := map[string]bool{}
-	nodeToDestCIDRs := map[string][]string{}
-	for _, route := range r {
-		nodeName := route.NodeName
-		nodeBlackhole[nodeName] = route.Blackhole
-		addrs, ok := nodeToAddr[nodeName]
-		if !ok {
-			addrs = []corev1.NodeAddress{}
-		}
-		if !route.NextHop.IsUnspecified() {
-			addrs = append(addrs, corev1.NodeAddress{
-				Type:    corev1.NodeInternalIP,
-				Address: route.NextHop.String(),
-			})
-		}
-		nodeToAddr[nodeName] = addrs
-		nodeToDestCIDRs[nodeName] = append(nodeToDestCIDRs[nodeName], route.DestinationCIDR.String())
-	}
-
-	cpRoutes := make([]*cloudprovider.Route, 0, len(nodeToAddr))
-	for node, addrs := range nodeToAddr {
-		for _, destCIDR := range nodeToDestCIDRs[node] {
+	nodeInfoMap := r.aggregateNodeRoutes()
+	cpRoutes := make([]*cloudprovider.Route, 0, len(nodeInfoMap))
+	for node, info := range nodeInfoMap {
+		for _, destCIDR := range info.DestCIDRs {
 			cpRoutes = append(cpRoutes, &cloudprovider.Route{
 				TargetNode:          types.NodeName(node),
-				Blackhole:           nodeBlackhole[node],
+				TargetNodeAddresses: info.Addresses.UnsortedList(),
 				DestinationCIDR:     destCIDR,
-				TargetNodeAddresses: addrs,
+				Blackhole:           info.Blackhole,
 				// EnableNodeAddresses = true will make the route controller reconcile routes if node.Status.Address changes.
 				// Since this will trigger create - delete calls if we return TargetNodeAddresses that miss certain Addresses (like Hostname),
 				// we will not leverage this feature as we cannot get all Addresses from the routes only.
@@ -209,6 +190,39 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 		}
 	}
 	return cpRoutes
+}
+
+type nodeRouteInfo struct {
+	Blackhole bool
+	Addresses sets.Set[corev1.NodeAddress]
+	DestCIDRs []string
+}
+
+func (r routes) aggregateNodeRoutes() map[string]*nodeRouteInfo {
+	nodeMap := make(map[string]*nodeRouteInfo)
+
+	for _, route := range r {
+		node, exists := nodeMap[route.NodeName]
+		if !exists {
+			node = &nodeRouteInfo{
+				Addresses: sets.New[corev1.NodeAddress](),
+			}
+			nodeMap[route.NodeName] = node
+		}
+
+		node.Blackhole = route.Blackhole
+
+		if !route.NextHop.IsUnspecified() {
+			node.Addresses = sets.Insert(node.Addresses, corev1.NodeAddress{
+				Type:    corev1.NodeInternalIP,
+				Address: route.NextHop.String(),
+			})
+		}
+
+		node.DestCIDRs = append(node.DestCIDRs, route.DestinationCIDR.String())
+	}
+
+	return nodeMap
 }
 
 func (r route) String() string {

@@ -2,6 +2,7 @@ package ccm
 
 import (
 	"context"
+	"net/netip"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,6 +11,7 @@ import (
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
@@ -232,4 +234,69 @@ var _ = Describe("Routes", func() {
 		})
 	})
 
+	Describe("internal route representation", func() {
+		Describe("routes", func() {
+			Describe("#ToCloudProvider", func() {
+				It("should be able to handle dual stack", func() {
+					r := routes{
+						{
+							NodeName:        "foo",
+							NextHop:         netip.MustParseAddr("10.0.0.2"),
+							Blackhole:       false,
+							DestinationCIDR: netip.MustParsePrefix("100.0.0.0/24"),
+						},
+						{
+							NodeName:        "foo",
+							NextHop:         netip.MustParseAddr("10.0.0.2"),
+							Blackhole:       false,
+							DestinationCIDR: netip.MustParsePrefix("2001:db8:acad::/64"),
+						},
+						{
+							NodeName:        "bar",
+							NextHop:         netip.MustParseAddr("10.0.0.3"),
+							Blackhole:       false,
+							DestinationCIDR: netip.MustParsePrefix("100.0.1.0/24"),
+						},
+						{
+							NodeName:        "bar",
+							NextHop:         netip.MustParseAddr("10.0.0.3"),
+							Blackhole:       false,
+							DestinationCIDR: netip.MustParsePrefix("2001:db8:acad:1::/64"),
+						},
+					}
+					cpRoutes := r.ToCloudProvider()
+					Expect(cpRoutes).To(ConsistOf(
+						&cloudprovider.Route{
+							TargetNode:          types.NodeName("foo"),
+							EnableNodeAddresses: false,
+							TargetNodeAddresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.2"}},
+							DestinationCIDR:     "100.0.0.0/24",
+							Blackhole:           false,
+						},
+						&cloudprovider.Route{
+							TargetNode:          types.NodeName("foo"),
+							EnableNodeAddresses: false,
+							TargetNodeAddresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.2"}},
+							DestinationCIDR:     "2001:db8:acad::/64",
+							Blackhole:           false,
+						},
+						&cloudprovider.Route{
+							TargetNode:          types.NodeName("bar"),
+							EnableNodeAddresses: false,
+							TargetNodeAddresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.3"}},
+							DestinationCIDR:     "100.0.1.0/24",
+							Blackhole:           false,
+						},
+						&cloudprovider.Route{
+							TargetNode:          types.NodeName("bar"),
+							EnableNodeAddresses: false,
+							TargetNodeAddresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.0.0.3"}},
+							DestinationCIDR:     "2001:db8:acad:1::/64",
+							Blackhole:           false,
+						},
+					))
+				})
+			})
+		})
+	})
 })
