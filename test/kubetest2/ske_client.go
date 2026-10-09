@@ -52,7 +52,7 @@ func (c *sdkSKEClient) CreateOrUpdateCluster(ctx context.Context, projectID, reg
 
 func (c *sdkSKEClient) WaitForClusterReady(ctx context.Context, projectID, region, name string) (*ske.Cluster, error) {
 	klog.Infof("Waiting for SKE cluster to become ready: project_id=%q region=%q cluster=%q", projectID, region, name)
-	cluster, err := skewait.CreateOrUpdateClusterWaitHandler(ctx, c.api, projectID, region, name).WaitWithContext(ctx)
+	cluster, err := skewait.CreateClusterWaitHandler(ctx, c.api, projectID, region, name).WaitWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
