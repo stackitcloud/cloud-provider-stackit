@@ -89,12 +89,41 @@ var _ = Describe("Down", func() {
 		Expect(projectClient.deleteCalls).To(Equal(1))
 		Expect(projectClient.waitDeletedCalls).To(Equal(1))
 	})
+
+	It("skips delete when project is already deleting", func() {
+		d := newTestDeployer()
+		deletingProject := projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels())
+		deletingProject.SetLifecycleState(resourcemanager.LIFECYCLESTATE_DELETING)
+
+		projectClient := &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{*deletingProject},
+		}
+		d.projectClient = projectClient
+
+		Expect(d.Down()).To(Succeed())
+		Expect(projectClient.deleteCalls).To(Equal(0))
+		Expect(projectClient.waitDeletedCalls).To(Equal(1))
+	})
 })
 
 var _ = Describe("IsUp", func() {
 	It("returns false when no project", func() {
 		d := newTestDeployer()
 		d.projectClient = &fakeProjectClient{}
+
+		isUp, err := d.IsUp()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(isUp).To(BeFalse())
+	})
+
+	It("returns false when project is deleting", func() {
+		d := newTestDeployer()
+		deletingProject := projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels())
+		deletingProject.SetLifecycleState(resourcemanager.LIFECYCLESTATE_DELETING)
+
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{*deletingProject},
+		}
 
 		isUp, err := d.IsUp()
 		Expect(err).NotTo(HaveOccurred())

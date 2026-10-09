@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 	"k8s.io/klog/v2"
@@ -40,7 +41,11 @@ func (d *Deployer) writeKubeconfig(ctx context.Context, clusterName string) erro
 		return fmt.Errorf("create kubeconfig for SKE cluster %q: %w", clusterName, err)
 	}
 	klog.Infof("Writing kubeconfig for cluster=%q to %q", clusterName, d.kubeconfigPath)
-	if err := os.WriteFile(d.kubeconfigPath, []byte(kubeconfig.GetKubeconfig()), 0o600); err != nil {
+	content := kubeconfig.GetKubeconfig()
+	if strings.TrimSpace(content) == "" {
+		return fmt.Errorf("create kubeconfig for SKE cluster %q returned empty kubeconfig", clusterName)
+	}
+	if err := os.WriteFile(d.kubeconfigPath, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write kubeconfig %q: %w", d.kubeconfigPath, err)
 	}
 	return nil
@@ -52,6 +57,9 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 	options, err := d.skeClient.ListProviderOptions(ctx, d.region)
 	if err != nil {
 		return fmt.Errorf("list SKE provider options: %w", err)
+	}
+	if options == nil {
+		return fmt.Errorf("list SKE provider options returned nil response")
 	}
 
 	if !containsKubernetesVersion(options, d.kubernetesVersion) {

@@ -11,10 +11,11 @@ import (
 )
 
 type managedProject struct {
-	ContainerID string
-	ProjectID   string
-	Name        string
-	Labels      map[string]string
+	ContainerID    string
+	ProjectID      string
+	Name           string
+	LifecycleState resourcemanager.LifecycleState
+	Labels         map[string]string
 }
 
 // ensureProject idempotently resolves (or creates) the managed STACKIT project
@@ -42,10 +43,11 @@ func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, err
 			continue
 		}
 		matches = append(matches, managedProject{
-			ContainerID: project.GetContainerId(),
-			ProjectID:   project.GetProjectId(),
-			Name:        project.GetName(),
-			Labels:      project.GetLabels(),
+			ContainerID:    project.GetContainerId(),
+			ProjectID:      project.GetProjectId(),
+			Name:           project.GetName(),
+			LifecycleState: project.GetLifecycleState(),
+			Labels:         project.GetLabels(),
 		})
 	}
 
@@ -70,6 +72,9 @@ func (d *Deployer) resolveManagedProject(ctx context.Context) (*managedProject, 
 		return nil, err
 	}
 	if project != nil {
+		if project.LifecycleState == resourcemanager.LIFECYCLESTATE_DELETING {
+			return nil, fmt.Errorf("managed project %q (%s) is terminating (DELETING)", project.Name, project.ProjectID)
+		}
 		klog.Infof("Reusing managed project=%q project_id=%q", project.Name, project.ProjectID)
 		return project, nil
 	}
@@ -92,10 +97,11 @@ func (d *Deployer) resolveManagedProject(ctx context.Context) (*managedProject, 
 	}
 
 	return &managedProject{
-		ContainerID: activeProject.GetContainerId(),
-		ProjectID:   activeProject.GetProjectId(),
-		Name:        activeProject.GetName(),
-		Labels:      activeProject.GetLabels(),
+		ContainerID:    activeProject.GetContainerId(),
+		ProjectID:      activeProject.GetProjectId(),
+		Name:           activeProject.GetName(),
+		LifecycleState: activeProject.GetLifecycleState(),
+		Labels:         activeProject.GetLabels(),
 	}, nil
 }
 
@@ -132,6 +138,9 @@ func (d *Deployer) ensureSKEServiceEnabled(ctx context.Context, projectID string
 	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLED {
 		klog.Infof("SKE service already enabled for project_id=%q", projectID)
 		return nil
+	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLING {
+		klog.Infof("SKE service enablement already in progress for project_id=%q, waiting", projectID)
+		return d.serviceEnablementClient.WaitForServiceEnabled(ctx, d.region, projectID, skeServiceID)
 	} else {
 		klog.Infof("SKE service in state %q for project_id=%q, enabling", status.GetState(), projectID)
 	}

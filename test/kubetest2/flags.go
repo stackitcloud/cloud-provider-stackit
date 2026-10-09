@@ -26,6 +26,18 @@ func bindFlags(fs *pflag.FlagSet, d *Deployer) {
 }
 
 func (d *Deployer) validate() error {
+	if strings.TrimSpace(d.region) == "" {
+		return incorrectUsagef("--region is required")
+	}
+	if d.options == nil || strings.TrimSpace(d.options.RunID()) == "" {
+		return incorrectUsagef("kubetest2 run-id must not be empty")
+	}
+
+	if !d.options.ShouldUp() {
+		klog.Infof("Deployer configuration validation succeeded for non-up phase (run_id=%q region=%q)", d.options.RunID(), d.region)
+		return nil
+	}
+
 	klog.Infof(
 		"Validating deployer configuration: run_id=%q region=%q kubernetes_version=%q availability_zone=%q machine_type=%q node_image_name=%q node_image_version=%q node_count=%d nodepool_name=%q volume_size=%d volume_type=%q kubeconfig_expiration_seconds=%d csi_image_name=%q csi_image_tag=%q",
 		d.options.RunID(),
@@ -45,7 +57,6 @@ func (d *Deployer) validate() error {
 	)
 
 	requiredFlags := map[string]string{
-		"--region":             d.region,
 		"--kubernetes-version": d.kubernetesVersion,
 		"--availability-zone":  d.availabilityZone,
 		"--machine-type":       d.machineType,
@@ -79,9 +90,6 @@ func (d *Deployer) validate() error {
 			minKubeconfigExpiration,
 			maxKubeconfigExpiration,
 		)
-	}
-	if strings.TrimSpace(d.options.RunID()) == "" {
-		return incorrectUsagef("kubetest2 run-id must not be empty")
 	}
 
 	klog.Infof("Deployer configuration validation succeeded")

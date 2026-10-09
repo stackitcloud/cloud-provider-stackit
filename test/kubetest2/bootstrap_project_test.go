@@ -73,6 +73,20 @@ var _ = Describe("resolveManagedProject", func() {
 		Expect(projectClient.lastCreateLabels).To(Equal(d.managedProjectLabels()))
 	})
 
+	It("fails when matched project is terminating", func() {
+		d := newTestDeployer()
+		deletingProject := projectFixture(d.projectName(), "project-deleting", "container-deleting", d.managedProjectLabels())
+		deletingProject.SetLifecycleState(resourcemanager.LIFECYCLESTATE_DELETING)
+
+		projectClient := &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{*deletingProject},
+		}
+		d.projectClient = projectClient
+
+		_, err := d.resolveManagedProject(context.Background())
+		Expect(err).To(MatchError(ContainSubstring("terminating (DELETING)")))
+	})
+
 	It("errors on multiple matches", func() {
 		d := newTestDeployer()
 		d.projectClient = &fakeProjectClient{
@@ -140,6 +154,18 @@ var _ = Describe("ensureSKEServiceEnabled", func() {
 
 		Expect(d.ensureSKEServiceEnabled(context.Background(), "project-123")).To(Succeed())
 		Expect(client.enableCalls).To(Equal(1))
+		Expect(client.waitCalls).To(Equal(1))
+	})
+
+	It("waits without enabling when enablement is already in progress", func() {
+		d := newTestDeployer()
+		client := &fakeServiceEnablementClient{
+			getStatusResult: enablingServiceStatusFixture(),
+		}
+		d.serviceEnablementClient = client
+
+		Expect(d.ensureSKEServiceEnabled(context.Background(), "project-123")).To(Succeed())
+		Expect(client.enableCalls).To(Equal(0))
 		Expect(client.waitCalls).To(Equal(1))
 	})
 

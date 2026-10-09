@@ -7,6 +7,7 @@ import (
 
 func newValidTestDeployer() *Deployer {
 	d := newTestDeployer()
+	d.options = fakeOptions{runID: "run-123", runDir: d.options.RunDir(), shouldUp: true}
 	configureValidUpInputs(d)
 	d.nodeCount = defaultNodeCount
 	d.volumeSizeGiB = defaultVolumeSizeGiB
@@ -17,6 +18,19 @@ func newValidTestDeployer() *Deployer {
 var _ = Describe("validate", func() {
 	It("accepts a valid configuration", func() {
 		Expect(newValidTestDeployer().validate()).To(Succeed())
+	})
+
+	It("accepts minimal configuration when not running up", func() {
+		d := newTestDeployer()
+		d.options = fakeOptions{runID: "run-123", runDir: d.options.RunDir(), shouldUp: false}
+		Expect(d.validate()).To(Succeed())
+	})
+
+	It("rejects empty region when not running up", func() {
+		d := newTestDeployer()
+		d.region = ""
+		d.options = fakeOptions{runID: "run-123", runDir: d.options.RunDir(), shouldUp: false}
+		Expect(d.validate()).To(MatchError(ContainSubstring("--region is required")))
 	})
 
 	DescribeTable("rejects invalid configuration",

@@ -25,14 +25,15 @@ func TestKubetest2(t *testing.T) {
 const validServiceAccountKey = `{"credentials":{"iss":"owner@example.com"}}`
 
 type fakeOptions struct {
-	runID  string
-	runDir string
+	runID    string
+	runDir   string
+	shouldUp bool
 }
 
 func (o fakeOptions) HelpRequested() bool       { return false }
 func (o fakeOptions) ShouldBuild() bool         { return false }
-func (o fakeOptions) ShouldUp() bool            { return false }
-func (o fakeOptions) ShouldDown() bool          { return false }
+func (o fakeOptions) ShouldUp() bool            { return o.shouldUp }
+func (o fakeOptions) ShouldDown() bool          { return !o.shouldUp }
 func (o fakeOptions) ShouldTest() bool          { return false }
 func (o fakeOptions) SkipTestJUnitReport() bool { return false }
 func (o fakeOptions) RunID() string             { return o.runID }
@@ -340,6 +341,13 @@ func healthyClusterFixture() *ske.Cluster {
 func disabledServiceStatusFixture() *serviceenablement.ServiceStatus {
 	status := serviceenablement.NewServiceStatus()
 	state := serviceenablement.SERVICESTATUSSTATE_DISABLED
+	status.State = &state
+	return status
+}
+
+func enablingServiceStatusFixture() *serviceenablement.ServiceStatus {
+	status := serviceenablement.NewServiceStatus()
+	state := serviceenablement.SERVICESTATUSSTATE_ENABLING
 	status.State = &state
 	return status
 }
