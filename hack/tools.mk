@@ -1,8 +1,8 @@
 TOOLS_BIN_DIR := hack/tools/bin
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
-OS := $(shell uname -s | tr "[:upper:]" "[:lower:]")
-ARCH := $(shell uname -m)
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
 
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
 GOIMPORTS_REVISER_VERSION ?= v3.13.2
@@ -15,7 +15,7 @@ APKO_VERSION ?= v1.4.8
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.19.1
 
-KUBERNETES_TEST_VERSION ?= v1.33.5
+KUBERNETES_TEST_VERSION ?= $(shell go list -m -f '{{.Version}}' k8s.io/api | sed 's/^v0\./v1./')
 
 # Tool targets should declare go.mod as a prerequisite, if the tool's version is managed via go modules. This causes
 # make to rebuild the tool in the desired version, when go.mod is changed.
