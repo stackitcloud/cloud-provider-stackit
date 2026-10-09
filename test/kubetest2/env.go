@@ -69,7 +69,11 @@ func (d *Deployer) loadEnvironment() error {
 }
 
 func extractServiceAccountEmail(serviceAccountKey string) (string, error) {
-	var key serviceAccountKeyFile
+	var key struct {
+		Credentials struct {
+			Iss string `json:"iss"`
+		} `json:"credentials"`
+	}
 	if err := json.Unmarshal([]byte(serviceAccountKey), &key); err != nil {
 		return "", fmt.Errorf("parse service account key: %w", err)
 	}

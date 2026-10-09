@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 )
 
 var _ = Describe("validateProviderOptions", func() {
@@ -41,6 +42,12 @@ var _ = Describe("validateProviderOptions", func() {
 		d.volumeType = ""
 		d.skeClient = &fakeSKEClient{providerOptions: providerOptionsFixture()}
 		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
+	})
+
+	It("fails when provider options response is nil", func() {
+		d := newValidTestDeployer()
+		d.skeClient = &fakeSKEClient{providerOptions: nil}
+		Expect(d.validateProviderOptions(context.Background())).To(MatchError(ContainSubstring("returned nil response")))
 	})
 })
 
@@ -83,5 +90,15 @@ var _ = Describe("clusterPayload", func() {
 		Expect(payload.GetNodepools()).To(HaveLen(1))
 		volume := payload.GetNodepools()[0].GetVolume()
 		Expect(volume.GetType()).To(BeEmpty())
+	})
+})
+
+var _ = Describe("writeKubeconfig", func() {
+	It("rejects empty kubeconfig content", func() {
+		d := newValidTestDeployer()
+		d.skeClient = &fakeSKEClient{
+			kubeconfigResult: ske.NewKubeconfig(),
+		}
+		Expect(d.writeKubeconfig(context.Background(), "test-cluster")).To(MatchError(ContainSubstring("returned empty kubeconfig")))
 	})
 })

@@ -25,27 +25,6 @@ type managedServiceAccount struct {
 	ProjectID string
 }
 
-type serviceAccountKeyFile struct {
-	Active       bool                             `json:"active"`
-	CreatedAt    time.Time                        `json:"createdAt"`
-	Credentials  serviceAccountKeyCredentialsFile `json:"credentials"`
-	ID           string                           `json:"id"`
-	KeyAlgorithm string                           `json:"keyAlgorithm"`
-	KeyOrigin    string                           `json:"keyOrigin"`
-	KeyType      string                           `json:"keyType"`
-	PublicKey    string                           `json:"publicKey"`
-	ValidUntil   *time.Time                       `json:"validUntil,omitempty"`
-}
-
-type serviceAccountKeyCredentialsFile struct {
-	Aud           string  `json:"aud"`
-	Iss           string  `json:"iss"`
-	Kid           string  `json:"kid"`
-	PrivateKey    *string `json:"privateKey,omitempty"`
-	Sub           string  `json:"sub"`
-	TokenEndpoint string  `json:"tokenEndpoint"`
-}
-
 var childProjectRoles = []string{
 	childProjectSKERole,
 	childProjectStorageRole,
@@ -186,7 +165,10 @@ func retryWithBackoff[T any](ctx context.Context, backoff wait.Backoff, fn func(
 		return true, nil
 	})
 	if waitErr != nil {
-		return result, fmt.Errorf("backoff failed: %w, last error: %v", waitErr, lastErr)
+		if lastErr != nil {
+			return result, fmt.Errorf("backoff failed: %w, last error: %w", waitErr, lastErr)
+		}
+		return result, fmt.Errorf("backoff failed: %w", waitErr)
 	}
 	return result, nil
 }
@@ -202,7 +184,11 @@ func (d *Deployer) readCachedChildServiceAccountKey() (key string, ok bool, err 
 		}
 		return "", false, err
 	}
-	return string(keyBytes), true, nil
+	key = string(keyBytes)
+	if strings.TrimSpace(key) == "" {
+		return "", false, nil
+	}
+	return key, true, nil
 }
 
 func (d *Deployer) writeCachedChildServiceAccountKey(serviceAccountKey string) error {
@@ -231,28 +217,7 @@ func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyRes
 		return "", fmt.Errorf("service-account key response did not include a private key")
 	}
 
-	serviceAccountKey := serviceAccountKeyFile{
-		Active:    createdKey.GetActive(),
-		CreatedAt: createdKey.GetCreatedAt(),
-		Credentials: serviceAccountKeyCredentialsFile{
-			Aud:           credentials.GetAud(),
-			Iss:           credentials.GetIss(),
-			Kid:           credentials.GetKid(),
-			PrivateKey:    privateKey,
-			Sub:           credentials.GetSub(),
-			TokenEndpoint: credentials.GetTokenEndpoint(),
-		},
-		ID:           createdKey.GetId(),
-		KeyAlgorithm: string(createdKey.GetKeyAlgorithm()),
-		KeyOrigin:    string(createdKey.GetKeyOrigin()),
-		KeyType:      string(createdKey.GetKeyType()),
-		PublicKey:    createdKey.GetPublicKey(),
-	}
-	if validUntil, ok := createdKey.GetValidUntilOk(); ok {
-		serviceAccountKey.ValidUntil = validUntil
-	}
-
-	keyJSON, err := json.Marshal(serviceAccountKey)
+	keyJSON, err := json.Marshal(createdKey)
 	if err != nil {
 		return "", err
 	}
