@@ -3,5 +3,7 @@ kind: StorageClass
 metadata:
   name: premium-perf4-stackit-kubetest2
 provisioner: kubetest2.csi.stackit.cloud
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
 parameters:
   type: "storage_premium_perf4"
