@@ -15,7 +15,7 @@ APKO_VERSION ?= v1.4.8
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.19.1
 
-KUBERNETES_TEST_VERSION ?= v1.36.2
+KUBERNETES_TEST_VERSION ?= $(shell go list -m -f '{{.Version}}' k8s.io/api | sed 's/^v0\./v1./')
 
 # Tool targets should declare go.mod as a prerequisite, if the tool's version is managed via go modules. This causes
 # make to rebuild the tool in the desired version, when go.mod is changed.
