@@ -165,11 +165,24 @@ var _ = Describe("retryWithBackoff", func() {
 
 	It("returns last error when exhausted", func() {
 		calls := 0
+		rootErr := errors.New("underlying cause")
 		_, err := retryWithBackoff(context.Background(), wait.Backoff{Duration: 0, Factor: 1, Steps: 3}, func() (int, error) {
 			calls++
-			return 0, errors.New("always fails")
+			return 0, rootErr
 		})
 		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, rootErr)).To(BeTrue())
 		Expect(calls).To(Equal(3))
+	})
+})
+
+var _ = Describe("readCachedChildServiceAccountKey", func() {
+	It("ignores empty or whitespace-only cache files", func() {
+		d := newTestDeployer()
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte("   \n\t  "), 0o600)).To(Succeed())
+		key, ok, err := d.readCachedChildServiceAccountKey()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
+		Expect(key).To(BeEmpty())
 	})
 })

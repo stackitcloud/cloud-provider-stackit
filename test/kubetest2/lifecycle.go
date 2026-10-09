@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
+	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
 	"github.com/stackitcloud/stackit-sdk-go/services/ske"
 	"k8s.io/klog/v2"
 )
@@ -71,12 +72,14 @@ func (d *Deployer) Down() error {
 	}
 
 	d.projectID = project.ProjectID
-	if err := d.projectClient.DeleteProject(ctx, project.ProjectID); err != nil {
-		if !stackiterrors.IsNotFound(err) {
-			return fmt.Errorf("delete STACKIT project %q: %w", project.ProjectID, err)
+	if project.LifecycleState != resourcemanager.LIFECYCLESTATE_DELETING {
+		if err := d.projectClient.DeleteProject(ctx, project.ProjectID); err != nil {
+			if !stackiterrors.IsNotFound(err) {
+				return fmt.Errorf("delete STACKIT project %q: %w", project.ProjectID, err)
+			}
+			klog.Infof("Project=%q already absent, treating delete as success", project.ProjectID)
+			return nil
 		}
-		klog.Infof("Project=%q already absent, treating delete as success", project.ProjectID)
-		return nil
 	}
 
 	if err := d.projectClient.WaitForProjectDeleted(ctx, project.ProjectID); err != nil {
@@ -94,8 +97,8 @@ func (d *Deployer) IsUp() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if project == nil {
-		klog.Infof("Managed project for run_id=%q not found during IsUp check", d.options.RunID())
+	if project == nil || project.LifecycleState == resourcemanager.LIFECYCLESTATE_DELETING {
+		klog.Infof("Managed project for run_id=%q not found or terminating during IsUp check", d.options.RunID())
 		return false, nil
 	}
 
