@@ -7,7 +7,7 @@ import (
 
 	"github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/stackiterrors"
 	resourcemanager "github.com/stackitcloud/stackit-sdk-go/services/resourcemanager/v0api"
-	"github.com/stackitcloud/stackit-sdk-go/services/ske"
+	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 	"k8s.io/klog/v2"
 )
 
@@ -135,7 +135,7 @@ func (d *Deployer) IsUp() (bool, error) {
 
 	state := cluster.Status.GetAggregated()
 	klog.Infof("Cluster=%q current aggregated state=%q", d.clusterName(), state)
-	return state == ske.CLUSTERSTATUSSTATE_HEALTHY || state == ske.CLUSTERSTATUSSTATE_HIBERNATED, nil
+	return state == ske.CLUSTERSTATUSSTATE_STATE_HEALTHY || state == ske.CLUSTERSTATUSSTATE_STATE_HIBERNATED, nil
 }
 
 func (d *Deployer) Kubeconfig() (string, error) {

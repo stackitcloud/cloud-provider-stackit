@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/stackitcloud/stackit-sdk-go/services/ske"
-	skewait "github.com/stackitcloud/stackit-sdk-go/services/ske/wait"
+	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
+	skewait "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api/wait"
 	"k8s.io/klog/v2"
 )
 
 type skeClient interface {
 	GetCluster(ctx context.Context, projectID, region, name string) (*ske.Cluster, error)
 	ListProviderOptions(ctx context.Context, region string) (*ske.ProviderOptions, error)
-	CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error)
+	CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload *ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error)
 	WaitForClusterReady(ctx context.Context, projectID, region, name string) (*ske.Cluster, error)
 	CreateKubeconfig(ctx context.Context, projectID, region, name string, expirationSeconds int64) (*ske.Kubeconfig, error)
 }
 
 type sdkSKEClient struct {
-	api ske.DefaultApi
+	api ske.DefaultAPI
 }
 
 func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
@@ -32,7 +32,7 @@ func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
 
 	klog.Infof("Created SKE API client successfully")
 
-	return &sdkSKEClient{api: apiClient}, nil
+	return &sdkSKEClient{api: apiClient.DefaultAPI}, nil
 }
 
 func (c *sdkSKEClient) GetCluster(ctx context.Context, projectID, region, name string) (*ske.Cluster, error) {
@@ -45,9 +45,9 @@ func (c *sdkSKEClient) ListProviderOptions(ctx context.Context, region string) (
 	return c.api.ListProviderOptions(ctx, region).Execute()
 }
 
-func (c *sdkSKEClient) CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error) {
+func (c *sdkSKEClient) CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload *ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error) {
 	klog.Infof("SKE CreateOrUpdateCluster: project_id=%q region=%q cluster=%q", projectID, region, name)
-	return c.api.CreateOrUpdateCluster(ctx, projectID, region, name).CreateOrUpdateClusterPayload(payload).Execute()
+	return c.api.CreateOrUpdateCluster(ctx, projectID, region, name).CreateOrUpdateClusterPayload(*payload).Execute()
 }
 
 func (c *sdkSKEClient) WaitForClusterReady(ctx context.Context, projectID, region, name string) (*ske.Cluster, error) {
