@@ -1,8 +1,8 @@
 TOOLS_BIN_DIR := hack/tools/bin
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
-OS := $(shell uname -s | tr "[:upper:]" "[:lower:]")
-ARCH := $(shell uname -m)
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
 
 # renovate: datasource=github-releases depName=incu6us/goimports-reviser
 GOIMPORTS_REVISER_VERSION ?= v3.13.2
