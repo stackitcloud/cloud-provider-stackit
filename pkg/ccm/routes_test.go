@@ -242,25 +242,21 @@ var _ = Describe("Routes", func() {
 						{
 							NodeName:        "foo",
 							NextHop:         netip.MustParseAddr("10.0.0.2"),
-							Blackhole:       false,
 							DestinationCIDR: netip.MustParsePrefix("100.0.0.0/24"),
 						},
 						{
 							NodeName:        "foo",
 							NextHop:         netip.MustParseAddr("10.0.0.2"),
-							Blackhole:       false,
 							DestinationCIDR: netip.MustParsePrefix("2001:db8:acad::/64"),
 						},
 						{
 							NodeName:        "bar",
 							NextHop:         netip.MustParseAddr("10.0.0.3"),
-							Blackhole:       false,
 							DestinationCIDR: netip.MustParsePrefix("100.0.1.0/24"),
 						},
 						{
 							NodeName:        "bar",
 							NextHop:         netip.MustParseAddr("10.0.0.3"),
-							Blackhole:       false,
 							DestinationCIDR: netip.MustParsePrefix("2001:db8:acad:1::/64"),
 						},
 					}

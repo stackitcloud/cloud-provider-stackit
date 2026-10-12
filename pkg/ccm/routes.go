@@ -19,7 +19,6 @@ import (
 const (
 	routeDestinationTypeCIDRv4 = "cidrv4"
 	routeDestinationTypeCIDRv6 = "cidrv6"
-	routeNexthopTypeBlackhole  = "blackhole"
 	routeNexthopTypeIPv4       = "ipv4"
 	routeNexthopTypeIPv6       = "ipv6"
 )
@@ -37,9 +36,14 @@ type Routes struct {
 
 // CreateRoute implements [cloudprovider.Routes].
 func (r *Routes) CreateRoute(ctx context.Context, clusterName, nameHint string, route *cloudprovider.Route) error {
-	routes, err := r.routesFromCloudprovider(route)
+	routes, err := r.routesFromCloudProvider(route)
 	if err != nil {
-		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
+		return fmt.Errorf("getting routes from cloudprovider.Route: %w", err)
+	}
+
+	// if a node does not yet have any InternalIP reported in it's status we must make sure the controller retries by returning an error
+	if len(routes) == 0 {
+		return errors.New("no routes determined")
 	}
 
 	existingRoutes, err := r.getExistingRoutes(ctx, clusterName, nameHint, string(route.TargetNode), r.routingTableID)
@@ -84,7 +88,7 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, cloudprovi
 		existingRoutes[*route] = iaasRoute.GetId()
 	}
 
-	routes, err := r.routesFromCloudprovider(cloudproviderRoute)
+	routes, err := r.routesFromCloudProvider(cloudproviderRoute)
 	if err != nil {
 		return fmt.Errorf("casting routes from cloudprovider.Route: %w", err)
 	}
@@ -92,7 +96,8 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, cloudprovi
 	for _, route := range routes {
 		id, ok := existingRoutes[route]
 		if ok {
-			deleteErr = errors.Join(err, r.iaasClient.DeleteRoute(ctx, r.routingTableID, id))
+			err := r.iaasClient.DeleteRoute(ctx, r.routingTableID, id)
+			deleteErr = errors.Join(deleteErr, err)
 		}
 	}
 
@@ -128,12 +133,14 @@ func (r *Routes) getExistingRoutes(ctx context.Context, clusterName, nameHint, t
 
 // routesFromCloudprovider parses [cloudprovider.Route] into the in-memory route representation.
 // A [cloudprovider.Route] can results in multiple in-memory routes since we need 1 route per node IP
-func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (routes, error) {
+func (r *Routes) routesFromCloudProvider(cloudroute *cloudprovider.Route) (routes, error) {
 	var routes routes
 	destinationCIDR, err := netip.ParsePrefix(cloudroute.DestinationCIDR)
 	if err != nil {
 		return nil, fmt.Errorf("parsing route destinationCIDR %s: %w", cloudroute.DestinationCIDR, err)
 	}
+
+	// blackholed routes are not supported as they are not determined by the controller
 	for _, nodeAddr := range cloudroute.TargetNodeAddresses {
 		if nodeAddr.Type != corev1.NodeInternalIP {
 			continue
@@ -150,13 +157,7 @@ func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (route
 			NextHop:         nodeAddrIP,
 		})
 	}
-	if cloudroute.Blackhole {
-		routes = append(routes, route{
-			Blackhole:       true,
-			DestinationCIDR: destinationCIDR,
-			NodeName:        string(cloudroute.TargetNode),
-		})
-	}
+
 	return routes, nil
 }
 
@@ -165,7 +166,6 @@ func (r *Routes) routesFromCloudprovider(cloudroute *cloudprovider.Route) (route
 type route struct {
 	NodeName        string
 	NextHop         netip.Addr
-	Blackhole       bool
 	DestinationCIDR netip.Prefix
 }
 
@@ -181,7 +181,8 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 				TargetNode:          types.NodeName(node),
 				TargetNodeAddresses: info.Addresses.UnsortedList(),
 				DestinationCIDR:     destCIDR,
-				Blackhole:           info.Blackhole,
+				// we do not support blackholing routes
+				Blackhole: false,
 				// EnableNodeAddresses = true will make the route controller reconcile routes if node.Status.Address changes.
 				// Since this will trigger create - delete calls if we return TargetNodeAddresses that miss certain Addresses (like Hostname),
 				// we will not leverage this feature as we cannot get all Addresses from the routes only.
@@ -193,7 +194,6 @@ func (r routes) ToCloudProvider() []*cloudprovider.Route {
 }
 
 type nodeRouteInfo struct {
-	Blackhole bool
 	Addresses sets.Set[corev1.NodeAddress]
 	DestCIDRs []string
 }
@@ -210,9 +210,7 @@ func (r routes) aggregateNodeRoutes() map[string]*nodeRouteInfo {
 			nodeMap[route.NodeName] = node
 		}
 
-		node.Blackhole = route.Blackhole
-
-		if !route.NextHop.IsUnspecified() {
+		if route.NextHop.IsValid() {
 			node.Addresses = sets.Insert(node.Addresses, corev1.NodeAddress{
 				Type:    corev1.NodeInternalIP,
 				Address: route.NextHop.String(),
@@ -227,12 +225,7 @@ func (r routes) aggregateNodeRoutes() map[string]*nodeRouteInfo {
 
 func (r route) String() string {
 	sb := new(strings.Builder)
-	fmt.Fprintf(sb, "node=%s, nextHop=%s ", r.NodeName, r.NextHop)
-	if r.Blackhole {
-		fmt.Fprint(sb, "blackhole")
-	} else {
-		fmt.Fprintf(sb, "destinationCIDR=%s", r.DestinationCIDR)
-	}
+	fmt.Fprintf(sb, "node=%s, nextHop=%s destinationCIDR=%s", r.NodeName, r.NextHop, r.DestinationCIDR)
 	return sb.String()
 }
 
@@ -257,47 +250,43 @@ func (r *route) ToIaasRoute(nameHint, clusterName string) (iaas.Route, error) {
 func (r *route) iaasRouteDestination() (iaas.RouteDestination, error) {
 	var dest iaas.RouteDestination
 
-	switch len(r.DestinationCIDR.Addr().AsSlice()) {
-	case 4:
+	destAddr := r.DestinationCIDR.Addr()
+	if destAddr.Is4() {
 		dest.DestinationCIDRv4 = &iaas.DestinationCIDRv4{
 			Type:  routeDestinationTypeCIDRv4,
 			Value: r.DestinationCIDR.String(),
 		}
-	case 16:
+		return dest, nil
+	}
+	if destAddr.Is6() {
 		dest.DestinationCIDRv6 = &iaas.DestinationCIDRv6{
 			Type:  routeDestinationTypeCIDRv6,
 			Value: r.DestinationCIDR.String(),
 		}
-	default:
-		return dest, fmt.Errorf("unknown ip type %s", r.DestinationCIDR.Addr())
+		return dest, nil
 	}
-	return dest, nil
+
+	return dest, fmt.Errorf("unknown ip type %s", r.DestinationCIDR.Addr())
 }
 
 func (r *route) iaasNextHop() (iaas.RouteNexthop, error) {
 	nextHop := iaas.RouteNexthop{}
-	if r.Blackhole {
-		nextHop.NexthopBlackhole = &iaas.NexthopBlackhole{
-			Type: routeNexthopTypeBlackhole,
-		}
-		return nextHop, nil
-	}
-	switch len(r.NextHop.AsSlice()) {
-	case 4:
+	if r.NextHop.Is4() {
 		nextHop.NexthopIPv4 = &iaas.NexthopIPv4{
 			Type:  routeNexthopTypeIPv4,
 			Value: r.NextHop.String(),
 		}
-	case 16:
+		return nextHop, nil
+	}
+	if r.NextHop.Is6() {
 		nextHop.NexthopIPv6 = &iaas.NexthopIPv6{
 			Type:  routeNexthopTypeIPv6,
 			Value: r.NextHop.String(),
 		}
-	default:
-		return nextHop, fmt.Errorf("unknown ip type %s", r.NextHop)
+		return nextHop, nil
 	}
 
-	return nextHop, nil
+	return nextHop, fmt.Errorf("unknown ip type %s", r.NextHop)
 }
 
 func routeFromIaas(iaasRoute *iaas.Route) (*route, error) {
@@ -342,7 +331,6 @@ func routeFromIaas(iaasRoute *iaas.Route) (*route, error) {
 	}
 
 	return &route{
-		Blackhole:       iaasRoute.GetNexthop().NexthopBlackhole != nil,
 		DestinationCIDR: destinationPrefix,
 		NodeName:        nodeName,
 		NextHop:         nextHopAddr,
