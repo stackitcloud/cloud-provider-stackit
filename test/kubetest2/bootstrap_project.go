@@ -51,12 +51,10 @@ func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, err
 		})
 	}
 
-	switch len(matches) {
-	case 0:
+	if len(matches) == 0 {
 		return nil, nil
-	case 1:
-		return &matches[0], nil
-	default:
+	}
+	if len(matches) > 1 {
 		return nil, fmt.Errorf(
 			"found %d managed STACKIT projects for run token %q under parent container %q",
 			len(matches),
@@ -64,6 +62,7 @@ func (d *Deployer) findManagedProject(ctx context.Context) (*managedProject, err
 			d.parentContainerID,
 		)
 	}
+	return &matches[0], nil
 }
 
 func (d *Deployer) resolveManagedProject(ctx context.Context) (*managedProject, error) {
@@ -135,13 +134,17 @@ func (d *Deployer) ensureSKEServiceEnabled(ctx context.Context, projectID string
 			return fmt.Errorf("get SKE service status for project %q: %w", projectID, err)
 		}
 		klog.Infof("SKE service not yet enabled for project_id=%q", projectID)
-	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLED {
-		klog.Infof("SKE service already enabled for project_id=%q", projectID)
-		return nil
-	} else if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLING {
-		klog.Infof("SKE service enablement already in progress for project_id=%q, waiting", projectID)
-		return d.serviceEnablementClient.WaitForServiceEnabled(ctx, d.region, projectID, skeServiceID)
-	} else {
+	}
+
+	if status != nil {
+		if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLED {
+			klog.Infof("SKE service already enabled for project_id=%q", projectID)
+			return nil
+		}
+		if status.GetState() == serviceenablement.SERVICESTATUSSTATE_ENABLING {
+			klog.Infof("SKE service enablement already in progress for project_id=%q, waiting", projectID)
+			return d.serviceEnablementClient.WaitForServiceEnabled(ctx, d.region, projectID, skeServiceID)
+		}
 		klog.Infof("SKE service in state %q for project_id=%q, enabling", status.GetState(), projectID)
 	}
 
