@@ -120,11 +120,6 @@ type Option func(o *Options)
 func WithVPC(id string) Option {
 	return func(o *Options) {
 		o.vpcID = id
-	}
-}
-
-func UseVPCRoutes() Option {
-	return func(o *Options) {
 		o.useVPCRoutes = true
 	}
 }

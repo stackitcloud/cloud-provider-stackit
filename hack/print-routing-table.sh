@@ -1,23 +1,18 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -euo pipefail
+
+# TODO: This is a temporary script to ease the setup for VPCs as long as the stackit CLI does not support them.
+# Refactor/delete once we use the CLI.
 
 PROJECT_ID=$1
-VPC_ID=$2
-RT_ID=$3
+VPC_ID=${2:-"$(cat dev/config.yaml | yq .global.vpcId)"}
+RT_ID=${3:-"$(cat dev/config.yaml | yq .route.routingTableId)"}
 CLUSTER=${CLUSTER:="kubernetes"}
 base_url=https://$IAAS_API/v2alpha1/projects/$PROJECT_ID
 
 if [[ -z $PROJECT_ID ]]; then
   echo "must provide project ID as arg 1"
   exit 1
-fi
-
-if [[ -z $VPC_ID ]]; then
-  VPC_ID=$(cat dev/config.yaml | yq .global.vpcId)
-fi
-
-if [[ -z $RT_ID ]]; then
-  RT_ID=$(cat dev/config.yaml | yq .route.routingTableId)
 fi
 
 IAAS_API=${IAAS_API:="iaas.api.stackit.cloud"}

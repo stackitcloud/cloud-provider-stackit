@@ -26,7 +26,7 @@ The pushed image name and tag are logged to the console.
 To run the cloud controller manager locally on your machine, make sure to target the cluster first.
 
 Run `make run-cloud-controller-manager` to start the controller. It requires you to create a config at `./dev/config.yaml` for the cloud-controller-manager. See [./migration/configuration.md] for config reference.
-This requires you to have the STACKIT CLI installed. The make target will issue a short-lived access-token using the STACKIT CLI. It's valid for only a short period of time.
+This requires you to have the STACKIT CLI installed. The make target will issue a short-lived access-token using the STACKIT CLI.
 
 You can override certain configuration settings for the controller using make variables. The variables are prefixed with `CCM_` and represent the corresponding cloud-controller-manager flag.
 Defaults:

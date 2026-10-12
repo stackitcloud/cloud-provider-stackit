@@ -9,8 +9,6 @@ REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
-GOOS ?= $(shell uname -s | tr "[:upper:]" "[:lower:]")
-GOARCH ?= $(shell uname -m)
 LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
@@ -26,14 +24,15 @@ include ./hack/tools.mk
 build: $(BUILD_IMAGES)
 
 $(BUILD_IMAGES): $(SOURCES) ensure-bin-dir
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+	CGO_ENABLED=0 go build \
 		-trimpath \
 		-ldflags "$(LDFLAGS)" \
 		-o bin/$@ \
 		./cmd/$@/main.go
 
+.PHONY: ensure-bin-dir
 ensure-bin-dir:
-	@mkdir bin || true
+	@mkdir -p bin
 
 .PHONY: images
 images: $(foreach image,$(BUILD_IMAGES),image-$(image))

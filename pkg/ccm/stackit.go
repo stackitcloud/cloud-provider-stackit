@@ -168,6 +168,9 @@ func NewCloudControllerManager(cfg *stackitconfig.CCMConfig, obs *MetricsRemoteW
 	}
 
 	if cfg.Route.RoutingTableID != "" {
+		if (cfg.Global.AreaID == "" || cfg.Global.OrganizationID == "") && cfg.Global.VPCID == "" {
+			return nil, errors.New("must provide global.organizationId and global.areaId or global.vpcId when specifying route.routingTableId")
+		}
 		ccm.routes = &Routes{
 			iaasClient:     iaasClient,
 			routingTableID: cfg.Route.RoutingTableID,
