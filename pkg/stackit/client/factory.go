@@ -70,7 +70,7 @@ func (f *factory) IaaS(options []sdkconfig.ConfigurationOption) (IaaSClient, err
 		clientOpts = append(clientOpts, WithArea(f.StackitOrganizationID, f.StackitAreaID))
 	}
 	if f.StackitVPCID != "" {
-		clientOpts = append(clientOpts, WithVPC(f.StackitVPCID), UseVPCRoutes())
+		clientOpts = append(clientOpts, WithVPC(f.StackitVPCID))
 	}
 	return NewIaaSClient(f.StackitRegion, f.StackitProjectID, withDefaultOptions(options), clientOpts...)
 }

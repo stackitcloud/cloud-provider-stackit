@@ -24,7 +24,7 @@ Example SNA config:
 ```yaml
 global:
   areaId: foo
-  orgId: xyz
+  organizationId: xyz
 ```
 
 
@@ -36,7 +36,7 @@ global:
 
 #### Multiple clusters in the same routing table
 
-To be able to make multiple clusters support native routing of Pod IPs regard the following limitations:
+Every cluster in the network must use unique, non-overlapping Pod IP address blocks (CIDRs) to prevent routing collisions. Pay attention to the following limitations:
 - Pod CIDRs of all clusters (`--cluster-cidr` flag in cloud-controller-manager) must be disjoint, overlapping ranges may result misbehavior. The route-controller may add a route with the same pod CIDR using a different nexthop.
 - Unique cluster name (`--cluster-name`). Each cloud-controller-manager must use a unique cluster name as the routes are managed based on cluster name.
 

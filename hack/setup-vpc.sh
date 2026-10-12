@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# TODO: this is a temporary script to ease the setup for VPCs as long as the stackit CLI does not support creating them.
+# Refactor/delete once we can easily provision VPCs using the CLI.
+
 set -eou pipefail
 
 PROJECT_ID=$1
