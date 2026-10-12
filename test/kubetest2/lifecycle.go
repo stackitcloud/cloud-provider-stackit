@@ -11,11 +11,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type bootstrapStep struct {
-	name string
-	fn   func(context.Context) error
-}
-
 func (d *Deployer) Init() error {
 	klog.Infof("Initializing STACKIT kubetest2 deployer")
 
@@ -39,17 +34,17 @@ func (d *Deployer) Up() error {
 	klog.Infof("Starting cluster up flow for cluster=%q", d.clusterName())
 
 	ctx := context.Background()
-	for _, step := range []bootstrapStep{
-		{"project", d.ensureProject},
-		{"service account", d.ensureServiceAccount},
-		{"cluster", d.ensureCluster},
-		{"csi", d.ensureCSI},
-	} {
-		klog.Infof("Bootstrap step %q starting", step.name)
-		if err := step.fn(ctx); err != nil {
-			return fmt.Errorf("bootstrap step %q: %w", step.name, err)
-		}
-		klog.Infof("Bootstrap step %q completed", step.name)
+	if err := d.ensureProject(ctx); err != nil {
+		return fmt.Errorf("bootstrap project: %w", err)
+	}
+	if err := d.ensureServiceAccount(ctx); err != nil {
+		return fmt.Errorf("bootstrap service account: %w", err)
+	}
+	if err := d.ensureCluster(ctx); err != nil {
+		return fmt.Errorf("bootstrap cluster: %w", err)
+	}
+	if err := d.ensureCSI(ctx); err != nil {
+		return fmt.Errorf("bootstrap csi: %w", err)
 	}
 
 	klog.Infof("Cluster up flow completed successfully for cluster=%q", d.clusterName())
