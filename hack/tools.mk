@@ -14,8 +14,7 @@ MOCKGEN_VERSION ?= v0.6.0
 APKO_VERSION ?= v1.4.8
 # renovate: datasource=github-releases depName=ko-build/ko
 KO_VERSION ?= v0.19.1
-# renovate: datasource=go depName=sigs.k8s.io/kubetest2
-KUBETEST2_VERSION ?= v0.0.0-20260510045745-558f16b589d1
+KUBETEST2_VERSION ?= $(shell go list -m -f '{{.Version}}' sigs.k8s.io/kubetest2)
 
 KUBERNETES_TEST_VERSION ?= $(shell go list -m -f '{{.Version}}' k8s.io/api | sed 's/^v0\./v1./')
 
