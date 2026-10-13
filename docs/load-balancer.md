@@ -17,9 +17,9 @@ The cloud controller manager provisions STACKIT load balancers for Kubernetes se
 
 ## Limitations
 
-- `externalTrafficPolicy=local` is not supported.
+- `externalTrafficPolicy=local` is not supported when `loadBalancer.healthCheck.useKubeProxy` is disabled. 
+  It is; however, enabled by default. See the Parameters section in [docs/deployment.md](./deployment.md) for more information.
 - `sessionAffinity` is not supported.
-- Health checks are not implemented. If a node becomes unhealthy, then it is removed from the targets via the CCM.
 - The load balancer service currently adds security rules to each target.
   In the case of the CCM, the targets are the Kubernetes nodes.
   Experiments have shown that SKE will leave the assignment untouched, even during a maintenance.
@@ -33,10 +33,10 @@ The cloud controller manager does not disable the services when it no longer nee
 ## Configuration
 
 The cloud controller manager provisions a load balancer based on the specification of the service.
-STACKIT-specific options can be configured via annotations.
-Values for boolean annotations are parsed according to [ParseBool](https://pkg.go.dev/strconv#ParseBool).
+Global load balancer behavior (such as active health checks) is configured in the cloud configuration, while service-specific options are configured via annotations. See [the deployment docs](./deployment.md) for more details on the cloud configuration.
 
 ### STACKIT Annotations
+Note: values for boolean annotations are parsed according to [ParseBool](https://pkg.go.dev/strconv#ParseBool).
 
 | Name                                                | Default    | Description                                                                                                                                                                                                                                                                                                                                                                                                              |
 | --------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
