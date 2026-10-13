@@ -67,7 +67,10 @@ const (
 	defaultUDPIdleTimeout = 2 * time.Minute
 )
 
-const eventReasonYawolAnnotationPresent = "YawolAnnotationPresent"
+const (
+	eventReasonYawolAnnotationPresent = "YawolAnnotationPresent"
+	eventReasonImmutableFieldChanged  = "ImmutableFieldChanged"
+)
 
 const (
 	p10  = "p10"
@@ -597,24 +600,85 @@ func checkUnsupportedAnnotations(service *corev1.Service) *Event {
 	return nil
 }
 
-// resultImmutableChanged denotes that at least one property that cannot be changed did change.
-// Attempting an update will fail.
-type resultImmutableChanged struct {
-	field      string
-	annotation string
+func revertImmutableChanges(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) []Event {
+	var events []Event
+	if field, annotation, changed := addressChange(lb, spec); changed {
+		events = append(events, immutableChangeEvent(field, annotation))
+		revertAddress(lb, spec)
+	}
+	if fields := networkChanges(lb, spec); len(fields) > 0 {
+		for _, field := range fields {
+			events = append(events, immutableChangeEvent(field, listenerNetworkAnnotation))
+		}
+		spec.Networks = lb.Networks
+	}
+	return events
 }
 
-// compareLBwithSpec checks whether the load balancer fulfills the specification.
-// If immutableChanged is not nil then spec differs from lb such that an update will fail.
-// Otherwise, fulfills will indicate whether an update is necessary.
-
-func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool, immutableChanged *resultImmutableChanged) { //nolint:gocyclo,funlen,lll // It is long but not complex.
-	// If a mutable property has changed we must still check the rest of the object because if there is an immutable change it must always be returned.
-	fulfills = true
-
-	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly) {
-		return false, &resultImmutableChanged{field: ".options.privateNetworkOnly", annotation: internalLBAnnotation}
+func addressChange(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (field, annotation string, changed bool) {
+	lbPrivate := cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly)
+	switch {
+	case lbPrivate != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).PrivateNetworkOnly):
+		return ".options.privateNetworkOnly", internalLBAnnotation, true
+	case cmp.UnpackPtr(spec.ExternalAddress) != "":
+		// lb.ExternalAddress is set to the ephemeral IP if the load balancer is ephemeral, while spec will never contain an ephemeral IP.
+		// So we only compare them if the spec has a static IP.
+		// Promoting an ephemeral IP to a static IP is allowed.
+		if !cmp.PtrValEqual(lb.ExternalAddress, spec.ExternalAddress) {
+			return ".externalAddress", externalIPAnnotation, true
+		}
+	case !lbPrivate && !cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress):
+		// Demotion is not allowed by the load balancer API.
+		return ".options.ephemeralAddress", externalIPAnnotation, true
 	}
+	return "", "", false
+}
+
+func revertAddress(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) {
+	if spec.Options == nil {
+		spec.Options = &loadbalancer.LoadBalancerOptions{}
+	}
+	private := cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly)
+	ephemeral := cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress)
+	spec.Options.PrivateNetworkOnly = new(private)
+	spec.Options.EphemeralAddress = new(ephemeral)
+	spec.ExternalAddress = nil
+	if !private && !ephemeral {
+		// An ephemeral external address cannot be set during an update (although it is returned by the API).
+		spec.ExternalAddress = lb.ExternalAddress
+	}
+}
+
+func networkChanges(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) []string {
+	if len(lb.Networks) != len(spec.Networks) {
+		return []string{"len(.networks)"}
+	}
+	var fields []string
+	for i, x := range lb.Networks {
+		y := spec.Networks[i]
+		if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
+			fields = append(fields, fmt.Sprintf(".networks[%d].networkId", i))
+		}
+		if !cmp.PtrValEqual(x.Role, y.Role) {
+			fields = append(fields, fmt.Sprintf(".networks[%d].role", i))
+		}
+	}
+	return fields
+}
+
+func immutableChangeEvent(field, annotation string) Event {
+	return Event{
+		Type:   corev1.EventTypeWarning,
+		Reason: eventReasonImmutableFieldChanged,
+		Message: fmt.Sprintf("The load balancer API doesn't support changing %q (%q). The change is ignored and the current value is kept.",
+			field, annotation),
+	}
+}
+
+// compareLBwithSpec checks whether the load balancer fulfills the specification, i.e. whether an update is not necessary.
+// spec must not contain changes to immutable properties, see revertImmutableChanges.
+func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateLoadBalancerPayload) (fulfills bool) { //nolint:gocyclo,funlen,lll // It is long but not complex.
+	fulfills = true
 
 	if !cmp.PtrValEqualFn(
 		cmp.UnpackPtr(lb.Options).Observability,
@@ -642,20 +706,9 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		fulfills = false
 	}
 
-	if cmp.UnpackPtr(spec.ExternalAddress) != "" {
-		// lb.ExternalAddress is set to the ephemeral IP if the load balancer is ephemeral, while spec will never contain an ephemeral IP.
-		// So we only compare them if the spec has a static IP.
-		if !cmp.PtrValEqual(lb.ExternalAddress, spec.ExternalAddress) {
-			return false, &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation}
-		}
-		if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
-			// Promote an ephemeral IP to a static IP.
-			fulfills = false
-		}
-	} else if !cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).PrivateNetworkOnly) &&
-		!cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
-		// Demotion is not allowed by the load balancer API.
-		return false, &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation}
+	if cmp.UnpackPtr(spec.ExternalAddress) != "" && cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).EphemeralAddress) {
+		// Promote an ephemeral IP to a static IP.
+		fulfills = false
 	}
 
 	if len(lb.Listeners) != len(spec.Listeners) {
@@ -686,19 +739,6 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 			}) {
 				fulfills = false
 			}
-		}
-	}
-
-	if len(lb.Networks) != len(spec.Networks) {
-		return false, &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation}
-	}
-	for i, x := range lb.Networks {
-		y := spec.Networks[i]
-		if !cmp.PtrValEqual(x.NetworkId, y.NetworkId) {
-			return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].networkId", i), annotation: listenerNetworkAnnotation}
-		}
-		if !cmp.PtrValEqual(x.Role, y.Role) {
-			return false, &resultImmutableChanged{field: fmt.Sprintf(".networks[%d].role", i), annotation: listenerNetworkAnnotation}
 		}
 	}
 
@@ -764,7 +804,7 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		fulfills = false
 	}
 
-	return fulfills, immutableChanged
+	return fulfills
 }
 
 // sanitizeNodeName returns a node name which fits in the DisplayName of a target.
