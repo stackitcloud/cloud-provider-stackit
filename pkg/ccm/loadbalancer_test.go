@@ -440,6 +440,149 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect DeleteCredentials to have been called.
 		})
 
+		DescribeTable("return error without update when an immutable field changed",
+			func(modify func(svc *corev1.Service, lb *loadbalancer.LoadBalancer), wantedErrorString string) {
+				svc := minimalLoadBalancerService()
+				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
+				Expect(err).NotTo(HaveOccurred())
+				myLb := &loadbalancer.LoadBalancer{
+					ExternalAddress: spec.ExternalAddress,
+					PlanId:          spec.PlanId,
+					Listeners:       spec.Listeners,
+					Name:            spec.Name,
+					Networks:        spec.Networks,
+					Options:         spec.Options,
+					Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
+					TargetPools:     spec.TargetPools,
+					Version:         new("current-version"),
+				}
+				svc = svc.DeepCopy()
+				modify(svc, myLb)
+
+				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+
+				_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+				Expect(err).To(MatchError(wantedErrorString))
+			},
+			Entry("when a static IP is to be demoted to an ephemeral IP",
+				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
+					delete(svc.Annotations, externalIPAnnotation)
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing ".options.ephemeralAddress" ("lb.stackit.cloud/external-address")`,
+			),
+			Entry("when the static IP changes",
+				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
+					svc.Annotations[externalIPAnnotation] = "8.8.4.4"
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing ".externalAddress" ("lb.stackit.cloud/external-address")`,
+			),
+			Entry("when the load balancer becomes internal",
+				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
+					svc.Annotations[internalLBAnnotation] = "true"
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing ".options.privateNetworkOnly" ("lb.stackit.cloud/internal-lb")`,
+			),
+			Entry("when a listener network is added",
+				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
+					svc.Annotations[listenerNetworkAnnotation] = "my-listener-network"
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing "len(.networks)" ("lb.stackit.cloud/listener-network")`,
+			),
+			Entry("when the network ID differs",
+				func(_ *corev1.Service, lb *loadbalancer.LoadBalancer) {
+					lb.Networks = []loadbalancer.Network{{
+						Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
+						NetworkId: new("other-network"),
+					}}
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing ".networks[0].networkId" ("lb.stackit.cloud/listener-network")`,
+			),
+			Entry("when the network role differs",
+				func(_ *corev1.Service, lb *loadbalancer.LoadBalancer) {
+					lb.Networks = []loadbalancer.Network{{
+						Role:      new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
+						NetworkId: new(lbOpts.NetworkID),
+					}}
+				},
+				`update to load balancer cannot be fulfilled: API doesn't support changing ".networks[0].role" ("lb.stackit.cloud/listener-network")`,
+			),
+		)
+
+		It("should keep the IP ephemeral when updating a load balancer with an ephemeral IP", func() {
+			svc := minimalLoadBalancerService()
+			delete(svc.Annotations, externalIPAnnotation)
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				// The API reports the ephemeral IP as external address.
+				ExternalAddress: new("8.8.4.4"),
+				PlanId:          spec.PlanId,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
+				TargetPools:     spec.TargetPools,
+				Version:         new("current-version"),
+			}
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+			mockClient.EXPECT().UpdateLoadBalancer(
+				gomock.Any(),
+				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
+				gomock.All(
+					versionMatcher("current-version"),
+					externalAddressNotSet(),
+					ephemeralAddress(),
+				),
+			).Return(myLb, nil)
+
+			svc = svc.DeepCopy()
+			svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+				Name:     "a-port",
+				Protocol: corev1.ProtocolTCP,
+				Port:     80,
+				NodePort: 1234,
+			})
+
+			_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should promote an ephemeral IP to a static IP", func() {
+			ephemeralSvc := minimalLoadBalancerService()
+			delete(ephemeralSvc.Annotations, externalIPAnnotation)
+			spec, _, err := lbSpecFromService(ephemeralSvc, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				ExternalAddress: new("123.124.88.99"),
+				PlanId:          spec.PlanId,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
+				TargetPools:     spec.TargetPools,
+				Version:         new("current-version"),
+			}
+			// minimalLoadBalancerService uses the ephemeral IP of myLb as static IP.
+			svc := minimalLoadBalancerService()
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+			mockClient.EXPECT().UpdateLoadBalancer(
+				gomock.Any(),
+				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
+				gomock.All(
+					versionMatcher("current-version"),
+					externalAddressSet("123.124.88.99"),
+					staticAddress(),
+				),
+			).Return(myLb, nil)
+
+			_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		DescribeTable("return error when LoadBalancer is in error state",
 			func(lbErrors []loadbalancer.LoadBalancerError, wantedErrorString string) {
 				svc := minimalLoadBalancerService()
@@ -860,5 +1003,13 @@ func ephemeralAddress() gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		return lb.Options != nil && lb.Options.EphemeralAddress != nil && *lb.Options.EphemeralAddress
+	})
+}
+
+// staticAddress ensures that the given UpdateLoadBalancerPayload has an ephemeral address explicitly disabled.
+func staticAddress() gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Options != nil && lb.Options.EphemeralAddress != nil && !*lb.Options.EphemeralAddress
 	})
 }
