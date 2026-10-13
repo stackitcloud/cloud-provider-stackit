@@ -1215,17 +1215,14 @@ func haveConsistentTargetPool() types.GomegaMatcher {
 }
 
 type compareLBwithSpecTest struct {
-	wantFulfilled         bool
-	wantImmutabledChanged *resultImmutableChanged
-	lb                    *loadbalancer.LoadBalancer
-	spec                  *loadbalancer.CreateLoadBalancerPayload
+	wantFulfilled bool
+	lb            *loadbalancer.LoadBalancer
+	spec          *loadbalancer.CreateLoadBalancerPayload
 }
 
 var _ = DescribeTable("compareLBwithSpec",
 	func(t *compareLBwithSpecTest) {
-		fulfills, immutableChanged := compareLBwithSpec(t.lb, t.spec)
-		Expect(immutableChanged).To(Equal(t.wantImmutabledChanged))
-		Expect(fulfills).To(Equal(t.wantFulfilled))
+		Expect(compareLBwithSpec(t.lb, t.spec)).To(Equal(t.wantFulfilled))
 	},
 	Entry("When LB has Observability set", &compareLBwithSpecTest{
 		// The load balancer API uses the same field to report an ephemeral IP and to reference a static IP.
@@ -1298,8 +1295,7 @@ var _ = DescribeTable("compareLBwithSpec",
 		},
 	}),
 	Entry("When specified and actual plan ID don't match", &compareLBwithSpecTest{
-		wantFulfilled:         false,
-		wantImmutabledChanged: nil,
+		wantFulfilled: false,
 		lb: &loadbalancer.LoadBalancer{
 			PlanId: new(p10),
 			Options: &loadbalancer.LoadBalancerOptions{
@@ -1311,25 +1307,6 @@ var _ = DescribeTable("compareLBwithSpec",
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: new(true),
 			},
-		},
-	}),
-	Entry("When LB has no external IP but one is specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			ExternalAddress: nil,
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			ExternalAddress: new("123.124.88.99"),
-		},
-	}),
-	Entry("When specified and actual IP don't match", &compareLBwithSpecTest{
-		// The IP can never be changed. Not even with promotion or demotion.
-		wantImmutabledChanged: &resultImmutableChanged{field: ".externalAddress", annotation: externalIPAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			ExternalAddress: new("123.124.88.01"),
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			ExternalAddress: new("123.124.88.99"),
 		},
 	}),
 	Entry("When IP is to be promoted", &compareLBwithSpecTest{
@@ -1344,20 +1321,6 @@ var _ = DescribeTable("compareLBwithSpec",
 			ExternalAddress: new("123.124.88.99"),
 			Options: &loadbalancer.LoadBalancerOptions{
 				EphemeralAddress: new(false),
-			},
-		},
-	}),
-	Entry("When IP is to be demoted", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.ephemeralAddress", annotation: externalIPAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: new(false),
-			},
-			ExternalAddress: new("123.124.88.99"),
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: &loadbalancer.LoadBalancerOptions{
-				EphemeralAddress: new(true),
 			},
 		},
 	}),
@@ -1540,69 +1503,6 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 			Listeners: []loadbalancer.Listener{
 				{TargetPool: new("target-pool-b")},
-			},
-		},
-	}),
-	Entry("When LB has no networks but one is specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: "len(.networks)", annotation: listenerNetworkAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: nil,
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: []loadbalancer.Network{
-				{},
-			},
-		},
-	}),
-	Entry("When network id doesn't match", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].networkId", annotation: listenerNetworkAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: []loadbalancer.Network{
-				{
-					NetworkId: new("my-network"),
-				},
-			},
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: []loadbalancer.Network{
-				{
-					NetworkId: new("other-network"),
-				},
-			},
-		},
-	}),
-	Entry("When network role doesn't match", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".networks[0].role", annotation: listenerNetworkAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: []loadbalancer.Network{
-				{
-					Role: new(loadbalancer.NETWORKROLE_ROLE_LISTENERS),
-				},
-			},
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-			Networks: []loadbalancer.Network{
-				{
-					Role: new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
-				},
 			},
 		},
 	}),
@@ -1859,17 +1759,6 @@ var _ = DescribeTable("compareLBwithSpec",
 			},
 		},
 	}),
-	Entry("When private network is disabled but specified", &compareLBwithSpecTest{
-		wantImmutabledChanged: &resultImmutableChanged{field: ".options.privateNetworkOnly", annotation: internalLBAnnotation},
-		lb: &loadbalancer.LoadBalancer{
-			Options: nil,
-		},
-		spec: &loadbalancer.CreateLoadBalancerPayload{
-			Options: &loadbalancer.LoadBalancerOptions{
-				PrivateNetworkOnly: new(true),
-			},
-		},
-	}),
 	Entry("When private IP is reported back from API", &compareLBwithSpecTest{
 		wantFulfilled: true,
 		lb: &loadbalancer.LoadBalancer{
@@ -1986,6 +1875,192 @@ var _ = DescribeTable("compareLBwithSpec",
 					UseSourceIpAddress: new(true),
 				},
 			}},
+		},
+	}),
+)
+
+type revertImmutableChangesTest struct {
+	lb         *loadbalancer.LoadBalancer
+	spec       *loadbalancer.CreateLoadBalancerPayload
+	wantSpec   *loadbalancer.CreateLoadBalancerPayload
+	wantEvents []Event
+}
+
+var _ = DescribeTable("revertImmutableChanges",
+	func(t *revertImmutableChangesTest) {
+		Expect(revertImmutableChanges(t.lb, t.spec)).To(Equal(t.wantEvents))
+		Expect(t.spec).To(Equal(t.wantSpec))
+	},
+	Entry("When the static IP is unchanged", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+	}),
+	Entry("When the ephemeral IP is unchanged", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+	}),
+	Entry("When IP is to be promoted", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+	}),
+	Entry("When IP is to be demoted", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true), PrivateNetworkOnly: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+		},
+		wantEvents: []Event{immutableChangeEvent(".options.ephemeralAddress", externalIPAnnotation)},
+	}),
+	Entry("When specified and actual static IP don't match", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.01"),
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.01"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+		},
+		wantEvents: []Event{immutableChangeEvent(".externalAddress", externalIPAnnotation)},
+	}),
+	Entry("When a static IP is specified that doesn't match the ephemeral IP", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.01"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true), PrivateNetworkOnly: new(false)},
+		},
+		wantEvents: []Event{immutableChangeEvent(".externalAddress", externalIPAnnotation)},
+	}),
+	Entry("When private network is enabled", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(true)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true), PrivateNetworkOnly: new(false)},
+		},
+		wantEvents: []Event{immutableChangeEvent(".options.privateNetworkOnly", internalLBAnnotation)},
+	}),
+	Entry("When private network is disabled", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			PrivateAddress: new("10.1.1.3"),
+			Options:        &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(true)},
+		},
+		wantEvents: []Event{immutableChangeEvent(".options.privateNetworkOnly", internalLBAnnotation)},
+	}),
+	Entry("When LB has no networks but one is specified", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options:  &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+			Networks: []loadbalancer.Network{{NetworkId: new("my-network")}},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+		},
+		wantEvents: []Event{immutableChangeEvent("len(.networks)", listenerNetworkAnnotation)},
+	}),
+	Entry("When network id and role don't match", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+			Networks: []loadbalancer.Network{{
+				NetworkId: new("my-network"),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
+			}},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+			Networks: []loadbalancer.Network{{
+				NetworkId: new("other-network"),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
+			}},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{PrivateNetworkOnly: new(true)},
+			Networks: []loadbalancer.Network{{
+				NetworkId: new("my-network"),
+				Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
+			}},
+		},
+		wantEvents: []Event{
+			immutableChangeEvent(".networks[0].networkId", listenerNetworkAnnotation),
+			immutableChangeEvent(".networks[0].role", listenerNetworkAnnotation),
+		},
+	}),
+	Entry("When address and network change together with a mutable property", &revertImmutableChangesTest{
+		lb: &loadbalancer.LoadBalancer{
+			ExternalAddress: new("123.124.88.99"),
+			PlanId:          new(p10),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false)},
+			Networks:        []loadbalancer.Network{{NetworkId: new("my-network")}},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			PlanId:   new(p50),
+			Options:  &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(true), PrivateNetworkOnly: new(false)},
+			Networks: []loadbalancer.Network{{NetworkId: new("other-network")}},
+		},
+		wantSpec: &loadbalancer.CreateLoadBalancerPayload{
+			ExternalAddress: new("123.124.88.99"),
+			PlanId:          new(p50),
+			Options:         &loadbalancer.LoadBalancerOptions{EphemeralAddress: new(false), PrivateNetworkOnly: new(false)},
+			Networks:        []loadbalancer.Network{{NetworkId: new("my-network")}},
+		},
+		wantEvents: []Event{
+			immutableChangeEvent(".options.ephemeralAddress", externalIPAnnotation),
+			immutableChangeEvent(".networks[0].networkId", listenerNetworkAnnotation),
 		},
 	}),
 )
