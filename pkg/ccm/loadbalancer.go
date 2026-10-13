@@ -127,19 +127,12 @@ func (l *LoadBalancer) EnsureLoadBalancer( //nolint:gocyclo // not really comple
 		return nil, fmt.Errorf("invalid load balancer specification: %w", err)
 	}
 
+	events = append(events, revertImmutableChanges(lb, spec)...)
 	for _, event := range events {
 		l.recorder.Event(service, event.Type, event.Reason, event.Message)
 	}
 
-	fulfills, immutableChanged := compareLBwithSpec(lb, spec)
-	if immutableChanged != nil {
-		changeStr := fmt.Sprintf("%q", immutableChanged.field)
-		if immutableChanged.annotation != "" {
-			changeStr += fmt.Sprintf(" (%q)", immutableChanged.annotation)
-		}
-		return nil, fmt.Errorf("update to load balancer cannot be fulfilled: API doesn't support changing %s", changeStr)
-	}
-	if !fulfills {
+	if !compareLBwithSpec(lb, spec) {
 		credentialsRefBeforeUpdate := getMetricsRemoteWriteRef(lb)
 		// We create the update payload from a new spec.
 		// However, we need to copy over the version because it is required on every update.
