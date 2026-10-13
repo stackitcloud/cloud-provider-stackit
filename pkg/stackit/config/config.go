@@ -34,8 +34,9 @@ type InstanceOpts struct {
 }
 
 type LoadBalancerOpts struct {
-	NetworkID   string            `yaml:"networkId"`
-	ExtraLabels map[string]string `yaml:"extraLabels"`
+	NetworkID          string            `yaml:"networkId"`
+	ExtraLabels        map[string]string `yaml:"extraLabels"`
+	EnableHealthChecks bool              `yaml:"enableHealthChecks"`
 }
 
 type RouteOpts struct {
