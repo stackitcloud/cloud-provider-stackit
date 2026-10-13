@@ -137,4 +137,31 @@ loadBalancer:
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config).To(Equal(stackitconfig.CCMConfig{}))
 	})
+
+	It("should parse healthCheck configuration and respect enable/disable toggle", func() {
+		yamlWithHealthCheckDisabled := `
+global:
+  projectId: "test-project"
+  region: "eu01"
+loadBalancer:
+  networkId: "test-network"
+  healthCheck:
+    useKubeProxyHealthCheckPort: false
+`
+		config, err := GetConfig(strings.NewReader(yamlWithHealthCheckDisabled))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(config.LoadBalancer.HealthCheck).NotTo(BeNil())
+		Expect(config.LoadBalancer.AreHealthChecksEnabled()).To(BeFalse())
+
+		yamlWithHealthCheckDefault := `
+global:
+  projectId: "test-project"
+  region: "eu01"
+loadBalancer:
+  networkId: "test-network"
+`
+		configDefault, err := GetConfig(strings.NewReader(yamlWithHealthCheckDefault))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(configDefault.LoadBalancer.AreHealthChecksEnabled()).To(BeTrue())
+	})
 })
