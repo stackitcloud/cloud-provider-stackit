@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider/api"
 )
 
@@ -32,6 +34,7 @@ var _ = Describe("LoadBalancer", func() {
 		loadBalancer         *LoadBalancer
 		clusterName          string
 		lbOpts               stackitconfig.LoadBalancerOpts
+		recorder             *record.FakeRecorder
 	)
 
 	BeforeEach(func() {
@@ -49,6 +52,8 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(err).NotTo(HaveOccurred())
 		loadBalancer, err = NewLoadBalancer(mockClient, lbOpts, nil)
 		Expect(err).NotTo(HaveOccurred())
+		recorder = record.NewFakeRecorder(10)
+		loadBalancer.recorder = recorder
 	})
 
 	Describe("GetLoadBalancerName", func() {
@@ -440,8 +445,12 @@ var _ = Describe("LoadBalancer", func() {
 			// Expect DeleteCredentials to have been called.
 		})
 
-		DescribeTable("return error without update when an immutable field changed",
-			func(modify func(svc *corev1.Service, lb *loadbalancer.LoadBalancer), wantedErrorString string) {
+		DescribeTable("revert changes of immutable fields, update the load balancer, and record an event",
+			func(
+				modify func(svc *corev1.Service, lb *loadbalancer.LoadBalancer),
+				payloadMatcher gomock.Matcher,
+				wantedEvent string,
+			) {
 				svc := minimalLoadBalancerService()
 				spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
 				Expect(err).NotTo(HaveOccurred())
@@ -458,35 +467,56 @@ var _ = Describe("LoadBalancer", func() {
 				}
 				svc = svc.DeepCopy()
 				modify(svc, myLb)
+				// Trigger an update by a mutable change.
+				svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+					Name:     "a-port",
+					Protocol: corev1.ProtocolTCP,
+					Port:     80,
+					NodePort: 1234,
+				})
 
 				mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+				mockClient.EXPECT().UpdateLoadBalancer(
+					gomock.Any(),
+					loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
+					gomock.All(versionMatcher("current-version"), payloadMatcher),
+				).Return(myLb, nil)
 
 				_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
-				Expect(err).To(MatchError(wantedErrorString))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(recorder.Events).To(Receive(Equal(wantedEvent)))
+				Expect(recorder.Events).NotTo(Receive())
 			},
 			Entry("when a static IP is to be demoted to an ephemeral IP",
 				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
 					delete(svc.Annotations, externalIPAnnotation)
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing ".options.ephemeralAddress" ("lb.stackit.cloud/external-address")`,
+				gomock.All(externalAddressSet("123.124.88.99"), staticAddress()),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing ".options.ephemeralAddress" ("lb.stackit.cloud/external-address"). The change is ignored and the current value is kept.`,
 			),
 			Entry("when the static IP changes",
 				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
 					svc.Annotations[externalIPAnnotation] = "8.8.4.4"
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing ".externalAddress" ("lb.stackit.cloud/external-address")`,
+				gomock.All(externalAddressSet("123.124.88.99"), staticAddress()),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing ".externalAddress" ("lb.stackit.cloud/external-address"). The change is ignored and the current value is kept.`,
 			),
 			Entry("when the load balancer becomes internal",
 				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
 					svc.Annotations[internalLBAnnotation] = "true"
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing ".options.privateNetworkOnly" ("lb.stackit.cloud/internal-lb")`,
+				gomock.All(externalAddressSet("123.124.88.99"), staticAddress(), privateNetworkOnly(false)),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing ".options.privateNetworkOnly" ("lb.stackit.cloud/internal-lb"). The change is ignored and the current value is kept.`,
 			),
 			Entry("when a listener network is added",
 				func(svc *corev1.Service, _ *loadbalancer.LoadBalancer) {
 					svc.Annotations[listenerNetworkAnnotation] = "my-listener-network"
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing "len(.networks)" ("lb.stackit.cloud/listener-network")`,
+				networksSet(loadbalancer.Network{
+					Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
+					NetworkId: new("my-network"),
+				}),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing "len(.networks)" ("lb.stackit.cloud/listener-network"). The change is ignored and the current value is kept.`,
 			),
 			Entry("when the network ID differs",
 				func(_ *corev1.Service, lb *loadbalancer.LoadBalancer) {
@@ -495,18 +525,51 @@ var _ = Describe("LoadBalancer", func() {
 						NetworkId: new("other-network"),
 					}}
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing ".networks[0].networkId" ("lb.stackit.cloud/listener-network")`,
+				networksSet(loadbalancer.Network{
+					Role:      new(loadbalancer.NETWORKROLE_ROLE_LISTENERS_AND_TARGETS),
+					NetworkId: new("other-network"),
+				}),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing ".networks[0].networkId" ("lb.stackit.cloud/listener-network"). The change is ignored and the current value is kept.`,
 			),
 			Entry("when the network role differs",
 				func(_ *corev1.Service, lb *loadbalancer.LoadBalancer) {
 					lb.Networks = []loadbalancer.Network{{
 						Role:      new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
-						NetworkId: new(lbOpts.NetworkID),
+						NetworkId: new("my-network"),
 					}}
 				},
-				`update to load balancer cannot be fulfilled: API doesn't support changing ".networks[0].role" ("lb.stackit.cloud/listener-network")`,
+				networksSet(loadbalancer.Network{
+					Role:      new(loadbalancer.NETWORKROLE_ROLE_TARGETS),
+					NetworkId: new("my-network"),
+				}),
+				`Warning ImmutableFieldChanged The load balancer API doesn't support changing ".networks[0].role" ("lb.stackit.cloud/listener-network"). The change is ignored and the current value is kept.`,
 			),
 		)
+
+		It("should record an event but not update the load balancer if only an immutable field changed", func() {
+			svc := minimalLoadBalancerService()
+			spec, _, err := lbSpecFromService(svc, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			myLb := &loadbalancer.LoadBalancer{
+				ExternalAddress: spec.ExternalAddress,
+				PlanId:          spec.PlanId,
+				Listeners:       spec.Listeners,
+				Name:            spec.Name,
+				Networks:        spec.Networks,
+				Options:         spec.Options,
+				Status:          new(loadbalancer.LOADBALANCERSTATUS_STATUS_READY),
+				TargetPools:     spec.TargetPools,
+				Version:         new("current-version"),
+			}
+			svc = svc.DeepCopy()
+			delete(svc.Annotations, externalIPAnnotation)
+
+			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(myLb, nil)
+
+			_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(recorder.Events).To(Receive(ContainSubstring(`".options.ephemeralAddress"`)))
+		})
 
 		It("should keep the IP ephemeral when updating a load balancer with an ephemeral IP", func() {
 			svc := minimalLoadBalancerService()
@@ -1011,5 +1074,21 @@ func staticAddress() gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		return lb.Options != nil && lb.Options.EphemeralAddress != nil && !*lb.Options.EphemeralAddress
+	})
+}
+
+// privateNetworkOnly ensures that the given UpdateLoadBalancerPayload has the private network only option set to enabled.
+func privateNetworkOnly(enabled bool) gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Options != nil && lb.Options.PrivateNetworkOnly != nil && *lb.Options.PrivateNetworkOnly == enabled
+	})
+}
+
+// networksSet ensures that the given UpdateLoadBalancerPayload has exactly the given networks.
+func networksSet(networks ...loadbalancer.Network) gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return reflect.DeepEqual(lb.Networks, networks)
 	})
 }
