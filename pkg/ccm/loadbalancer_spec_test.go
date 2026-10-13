@@ -540,6 +540,74 @@ var _ = Describe("lbSpecFromService", func() {
 			))
 			Expect(spec).To(haveConsistentTargetPool())
 		})
+
+		It("does not set ActiveHealthCheck on target pools by default", func() {
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": externalAddress,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{http},
+				},
+			}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.TargetPools).To(HaveLen(1))
+			Expect(spec.TargetPools[0].ActiveHealthCheck).To(BeNil())
+		})
+
+		It("sets ActiveHealthCheck on target pools for externalTrafficPolicy Cluster when enabled", func() {
+			opts := stackitconfig.LoadBalancerOpts{
+				NetworkID:                "my-network",
+				EnableActiveHealthChecks: true,
+			}
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": externalAddress,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{http},
+				},
+			}, []*corev1.Node{}, opts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.TargetPools).To(HaveLen(1))
+			Expect(spec.TargetPools[0].ActiveHealthCheck).NotTo(BeNil())
+			Expect(spec.TargetPools[0].ActiveHealthCheck.AltPort).To(PointTo(Equal(int32(10256))))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks).NotTo(BeNil())
+			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks.Path).To(PointTo(Equal("/healthz")))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.Interval).To(PointTo(Equal("5s")))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.Timeout).To(PointTo(Equal("5s")))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.HealthyThreshold).To(PointTo(Equal(int32(2))))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.UnhealthyThreshold).To(PointTo(Equal(int32(2))))
+		})
+
+		It("sets ActiveHealthCheck with HealthCheckNodePort for externalTrafficPolicy Local when enabled", func() {
+			opts := stackitconfig.LoadBalancerOpts{
+				NetworkID:                "my-network",
+				EnableActiveHealthChecks: true,
+			}
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": externalAddress,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports:                 []corev1.ServicePort{http},
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					HealthCheckNodePort:   32123,
+				},
+			}, []*corev1.Node{}, opts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.TargetPools).To(HaveLen(1))
+			Expect(spec.TargetPools[0].ActiveHealthCheck).NotTo(BeNil())
+			Expect(spec.TargetPools[0].ActiveHealthCheck.AltPort).To(PointTo(Equal(int32(32123))))
+			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks).NotTo(BeNil())
+			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks.Path).To(PointTo(Equal("/healthz")))
+		})
 	})
 
 	DescribeTable("unsupported annotations",
@@ -1854,6 +1922,64 @@ var _ = DescribeTable("compareLBwithSpec",
 				{
 					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
 						UnhealthyThreshold: new(int32(3)),
+					},
+				},
+			},
+		},
+	}),
+	Entry("When health check altPort doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+			},
+			TargetPools: []loadbalancer.TargetPool{
+				{
+					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
+						AltPort: new(int32(10256)),
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+			},
+			TargetPools: []loadbalancer.TargetPool{
+				{
+					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
+						AltPort: new(int32(31234)),
+					},
+				},
+			},
+		},
+	}),
+	Entry("When health check HTTP path doesn't match", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+			},
+			TargetPools: []loadbalancer.TargetPool{
+				{
+					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
+						HttpHealthChecks: &loadbalancer.HttpHealthChecks{
+							Path: new("/healthz"),
+						},
+					},
+				},
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+			},
+			TargetPools: []loadbalancer.TargetPool{
+				{
+					ActiveHealthCheck: &loadbalancer.ActiveHealthCheck{
+						HttpHealthChecks: &loadbalancer.HttpHealthChecks{
+							Path: new("/readyz"),
+						},
 					},
 				},
 			},

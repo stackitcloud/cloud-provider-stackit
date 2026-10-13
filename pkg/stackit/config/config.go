@@ -30,8 +30,9 @@ type InstanceOpts struct {
 }
 
 type LoadBalancerOpts struct {
-	NetworkID   string            `yaml:"networkId"`
-	ExtraLabels map[string]string `yaml:"extraLabels"`
+	NetworkID                string            `yaml:"networkId"`
+	ExtraLabels              map[string]string `yaml:"extraLabels"`
+	EnableActiveHealthChecks bool              `yaml:"enableActiveHealthChecks"`
 }
 
 type CSIConfig struct {
