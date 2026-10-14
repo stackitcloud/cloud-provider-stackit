@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: premium-perf4-stackit-kubetest2
+provisioner: kubetest2.csi.stackit.cloud
+parameters:
+  type: "storage_premium_perf4"
