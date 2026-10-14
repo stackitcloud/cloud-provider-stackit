@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-stackit-nodeplugin
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: stackit-csi-plugin
+        livenessProbe:
+          httpGet:
+            port: 19808
+        ports:
+        - $patch: replace
+        - containerPort: 19808
+          name: healthz
+          protocol: TCP
+      - name: liveness-probe
+        args:
+        - --csi-address=/csi/csi.sock
+        - --health-port=19808
