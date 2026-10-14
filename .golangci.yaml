@@ -88,6 +88,9 @@ linters:
       line-length: 165
     misspell:
       locale: US
+    modernize:
+      disable:
+        - embedlit
     nolintlint:
       allow-unused: false # report any unused nolint directives
       require-explanation: true # require an explanation for nolint directives
