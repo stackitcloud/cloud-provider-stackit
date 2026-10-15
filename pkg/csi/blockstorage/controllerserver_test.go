@@ -106,7 +106,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					captured = payload
 					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
 				})
-			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil, nil)
 
 			_, err := fakeCs.CreateVolume(context.Background(), req)
 			Expect(err).ToNot(HaveOccurred())
@@ -148,7 +148,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 					captured = payload
 					return &iaas.Volume{Id: new("volume-id"), Size: new(int64(20))}, nil
 				})
-			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil)
+			iaasClient.EXPECT().WaitVolumeTargetStatusWithCustomBackoff(gomock.Any(), "volume-id", gomock.Any(), gomock.Any()).Return(nil, nil)
 
 			_, err := fakeCs.CreateVolume(context.Background(), req)
 			Expect(err).ToNot(HaveOccurred())
