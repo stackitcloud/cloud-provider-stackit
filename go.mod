@@ -18,7 +18,7 @@ require (
 	github.com/stackitcloud/stackit-sdk-go/services/authorization v0.15.5
 	github.com/stackitcloud/stackit-sdk-go/services/iaas v1.14.5
 	github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.15.2
-	github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.0
+	github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.1
 	github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.21.1
 	github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.7.3
 	github.com/stackitcloud/stackit-sdk-go/services/ske v1.21.2
