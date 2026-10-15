@@ -28,19 +28,21 @@ type fakeOptions struct {
 	runID    string
 	runDir   string
 	shouldUp bool
+	metadata map[string]string
 }
 
-func (o fakeOptions) HelpRequested() bool       { return false }
-func (o fakeOptions) ShouldBuild() bool         { return false }
-func (o fakeOptions) ShouldUp() bool            { return o.shouldUp }
-func (o fakeOptions) ShouldDown() bool          { return !o.shouldUp }
-func (o fakeOptions) ShouldTest() bool          { return false }
-func (o fakeOptions) SkipTestJUnitReport() bool { return false }
-func (o fakeOptions) RunID() string             { return o.runID }
-func (o fakeOptions) RunDir() string            { return o.runDir }
-func (o fakeOptions) RundirInArtifacts() bool   { return false }
-func (o fakeOptions) PostTestCmd() []string     { return nil }
-func (o fakeOptions) PreTestCmd() []string      { return nil }
+func (o fakeOptions) HelpRequested() bool         { return false }
+func (o fakeOptions) ShouldBuild() bool           { return false }
+func (o fakeOptions) ShouldUp() bool              { return o.shouldUp }
+func (o fakeOptions) ShouldDown() bool            { return !o.shouldUp }
+func (o fakeOptions) ShouldTest() bool            { return false }
+func (o fakeOptions) SkipTestJUnitReport() bool   { return false }
+func (o fakeOptions) RunID() string               { return o.runID }
+func (o fakeOptions) RunDir() string              { return o.runDir }
+func (o fakeOptions) RundirInArtifacts() bool     { return false }
+func (o fakeOptions) PostTestCmd() []string       { return nil }
+func (o fakeOptions) PreTestCmd() []string        { return nil }
+func (o fakeOptions) Metadata() map[string]string { return o.metadata }
 
 type fakeProjectClient struct {
 	listProjectsResult []resourcemanager.Project
