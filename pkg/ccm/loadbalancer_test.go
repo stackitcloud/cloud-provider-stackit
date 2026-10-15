@@ -331,7 +331,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				gomock.All(
-					versionMatcher("current-version"),
+					isCurrentVersion(),
 					statusNotSet(),
 				),
 			).MinTimes(1).Return(myLb, nil)
@@ -391,7 +391,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				gomock.All(
-					versionMatcher("current-version"),
+					isCurrentVersion(),
 					statusNotSet(),
 				),
 			).MinTimes(1).Return(myLb, nil)
@@ -432,7 +432,7 @@ var _ = Describe("LoadBalancer", func() {
 					gomock.Any(),
 					loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 					gomock.All(
-						versionMatcher("current-version"),
+						isCurrentVersion(),
 						hasNoObservabilityConfigured(),
 					),
 				).MinTimes(1).Return(myLb, nil),
@@ -479,7 +479,7 @@ var _ = Describe("LoadBalancer", func() {
 				mockClient.EXPECT().UpdateLoadBalancer(
 					gomock.Any(),
 					loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
-					gomock.All(versionMatcher("current-version"), payloadMatcher),
+					gomock.All(isCurrentVersion(), payloadMatcher),
 				).Return(myLb, nil)
 
 				_, err = loadBalancer.EnsureLoadBalancer(context.Background(), clusterName, svc, []*corev1.Node{})
@@ -594,7 +594,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				gomock.All(
-					versionMatcher("current-version"),
+					isCurrentVersion(),
 					externalAddressNotSet(),
 					ephemeralAddress(),
 				),
@@ -636,7 +636,7 @@ var _ = Describe("LoadBalancer", func() {
 				gomock.Any(),
 				loadBalancer.GetLoadBalancerName(context.Background(), clusterName, svc),
 				gomock.All(
-					versionMatcher("current-version"),
+					isCurrentVersion(),
 					externalAddressSet("123.124.88.99"),
 					staticAddress(),
 				),
@@ -991,14 +991,14 @@ func minimalLoadBalancerService() *corev1.Service {
 	}
 }
 
-// versionMatcher ensures that the given UpdateLoadBalancerPayload has version specified.
-func versionMatcher(version string) gomock.Matcher {
+// isCurrentVersion ensures that the given UpdateLoadBalancerPayload has the version "current-version".
+func isCurrentVersion() gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		if lb.Version == nil {
 			return false
 		}
-		return *lb.Version == version
+		return *lb.Version == "current-version"
 	})
 }
 
