@@ -155,6 +155,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_S
 	--kubeconfig-expiration-seconds 3600 \
 	--csi-image-name "$(REGISTRY)/$(REPO)/stackit-csi-plugin-dev" \
 	--csi-image-tag "$(VERSION)-kubetest2" \
+	--metadata "csi-version=$(VERSION)-kubetest2,k8s-version=v$(E2E_K8S_VERSION)" \
 	-- \
 	--test-package-version="v$(E2E_K8S_VERSION)" \
 	--focus-regex="External.Storage" \
