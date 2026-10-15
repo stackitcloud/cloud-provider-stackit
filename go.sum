@@ -204,8 +204,8 @@ github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.15.2 h1:a7zyn+0r
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.15.2/go.mod h1:bG7b8OjvqSUf8MTjmkt/RW92YyYhkDgwZ0Z7Y6Evr+c=
 github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.1 h1:6NHoXh6c/GQ7+CO03bszc09rnKCeP0dzMmyrnz6mkvs=
 github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.1/go.mod h1:IsId3wbkp5oaO0JEaHZpZnbVW6KFHlAptwB+1iG3v3w=
-github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.21.1 h1:GJn6tlJscVpdovN2lekb9R5dOZ1ynM9+gIVhEVsRCE0=
-github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.21.1/go.mod h1:f5RySI1PHkYlv2JWIfbTOBARwf/JR+iAs/qeoGiXAvU=
+github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.22.0 h1:rq1vDC6IXwRCDQI/XodL2KROn5YZxDoEBwKckVSVquY=
+github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.22.0/go.mod h1:f5RySI1PHkYlv2JWIfbTOBARwf/JR+iAs/qeoGiXAvU=
 github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.8.0 h1:PsLXr7R/R/ceWIJOkist2B5chWm/Q34IgQd/dmhvWbQ=
 github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.8.0/go.mod h1:izKsr/tJKDNPsgZ/LFQ2civLOICA75BKU06NNWgADIw=
 github.com/stackitcloud/stackit-sdk-go/services/ske v1.21.2 h1:4ApmRQGkcf/G/h1s19QsqH/vqE3oqfrdG1J/3/40iEM=
