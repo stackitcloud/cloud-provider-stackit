@@ -3,6 +3,7 @@ package kubetest2
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/kubetest2/pkg/types"
 )
 
 func newValidTestDeployer() *Deployer {
@@ -55,4 +56,14 @@ var _ = Describe("validate", func() {
 		Entry("missing csi image tag", func(d *Deployer) { d.csiImageTag = "" }, "--csi-image-tag is required"),
 		Entry("empty run id", func(d *Deployer) { d.options = fakeOptions{runID: "", runDir: d.options.RunDir()} }, "run-id must not be empty"),
 	)
+})
+
+var _ = Describe("fakeOptions", func() {
+	It("implements types.Options with metadata support", func() {
+		opts := fakeOptions{
+			metadata: map[string]string{"env": "test"},
+		}
+		var iface types.Options = opts
+		Expect(iface.Metadata()).To(Equal(map[string]string{"env": "test"}))
+	})
 })
