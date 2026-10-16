@@ -401,7 +401,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		klog.V(4).Infof("[ControllerPublishVolume] AttachVolume %s on %s conflicted, verifying attachment state: %v", volumeID, instanceID, err)
 	default:
 		klog.Errorf("Failed to AttachVolume: %v", err)
-		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error %v", err)
+		return nil, status.Errorf(codes.Internal, "[ControllerPublishVolume] Attach Volume failed with error: %v", err)
 	}
 
 	err := cloud.WaitDiskAttached(ctx, instanceID, volumeID)
