@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	client "github.com/stackitcloud/cloud-provider-stackit/pkg/stackit/client"
 	v2api "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	gomock "go.uber.org/mock/gomock"
 	wait "k8s.io/apimachinery/pkg/util/wait"
@@ -40,6 +41,44 @@ func NewMockIaaSClient(ctrl *gomock.Controller) *MockIaaSClient {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockIaaSClient) EXPECT() *MockIaaSClientMockRecorder {
 	return m.recorder
+}
+
+// AddRoutes mocks base method.
+func (m *MockIaaSClient) AddRoutes(ctx context.Context, routingTableID string, routes []v2api.Route) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddRoutes", ctx, routingTableID, routes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddRoutes indicates an expected call of AddRoutes.
+func (mr *MockIaaSClientMockRecorder) AddRoutes(ctx, routingTableID, routes any) *MockIaaSClientAddRoutesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRoutes", reflect.TypeOf((*MockIaaSClient)(nil).AddRoutes), ctx, routingTableID, routes)
+	return &MockIaaSClientAddRoutesCall{Call: call}
+}
+
+// MockIaaSClientAddRoutesCall wrap *gomock.Call
+type MockIaaSClientAddRoutesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientAddRoutesCall) Return(arg0 error) *MockIaaSClientAddRoutesCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientAddRoutesCall) Do(f func(context.Context, string, []v2api.Route) error) *MockIaaSClientAddRoutesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientAddRoutesCall) DoAndReturn(f func(context.Context, string, []v2api.Route) error) *MockIaaSClientAddRoutesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // AttachVolume mocks base method.
@@ -232,6 +271,44 @@ func (c *MockIaaSClientDeleteBackupCall) Do(f func(context.Context, string) erro
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockIaaSClientDeleteBackupCall) DoAndReturn(f func(context.Context, string) error) *MockIaaSClientDeleteBackupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteRoute mocks base method.
+func (m *MockIaaSClient) DeleteRoute(ctx context.Context, routingTableID, routeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRoute", ctx, routingTableID, routeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRoute indicates an expected call of DeleteRoute.
+func (mr *MockIaaSClientMockRecorder) DeleteRoute(ctx, routingTableID, routeID any) *MockIaaSClientDeleteRouteCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRoute", reflect.TypeOf((*MockIaaSClient)(nil).DeleteRoute), ctx, routingTableID, routeID)
+	return &MockIaaSClientDeleteRouteCall{Call: call}
+}
+
+// MockIaaSClientDeleteRouteCall wrap *gomock.Call
+type MockIaaSClientDeleteRouteCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientDeleteRouteCall) Return(arg0 error) *MockIaaSClientDeleteRouteCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientDeleteRouteCall) Do(f func(context.Context, string, string) error) *MockIaaSClientDeleteRouteCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientDeleteRouteCall) DoAndReturn(f func(context.Context, string, string) error) *MockIaaSClientDeleteRouteCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -657,6 +734,45 @@ func (c *MockIaaSClientListBackupsCall) Do(f func(context.Context, map[string]st
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockIaaSClientListBackupsCall) DoAndReturn(f func(context.Context, map[string]string) ([]v2api.Backup, error)) *MockIaaSClientListBackupsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListRoutes mocks base method.
+func (m *MockIaaSClient) ListRoutes(ctx context.Context, routingTableID string, labels client.LabelMap) ([]v2api.Route, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRoutes", ctx, routingTableID, labels)
+	ret0, _ := ret[0].([]v2api.Route)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRoutes indicates an expected call of ListRoutes.
+func (mr *MockIaaSClientMockRecorder) ListRoutes(ctx, routingTableID, labels any) *MockIaaSClientListRoutesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoutes", reflect.TypeOf((*MockIaaSClient)(nil).ListRoutes), ctx, routingTableID, labels)
+	return &MockIaaSClientListRoutesCall{Call: call}
+}
+
+// MockIaaSClientListRoutesCall wrap *gomock.Call
+type MockIaaSClientListRoutesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockIaaSClientListRoutesCall) Return(arg0 []v2api.Route, arg1 error) *MockIaaSClientListRoutesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockIaaSClientListRoutesCall) Do(f func(context.Context, string, client.LabelMap) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockIaaSClientListRoutesCall) DoAndReturn(f func(context.Context, string, client.LabelMap) ([]v2api.Route, error)) *MockIaaSClientListRoutesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
