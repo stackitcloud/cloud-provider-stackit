@@ -140,7 +140,8 @@ func handle(ctx context.Context) {
 			iaasOpts = append(iaasOpts, sdkconfig.WithEndpoint(cfg.Global.APIEndpoints.IaasAPI))
 		}
 
-		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID).IaaS(iaasOpts)
+		// area, org and vpc id are unused for csi
+		iaasClient, err := stackitclient.New(cfg.Global.Region, cfg.Global.ProjectID, cfg.Global.OrganizationID, cfg.Global.AreaID, cfg.Global.VPCID).IaaS(iaasOpts)
 		if err != nil {
 			klog.Fatalf("Failed to create STACKIT provider: %v", err)
 		}
