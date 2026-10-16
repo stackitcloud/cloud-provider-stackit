@@ -9,6 +9,7 @@ REGISTRY ?= ghcr.io
 REPO ?= stackitcloud/cloud-provider-stackit
 PLATFORMS ?= amd64 arm64
 IS_DEV ?= true
+LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
 E2E_PARALLEL_NODES ?= 4
@@ -22,15 +23,34 @@ include ./hack/tools.mk
 
 build: $(BUILD_IMAGES)
 
-$(BUILD_IMAGES): $(SOURCES)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) GOPROXY=${GOPROXY} go build \
+$(BUILD_IMAGES): $(SOURCES) ensure-bin-dir
+	CGO_ENABLED=0 go build \
 		-trimpath \
 		-ldflags "$(LDFLAGS)" \
-		-o $@ \
-		cmd/$@/main.go
+		-o bin/$@ \
+		./cmd/$@/main.go
+
+.PHONY: ensure-bin-dir
+ensure-bin-dir:
+	@mkdir -p bin
 
 .PHONY: images
 images: $(foreach image,$(BUILD_IMAGES),image-$(image))
+
+CCM_CONTROLLERS ?= node-route-controller
+CCM_CLUSTER_NAME ?= kubernetes
+CCM_CLUSTER_CIDR ?= 100.64.0.0/13
+run-cloud-controller-manager: cloud-controller-manager 
+	STACKIT_SERVICE_ACCOUNT_TOKEN=$$(stackit auth get-access-token -o pretty) \
+		bin/cloud-controller-manager --cloud-provider=stackit \
+		--cluster-name=$(CCM_CLUSTER_NAME) \
+		--controllers=$(CCM_CONTROLLERS) \
+		--cloud-config=dev/config.yaml \
+		--cluster-cidr $(CCM_CLUSTER_CIDR) \
+		--secure-port=0 \
+		--metrics-address="" \
+		--leader-elect=false \
+		--kubeconfig=$${KUBECONFIG}
 
 # lazy reference, evaluated when called
 LOCAL = false
@@ -80,8 +100,8 @@ test-cover: ## Run tests with coverage.
 ##@ Verification
 
 .PHONY: lint
-lint: $(GOLANGCI_LINT) ## Run golangci-lint against code.
-	$(GOLANGCI_LINT) run ./...
+lint: $(GOLANGCI_LINT) ## Run golangci-lint against code. Use GOOS=linux since otherwise we will have wrong lints for linux only code
+	GOOS=linux $(GOLANGCI_LINT) run ./...
 
 .PHONY: check
 check: lint test ## Check everything (lint + test).
