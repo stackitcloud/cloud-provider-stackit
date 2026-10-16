@@ -659,37 +659,37 @@ func toIaasRoutes(routes []iaasalpha.Route) []iaas.Route {
 		destination := iaas.RouteDestination{}
 		if r.Destination.DestinationCIDRv4 != nil {
 			destination.DestinationCIDRv4 = &iaas.DestinationCIDRv4{
-				Type:  r.Destination.DestinationCIDRv4.Type,
+				Type:  iaas.DestinationCIDRv4Type(r.Destination.DestinationCIDRv4.Type),
 				Value: r.Destination.DestinationCIDRv4.Value,
 			}
 		}
 		if r.Destination.DestinationCIDRv6 != nil {
 			destination.DestinationCIDRv6 = &iaas.DestinationCIDRv6{
-				Type:  r.Destination.DestinationCIDRv6.Type,
+				Type:  iaas.DestinationCIDRv6Type(r.Destination.DestinationCIDRv6.Type),
 				Value: r.Destination.DestinationCIDRv6.Value,
 			}
 		}
 		nextHop := iaas.RouteNexthop{}
 		if r.Nexthop.NexthopBlackhole != nil {
 			nextHop.NexthopBlackhole = &iaas.NexthopBlackhole{
-				Type: r.Nexthop.NexthopBlackhole.Type,
+				Type: iaas.NexthopBlackholeType(r.Nexthop.NexthopBlackhole.Type),
 			}
 		}
 		if r.Nexthop.NexthopIPv4 != nil {
 			nextHop.NexthopIPv4 = &iaas.NexthopIPv4{
-				Type:  r.Nexthop.NexthopIPv4.Type,
+				Type:  iaas.NexthopIPv4Type(r.Nexthop.NexthopIPv4.Type),
 				Value: r.Nexthop.NexthopIPv4.Value,
 			}
 		}
 		if r.Nexthop.NexthopIPv6 != nil {
 			nextHop.NexthopIPv6 = &iaas.NexthopIPv6{
-				Type:  r.Nexthop.NexthopIPv6.Type,
+				Type:  iaas.NexthopIPv6Type(r.Nexthop.NexthopIPv6.Type),
 				Value: r.Nexthop.NexthopIPv6.Value,
 			}
 		}
 		if r.Nexthop.NexthopInternet != nil {
 			nextHop.NexthopInternet = &iaas.NexthopInternet{
-				Type: r.Nexthop.NexthopInternet.Type,
+				Type: iaas.NexthopInternetType(r.Nexthop.NexthopInternet.Type),
 			}
 		}
 		iaasRoutes = append(iaasRoutes, iaas.Route{
@@ -743,37 +743,37 @@ func toAlphaRoute(r *iaas.Route) iaasalpha.Route {
 	destination := iaasalpha.RouteDestination{}
 	if r.Destination.DestinationCIDRv4 != nil {
 		destination.DestinationCIDRv4 = &iaasalpha.DestinationCIDRv4{
-			Type:  r.Destination.DestinationCIDRv4.Type,
+			Type:  string(r.Destination.DestinationCIDRv4.Type),
 			Value: r.Destination.DestinationCIDRv4.Value,
 		}
 	}
 	if r.Destination.DestinationCIDRv6 != nil {
 		destination.DestinationCIDRv6 = &iaasalpha.DestinationCIDRv6{
-			Type:  r.Destination.DestinationCIDRv6.Type,
+			Type:  string(r.Destination.DestinationCIDRv6.Type),
 			Value: r.Destination.DestinationCIDRv6.Value,
 		}
 	}
 	nextHop := iaasalpha.RouteNexthop{}
 	if r.Nexthop.NexthopBlackhole != nil {
 		nextHop.NexthopBlackhole = &iaasalpha.NexthopBlackhole{
-			Type: r.Nexthop.NexthopBlackhole.Type,
+			Type: string(r.Nexthop.NexthopBlackhole.Type),
 		}
 	}
 	if r.Nexthop.NexthopIPv4 != nil {
 		nextHop.NexthopIPv4 = &iaasalpha.NexthopIPv4{
-			Type:  r.Nexthop.NexthopIPv4.Type,
+			Type:  string(r.Nexthop.NexthopIPv4.Type),
 			Value: r.Nexthop.NexthopIPv4.Value,
 		}
 	}
 	if r.Nexthop.NexthopIPv6 != nil {
 		nextHop.NexthopIPv6 = &iaasalpha.NexthopIPv6{
-			Type:  r.Nexthop.NexthopIPv6.Type,
+			Type:  string(r.Nexthop.NexthopIPv6.Type),
 			Value: r.Nexthop.NexthopIPv6.Value,
 		}
 	}
 	if r.Nexthop.NexthopInternet != nil {
 		nextHop.NexthopInternet = &iaasalpha.NexthopInternet{
-			Type: r.Nexthop.NexthopInternet.Type,
+			Type: string(r.Nexthop.NexthopInternet.Type),
 		}
 	}
 	return iaasalpha.Route{
