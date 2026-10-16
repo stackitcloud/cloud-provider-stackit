@@ -393,7 +393,7 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	switch err := cloud.AttachVolume(ctx, instanceID, volumeID, payload); {
 	case err == nil:
 	case stackiterrors.IsTooManyDevicesError(err):
-		return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Node can't accept any more volumes %v. All PCIe lanes are exhausted!", err)
+		return nil, status.Errorf(codes.ResourceExhausted, "[ControllerPublishVolume] Server can't accept any more volumes, all PCIe lanes are exhausted: %v", err)
 	case stackiterrors.IsNotFound(err):
 		return nil, status.Errorf(codes.NotFound, "[ControllerPublishVolume] volume %s or server %s not found: %v", volumeID, instanceID, err)
 	case stackiterrors.IsConflict(err):
