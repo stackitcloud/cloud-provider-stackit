@@ -257,7 +257,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 				return nil, status.Errorf(codes.InvalidArgument, "Failed to set volume encryption parameters: %v", err)
 			}
 		}
-	} else {
+	} else if volParams.Encrypted != nil {
 		klog.V(1).Infof("CreateVolume: no encryption parameters for volume source type %v", volumeSourceType)
 	}
 
