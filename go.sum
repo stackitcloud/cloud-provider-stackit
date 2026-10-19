@@ -198,8 +198,8 @@ github.com/stackitcloud/stackit-sdk-go/services/iaas v1.15.1 h1:5D0ABveu3SZyB7DB
 github.com/stackitcloud/stackit-sdk-go/services/iaas v1.15.1/go.mod h1:o6Mt/ZUB/3qvIwtu4B57m9IlyaUxAFS2Tu5XImiZxCE=
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.16.0 h1:zcPGXu16E5NRp5ocF/0JTnm6AyAQmk61iqIlUpAbfgo=
 github.com/stackitcloud/stackit-sdk-go/services/loadbalancer v1.16.0/go.mod h1:tVD3LmpowgML5U3imG9DdGAjhLmccibO92Ta7DPNfc0=
-github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.1 h1:6NHoXh6c/GQ7+CO03bszc09rnKCeP0dzMmyrnz6mkvs=
-github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.26.1/go.mod h1:IsId3wbkp5oaO0JEaHZpZnbVW6KFHlAptwB+1iG3v3w=
+github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.27.0 h1:lZl9X/wl0tF+HufZiurUkYJmk4u6/Vz8/FkdgT3wA10=
+github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.27.0/go.mod h1:IsId3wbkp5oaO0JEaHZpZnbVW6KFHlAptwB+1iG3v3w=
 github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.22.0 h1:rq1vDC6IXwRCDQI/XodL2KROn5YZxDoEBwKckVSVquY=
 github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.22.0/go.mod h1:f5RySI1PHkYlv2JWIfbTOBARwf/JR+iAs/qeoGiXAvU=
 github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.8.0 h1:PsLXr7R/R/ceWIJOkist2B5chWm/Q34IgQd/dmhvWbQ=
