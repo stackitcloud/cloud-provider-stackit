@@ -811,7 +811,7 @@ var _ = Describe("ControllerServer test", Ordered, func() {
 			_, err := fakeCs.ControllerPublishVolume(context.Background(), req)
 			Expect(err).To(HaveOccurred())
 			Expect(status.Code(err)).To(Equal(codes.ResourceExhausted))
-			Expect(status.Convert(err).Message()).To(ContainSubstring("Node can't accept any more volumes"))
+			Expect(status.Convert(err).Message()).To(ContainSubstring("Server can't accept any more volumes"))
 		})
 	})
 	Describe("ControllerUnpublishVolume", func() {
