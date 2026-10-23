@@ -14,7 +14,7 @@ contents:
   - lsblk=~2.42.2
   - mount=~2.42.2
   - umount=~2.42.2
-  - udev=~261.2
+  - udev=~262.1
   - util-linux-misc=~2.42.2 # contains fsck
   - xfsprogs=~7.1.1
   - xfsprogs-core=~7.1.1
