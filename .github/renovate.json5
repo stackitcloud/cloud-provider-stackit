@@ -135,13 +135,11 @@
       ],
     },
     {
-      enabled: true,
       groupName: 'apko packages',
       matchManagers: [
         'custom.regex',
       ],
       matchFileNames: [
-        'images/*/apko.yaml',
         '**/apko-base-image.yaml',
       ],
     },
