@@ -135,14 +135,11 @@
       ],
     },
     {
-      // TODO: enable again once the e2e pipeline is in place
-      enabled: false,
       groupName: 'apko packages',
       matchManagers: [
         'custom.regex',
       ],
       matchFileNames: [
-        'images/*/apko.yaml',
         '**/apko-base-image.yaml',
       ],
     },
