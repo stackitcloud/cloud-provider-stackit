@@ -147,6 +147,7 @@
     },
     {
       groupName: 'apko packages',
+      separateMajorMinor: false,
       matchManagers: [
         'custom.regex',
       ],
