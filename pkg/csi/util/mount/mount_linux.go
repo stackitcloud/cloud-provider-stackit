@@ -14,10 +14,10 @@ const (
 )
 
 func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
+	//nolint:gosec // G115: These numbers do not exceed MaxInt64 in practice
 	return &DeviceStats{
 		Block: false,
 
-		//nolint:gosec // G115: Bavail and Blocks can't exceed MaxInt64 in practice
 		AvailableBytes: int64(statfs.Bavail) * statfs.Bsize,
 		TotalBytes:     int64(statfs.Blocks) * statfs.Bsize,
 		UsedBytes:      (int64(statfs.Blocks) - int64(statfs.Bfree)) * statfs.Bsize,
