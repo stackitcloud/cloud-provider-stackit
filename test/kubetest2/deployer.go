@@ -14,9 +14,9 @@ const (
 
 	defaultRegion                     = "eu01"
 	defaultAvailabilityZone           = "eu01-1"
-	defaultNodeCount            int64 = 2
+	defaultNodeCount            int32 = 2
 	defaultNodepoolName               = "default"
-	defaultVolumeSizeGiB        int64 = 100
+	defaultVolumeSizeGiB        int32 = 100
 	defaultKubeconfigExpiration int64 = 6 * 60 * 60        // 6 hours
 	minKubeconfigExpiration     int64 = 10 * 60            // 10 minutes
 	maxKubeconfigExpiration     int64 = 180 * 24 * 60 * 60 // 180 days
@@ -31,9 +31,9 @@ type Deployer struct {
 	machineType         string
 	nodeImageName       string
 	nodeImageVersion    string
-	nodeCount           int64
+	nodeCount           int32
 	nodepoolName        string
-	volumeSizeGiB       int64
+	volumeSizeGiB       int32
 	volumeType          string
 	kubeconfigExpiresIn int64
 
