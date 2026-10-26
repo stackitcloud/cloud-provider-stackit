@@ -474,6 +474,7 @@ func replaceInFile(path string, replacements map[string]string) error {
 		content = strings.ReplaceAll(content, oldVal, newVal)
 	}
 
+	//nolint:gosec // G703: path comes from our own config file, can be considered trusted
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write file %q: %w", path, err)
 	}
