@@ -98,5 +98,6 @@ func (d *Deployer) validate() error {
 }
 
 func incorrectUsagef(format string, args ...any) error {
+	klog.Error(fmt.Sprintf(format, args...))
 	return types.NewIncorrectUsage(fmt.Sprintf(format, args...))
 }
