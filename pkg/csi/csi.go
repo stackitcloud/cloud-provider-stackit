@@ -181,6 +181,7 @@ func GetPVCAnnotations(pvcLister corev1.PersistentVolumeClaimLister, params map[
 // simultaneously. Copied from the
 // k8s.io/cloud-provider/app/controllermanager.go
 func resyncPeriod(s time.Duration) time.Duration {
+	//nolint:gosec // G404: jitter for resync period, not security-sensitive
 	factor := rand.Float64() + 1
 	return time.Duration(float64(s.Nanoseconds()) * factor)
 }
