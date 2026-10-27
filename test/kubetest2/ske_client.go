@@ -12,6 +12,7 @@ import (
 
 type skeClient interface {
 	GetCluster(ctx context.Context, projectID, region, name string) (*ske.Cluster, error)
+	ListCluster(ctx context.Context, projectID, region string) (*ske.ListClustersResponse, error)
 	ListProviderOptions(ctx context.Context, region string) (*ske.ProviderOptions, error)
 	CreateOrUpdateCluster(ctx context.Context, projectID, region, name string, payload *ske.CreateOrUpdateClusterPayload) (*ske.Cluster, error)
 	WaitForClusterReady(ctx context.Context, projectID, region, name string) (*ske.Cluster, error)
@@ -38,6 +39,11 @@ func newSKEClient(region, serviceAccount, endpoint string) (skeClient, error) {
 func (c *sdkSKEClient) GetCluster(ctx context.Context, projectID, region, name string) (*ske.Cluster, error) {
 	klog.Infof("SKE GetCluster: project_id=%q region=%q cluster=%q", projectID, region, name)
 	return c.api.GetCluster(ctx, projectID, region, name).Execute()
+}
+
+func (c *sdkSKEClient) ListCluster(ctx context.Context, projectID, region string) (*ske.ListClustersResponse, error) {
+	klog.Infof("SKE ListCluster: project_id=%q region=%q", projectID, region)
+	return c.api.ListClusters(ctx, projectID, region).Execute()
 }
 
 func (c *sdkSKEClient) ListProviderOptions(ctx context.Context, region string) (*ske.ProviderOptions, error) {

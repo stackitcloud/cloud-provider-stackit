@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -184,5 +185,23 @@ var _ = Describe("readCachedChildServiceAccountKey", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeFalse())
 		Expect(key).To(BeEmpty())
+	})
+})
+
+var _ = Describe("waitForServiceAccountToHavePermission", func() {
+	It("should fail when ske client returns error", func() {
+		d := newTestDeployer()
+
+		d.skeClient = &fakeSKEClient{listClusterErr: errors.New("listClusterErr")}
+
+		Expect(d.waitForServiceAccountToHavePermission(context.Background(), "test", time.Second)).ToNot(Succeed())
+	})
+
+	It("should succeed when ske client returns no error", func() {
+		d := newTestDeployer()
+
+		d.skeClient = &fakeSKEClient{}
+
+		Expect(d.waitForServiceAccountToHavePermission(context.Background(), "test", time.Second)).To(Succeed())
 	})
 })
