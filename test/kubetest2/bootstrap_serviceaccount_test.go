@@ -194,7 +194,7 @@ var _ = Describe("waitForServiceAccountToHavePermission", func() {
 
 		d.skeClient = &fakeSKEClient{listClusterErr: errors.New("listClusterErr")}
 
-		Expect(d.waitForServiceAccountToHavePermission(context.Background(), time.Second)).ToNot(Succeed())
+		Expect(d.waitForServiceAccountToHavePermission(context.Background(), "test", time.Second)).ToNot(Succeed())
 	})
 
 	It("should succeed when ske client returns no error", func() {
@@ -202,6 +202,6 @@ var _ = Describe("waitForServiceAccountToHavePermission", func() {
 
 		d.skeClient = &fakeSKEClient{}
 
-		Expect(d.waitForServiceAccountToHavePermission(context.Background(), time.Second)).To(Succeed())
+		Expect(d.waitForServiceAccountToHavePermission(context.Background(), "test", time.Second)).To(Succeed())
 	})
 })
