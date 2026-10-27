@@ -228,6 +228,8 @@ type fakeSKEClient struct {
 	providerOptionsErr error
 	getClusterResult   *ske.Cluster
 	getClusterErr      error
+	listClusterResult  *ske.ListClustersResponse
+	listClusterErr     error
 
 	createOrUpdateResult *ske.Cluster
 	createOrUpdateErr    error
@@ -247,6 +249,10 @@ type fakeSKEClient struct {
 func (c *fakeSKEClient) GetCluster(_ context.Context, projectID, _, _ string) (*ske.Cluster, error) {
 	c.lastGetProjectID = projectID
 	return c.getClusterResult, c.getClusterErr
+}
+
+func (c *fakeSKEClient) ListCluster(_ context.Context, _, _ string) (*ske.ListClustersResponse, error) {
+	return c.listClusterResult, c.listClusterErr
 }
 
 func (c *fakeSKEClient) ListProviderOptions(_ context.Context, _ string) (*ske.ProviderOptions, error) {
