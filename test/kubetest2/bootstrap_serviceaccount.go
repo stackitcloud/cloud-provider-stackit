@@ -59,7 +59,7 @@ func (d *Deployer) ensureServiceAccount(ctx context.Context) error {
 		return err
 	}
 
-	return d.waitForServiceAccountToHavePermission(ctx, serviceAccountCheckTimeout)
+	return d.waitForServiceAccountToHavePermission(ctx, childServiceAccount.Email, serviceAccountCheckTimeout)
 }
 
 func (d *Deployer) resolveManagedServiceAccount(ctx context.Context, projectID string) (*managedServiceAccount, error) {
@@ -223,14 +223,14 @@ func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
 
 // waitForServiceAccountToHavePermission tests with ListProviderOptions if the ServiceAccount already has permission.
 // Sometimes it takes a while before a request is possible
-func (d *Deployer) waitForServiceAccountToHavePermission(ctx context.Context, timeout time.Duration) error {
+func (d *Deployer) waitForServiceAccountToHavePermission(ctx context.Context, serviceAccountEmail string, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, serviceAccountCheckPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := d.skeClient.ListCluster(ctx, d.projectID, d.region)
 		if err != nil {
-			klog.Infof("Service account %q is not able to list SKE Clusters: %s", d.serviceAccount, err)
+			klog.Infof("Service account %q is not able to list SKE Clusters: %s", serviceAccountEmail, err)
 			return false, nil
 		}
-		klog.Infof("Service account %q is able to list SKE Clusters", d.serviceAccount)
+		klog.Infof("Service account %q is able to list SKE Clusters", serviceAccountEmail)
 		return true, nil
 	})
 }
