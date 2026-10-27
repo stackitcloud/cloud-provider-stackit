@@ -187,7 +187,7 @@ func mustMkdirAll(path string) {
 func mustWriteFile(path, content string) {
 	GinkgoHelper()
 	mustMkdirAll(filepath.Dir(path))
-	Expect(os.WriteFile(path, []byte(content), 0o644)).To(Succeed())
+	Expect(os.WriteFile(path, []byte(content), 0600)).To(Succeed())
 }
 
 func mustWriteVolumeMetadata(csiPluginDir, volumeName, driverName string) {

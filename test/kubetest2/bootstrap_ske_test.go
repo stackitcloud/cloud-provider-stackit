@@ -72,11 +72,11 @@ var _ = Describe("clusterPayload", func() {
 		Expect(image.GetName()).To(Equal("ubuntu"))
 		Expect(image.GetVersion()).To(Equal("v1"))
 
-		Expect(nodepool.GetMinimum()).To(Equal(int32(d.nodeCount)))
-		Expect(nodepool.GetMaximum()).To(Equal(int32(d.nodeCount)))
+		Expect(nodepool.GetMinimum()).To(Equal(d.nodeCount))
+		Expect(nodepool.GetMaximum()).To(Equal(d.nodeCount))
 
 		volume := nodepool.GetVolume()
-		Expect(volume.GetSize()).To(Equal(int32(d.volumeSizeGiB)))
+		Expect(volume.GetSize()).To(Equal(d.volumeSizeGiB))
 		Expect(volume.GetType()).To(Equal("storage"))
 
 		Expect(nodepool.GetAllowSystemComponents()).To(BeTrue())
