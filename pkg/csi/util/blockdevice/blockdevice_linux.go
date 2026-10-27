@@ -90,7 +90,7 @@ func checkBlockDeviceSize(devicePath, deviceMountPath string, newSize int64) err
 
 func triggerRescan(blockDeviceRescanPath string) error {
 	klog.V(4).Infof("Rescanning %q block device geometry", blockDeviceRescanPath)
-	err := os.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0666)
+	err := os.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0600)
 	if err != nil {
 		klog.Errorf("Error rescanning new block device geometry: %v", err)
 		return err

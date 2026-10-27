@@ -106,7 +106,7 @@ func (d *Deployer) clusterPayload() *ske.CreateOrUpdateClusterPayload {
 	clusterKubernetes := ske.NewKubernetes(d.kubernetesVersion)
 	nodeImage := ske.NewImage(d.nodeImageName, d.nodeImageVersion)
 	nodeMachine := ske.NewMachine(*nodeImage, d.machineType)
-	nodeVolume := ske.NewVolume(int32(d.volumeSizeGiB))
+	nodeVolume := ske.NewVolume(d.volumeSizeGiB)
 	if d.volumeType != "" {
 		nodeVolume.SetType(d.volumeType)
 	}
@@ -114,8 +114,8 @@ func (d *Deployer) clusterPayload() *ske.CreateOrUpdateClusterPayload {
 	nodepool := ske.NewNodepool(
 		[]string{d.availabilityZone},
 		*nodeMachine,
-		int32(d.nodeCount),
-		int32(d.nodeCount),
+		d.nodeCount,
+		d.nodeCount,
 		d.nodepoolName,
 		*nodeVolume,
 	)
