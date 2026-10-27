@@ -30,6 +30,11 @@ var childProjectRoles = []string{
 	childProjectStorageRole,
 }
 
+const (
+	serviceAccountCheckPollInterval = 2 * time.Second
+	serviceAccountCheckTimeout      = 1 * time.Minute
+)
+
 // ensureServiceAccount idempotently resolves (or creates) the managed child
 // service account, grants it the required project roles, caches a
 // service-account key and initializes the SKE client from it. Depends on
@@ -48,7 +53,13 @@ func (d *Deployer) ensureServiceAccount(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return d.initializeSKEClient(serviceAccountKey)
+
+	err = d.initializeSKEClient(serviceAccountKey)
+	if err != nil {
+		return err
+	}
+
+	return d.waitForServiceAccountToHavePermission(ctx, serviceAccountCheckTimeout)
 }
 
 func (d *Deployer) resolveManagedServiceAccount(ctx context.Context, projectID string) (*managedServiceAccount, error) {
@@ -208,6 +219,20 @@ func (d *Deployer) matchesManagedServiceAccountEmail(email string) bool {
 	}
 	name := d.serviceAccountName()
 	return localPart == name || strings.HasPrefix(localPart, name+"-")
+}
+
+// waitForServiceAccountToHavePermission tests with ListProviderOptions if the ServiceAccount already has permission.
+// Sometimes it takes a while before a request is possible
+func (d *Deployer) waitForServiceAccountToHavePermission(ctx context.Context, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, serviceAccountCheckPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := d.skeClient.ListCluster(ctx, d.projectID, d.region)
+		if err != nil {
+			klog.Infof("Service account %q is not able to list SKE Clusters: %s", d.serviceAccount, err)
+			return false, nil
+		}
+		klog.Infof("Service account %q is able to list SKE Clusters", d.serviceAccount)
+		return true, nil
+	})
 }
 
 func serviceAccountKeyJSON(createdKey *serviceaccount.CreateServiceAccountKeyResponse) (string, error) {
