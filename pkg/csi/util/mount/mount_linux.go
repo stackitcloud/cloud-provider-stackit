@@ -14,6 +14,7 @@ const (
 )
 
 func newDeviceStats(statfs *unix.Statfs_t) *DeviceStats {
+	//nolint:gosec // G115: These numbers do not exceed MaxInt64 in practice
 	return &DeviceStats{
 		Block: false,
 
