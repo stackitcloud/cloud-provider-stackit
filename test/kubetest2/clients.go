@@ -145,8 +145,10 @@ func (c *sdkProjectClient) ListProjects(ctx context.Context, parentContainerID s
 func (c *sdkProjectClient) CreateProject(ctx context.Context, parentContainerID, name, ownerEmail string, labels map[string]string) (*resourcemanager.Project, error) {
 	payload := resourcemanager.NewCreateProjectPayload(
 		parentContainerID,
-		[]resourcemanager.Member{*resourcemanager.NewMember(projectOwnerRole, ownerEmail)},
 		name,
+	)
+	payload.SetMembers(
+		[]resourcemanager.Member{*resourcemanager.NewMember(projectOwnerRole, ownerEmail)},
 	)
 	payload.SetLabels(labels)
 	return c.api.DefaultAPI.CreateProject(ctx).CreateProjectPayload(*payload).Execute()
