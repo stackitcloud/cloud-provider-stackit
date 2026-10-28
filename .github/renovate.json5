@@ -14,6 +14,11 @@
     'release-v1.34',
     'release-v1.33',
   ],
+  kubernetes: {
+    managerFilePatterns: [
+      '/^deploy/csi-plugin/.*\\.yaml$/',
+    ],
+  },
   customManagers: [
     {
       customType: 'regex',
@@ -145,5 +150,21 @@
         '**/apko-base-image.yaml',
       ],
     },
+    {
+      groupName: 'sig-storage',
+      matchPackageNames: [
+        'registry.k8s.io/sig-storage/**',
+      ],
+    },
+    {
+      description: 'Do not update own cloud-provider-stackit images',
+      matchManagers: [
+        'kubernetes',
+      ],
+      matchPackageNames: [
+        'ghcr.io/stackitcloud/cloud-provider-stackit/**',
+      ],
+      enabled: false,
+    }
   ],
 }
