@@ -36,6 +36,8 @@ var _ = Describe("loadEnvironment", func() {
 		"STACKIT_SERVICE_ENABLEMENT_ENDPOINT",
 		"STACKIT_SKE_ENDPOINT",
 		"STACKIT_IAAS_ENDPOINT",
+		"STACKIT_KUBERNETES_VERSION_STATE",
+		"STACKIT_NODE_IMAGE_VERSION_STATE",
 	}
 
 	DescribeTable("validates required environment variables",
@@ -60,6 +62,8 @@ var _ = Describe("loadEnvironment", func() {
 			Expect(d.projectID).To(BeEmpty())
 			Expect(d.kubeconfigPath).To(Equal(filepath.Join(runDir, "kubeconfig")))
 			Expect(d.serviceAccountKeyPath).To(Equal(filepath.Join(runDir, "service-account-key.json")))
+			Expect(d.kubernetesVersionState).To(Equal(defaultVersionState))
+			Expect(d.nodeImageVersionState).To(Equal(defaultVersionState))
 		},
 		Entry("missing all auth", map[string]string{
 			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
@@ -82,6 +86,38 @@ var _ = Describe("loadEnvironment", func() {
 			"STACKIT_SERVICE_ACCOUNT_EMAIL": "owner@example.com",
 			"STACKIT_PARENT_CONTAINER_ID":   "parent-1",
 		}, ""),
+		Entry("invalid kubernetes version state", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT":          validServiceAccountKey,
+			"STACKIT_PARENT_CONTAINER_ID":      "parent-1",
+			"STACKIT_KUBERNETES_VERSION_STATE": "invalid",
+		}, "invalid STACKIT_KUBERNETES_VERSION_STATE"),
+		Entry("invalid node image version state", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT":          validServiceAccountKey,
+			"STACKIT_PARENT_CONTAINER_ID":      "parent-1",
+			"STACKIT_NODE_IMAGE_VERSION_STATE": "invalid",
+		}, "invalid STACKIT_NODE_IMAGE_VERSION_STATE"),
+	)
+
+	DescribeTable("parses version states",
+		func(k8sRaw, imageRaw, wantK8s, wantImage string) {
+			for _, key := range envVarKeys {
+				setEnvVar(key, "")
+			}
+			setEnvVar("STACKIT_SERVICE_ACCOUNT", validServiceAccountKey)
+			setEnvVar("STACKIT_PARENT_CONTAINER_ID", "parent-1")
+			setEnvVar("STACKIT_KUBERNETES_VERSION_STATE", k8sRaw)
+			setEnvVar("STACKIT_NODE_IMAGE_VERSION_STATE", imageRaw)
+
+			runDir := GinkgoT().TempDir()
+			d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
+			Expect(d.loadEnvironment()).To(Succeed())
+			Expect(d.kubernetesVersionState).To(Equal(wantK8s))
+			Expect(d.nodeImageVersionState).To(Equal(wantImage))
+		},
+		Entry("defaults when empty", "", "", versionStateSupported, versionStateSupported),
+		Entry("supported", versionStateSupported, versionStateSupported, versionStateSupported, versionStateSupported),
+		Entry("preview uppercase", "PREVIEW", versionStateSupported, versionStatePreview, versionStateSupported),
+		Entry("deprecated trimmed", versionStateSupported, "  deprecated ", versionStateSupported, versionStateDeprecated),
 	)
 
 	It("reads optional endpoints with service account", func() {
