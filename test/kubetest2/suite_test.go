@@ -279,13 +279,15 @@ func (c *fakeSKEClient) CreateKubeconfig(_ context.Context, projectID, _, _ stri
 func newTestDeployer() *Deployer {
 	runDir := GinkgoT().TempDir()
 	return &Deployer{
-		options:               fakeOptions{runID: "run-123", runDir: runDir},
-		region:                defaultRegion,
-		parentContainerID:     "parent-123",
-		projectMemberEmail:    "owner@example.com",
-		kubeconfigPath:        filepath.Join(runDir, "kubeconfig"),
-		serviceAccountKeyPath: filepath.Join(runDir, "service-account-key.json"),
-		skeClientFactory:      newSKEClient,
+		options:                fakeOptions{runID: "run-123", runDir: runDir},
+		region:                 defaultRegion,
+		kubernetesVersionState: defaultVersionState,
+		nodeImageVersionState:  defaultVersionState,
+		parentContainerID:      "parent-123",
+		projectMemberEmail:     "[EMAIL_REDACTED]",
+		kubeconfigPath:         filepath.Join(runDir, "kubeconfig"),
+		serviceAccountKeyPath:  filepath.Join(runDir, "service-account-key.json"),
+		skeClientFactory:       newSKEClient,
 		csiApplier: func(_ context.Context, _, _ string) error {
 			return nil
 		},
@@ -312,6 +314,7 @@ func setEnvVar(key, value string) {
 func providerOptionsFixture() *ske.ProviderOptions {
 	kubernetesVersion := ske.NewKubernetesVersion()
 	kubernetesVersion.SetVersion("1.31.0")
+	kubernetesVersion.SetState(versionStateSupported)
 
 	availabilityZone := ske.NewAvailabilityZone()
 	availabilityZone.SetName(defaultAvailabilityZone)
@@ -321,6 +324,7 @@ func providerOptionsFixture() *ske.ProviderOptions {
 
 	imageVersion := ske.NewMachineImageVersion()
 	imageVersion.SetVersion("v1")
+	imageVersion.SetState(versionStateSupported)
 
 	machineImage := ske.NewMachineImage()
 	machineImage.SetName("ubuntu")
@@ -336,6 +340,20 @@ func providerOptionsFixture() *ske.ProviderOptions {
 	providerOptions.SetMachineImages([]ske.MachineImage{*machineImage})
 	providerOptions.SetVolumeTypes([]ske.VolumeType{*volumeType})
 	return providerOptions
+}
+
+func newKubernetesVersionFixture(version, state string) ske.KubernetesVersion {
+	kv := ske.NewKubernetesVersion()
+	kv.SetVersion(version)
+	kv.SetState(state)
+	return *kv
+}
+
+func newMachineImageVersionFixture(version, state string) ske.MachineImageVersion {
+	mv := ske.NewMachineImageVersion()
+	mv.SetVersion(version)
+	mv.SetState(state)
+	return *mv
 }
 
 func healthyClusterFixture() *ske.Cluster {
