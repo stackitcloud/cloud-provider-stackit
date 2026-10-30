@@ -61,7 +61,6 @@ func (d *Deployer) validate() error {
 		"--availability-zone":  d.availabilityZone,
 		"--machine-type":       d.machineType,
 		"--node-image-name":    d.nodeImageName,
-		"--node-image-version": d.nodeImageVersion,
 		"--csi-image-name":     d.csiImageName,
 		"--csi-image-tag":      d.csiImageTag,
 	}
