@@ -1,6 +1,7 @@
 package kubetest2
 
 import (
+	"context"
 	"flag"
 
 	"github.com/spf13/pflag"
@@ -14,6 +15,7 @@ const (
 
 	defaultRegion                     = "eu01"
 	defaultAvailabilityZone           = "eu01-1"
+	defaultVersionState               = "supported"
 	defaultNodeCount            int32 = 2
 	defaultNodepoolName               = "default"
 	defaultVolumeSizeGiB        int32 = 100
@@ -31,6 +33,7 @@ type Deployer struct {
 	machineType         string
 	nodeImageName       string
 	nodeImageVersion    string
+	versionState        string
 	nodeCount           int32
 	nodepoolName        string
 	volumeSizeGiB       int32
@@ -61,6 +64,7 @@ type Deployer struct {
 	skeClient               skeClient
 	skeClientFactory        func(region, serviceAccount, endpoint string) (skeClient, error)
 	csiApplier              csiApplier
+	testPackageAcquirer     func(ctx context.Context, kubernetesVersion, runDir string) error
 }
 
 var _ types.NewDeployer = New
@@ -75,12 +79,14 @@ func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 		options:             opts,
 		region:              defaultRegion,
 		availabilityZone:    defaultAvailabilityZone,
+		versionState:        defaultVersionState,
 		nodeCount:           defaultNodeCount,
 		nodepoolName:        defaultNodepoolName,
 		volumeSizeGiB:       defaultVolumeSizeGiB,
 		kubeconfigExpiresIn: defaultKubeconfigExpiration,
 		skeClientFactory:    newSKEClient,
 		csiApplier:          applyCSIManifestsNative,
+		testPackageAcquirer: acquireGinkgoTestPackage,
 	}
 
 	fs := pflag.NewFlagSet(Name, pflag.ContinueOnError)

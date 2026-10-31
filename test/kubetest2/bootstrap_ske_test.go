@@ -16,6 +16,73 @@ var _ = Describe("validateProviderOptions", func() {
 		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
 	})
 
+	It("resolves minor kubernetes version to latest supported patch version", func() {
+		d := newValidTestDeployer()
+		d.kubernetesVersion = "1.36"
+		d.nodeImageName = "flatcar"
+		d.nodeImageVersion = ""
+		d.skeClient = &fakeSKEClient{providerOptions: multiVersionProviderOptionsFixture()}
+
+		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
+		Expect(d.kubernetesVersion).To(Equal("1.36.5"))
+		Expect(d.nodeImageVersion).To(Equal("4593.2.5-containerd2.1.9"))
+	})
+
+	It("resolves latest flatcar version preferring containerd suffix and higher containerd version", func() {
+		d := newValidTestDeployer()
+		d.kubernetesVersion = "1.36"
+		d.nodeImageName = "flatcar"
+		d.nodeImageVersion = ""
+		opts := multiVersionProviderOptionsFixture()
+		images := opts.GetMachineImages()
+		for i := range images {
+			if images[i].GetName() == "flatcar" {
+				images[i].SetVersions([]ske.MachineImageVersion{
+					newMachineImageVersionFixture("4593.2.5", "supported"),
+					newMachineImageVersionFixture("4593.2.5-containerd2.1.9", "supported"),
+					newMachineImageVersionFixture("4593.2.5-containerd2.2.0", "supported"),
+				})
+			}
+		}
+		d.skeClient = &fakeSKEClient{providerOptions: opts}
+
+		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
+		Expect(d.nodeImageVersion).To(Equal("4593.2.5-containerd2.2.0"))
+	})
+
+	DescribeTable("resolves ubuntu versions",
+		func(requestedVersion, versionState, wantVersion string) {
+			d := newValidTestDeployer()
+			d.kubernetesVersion = "1.36"
+			d.nodeImageName = "ubuntu"
+			d.nodeImageVersion = requestedVersion
+			d.versionState = versionState
+			d.skeClient = &fakeSKEClient{providerOptions: multiVersionProviderOptionsFixture()}
+
+			Expect(d.validateProviderOptions(context.Background())).To(Succeed())
+			Expect(d.nodeImageVersion).To(Equal(wantVersion))
+		},
+		Entry("omitted version picks latest supported across all majors", "", "supported", "2604.20260921.0"),
+		Entry("major 22 picks latest supported 2204", "22", "supported", "2204.20260826.0"),
+		Entry("major 24 picks latest supported 2404", "24", "supported", "2404.20260901.0"),
+		Entry("major 26 picks latest supported 2604", "26", "supported", "2604.20260921.0"),
+		Entry("major 22 with preview state picks latest preview 2204", "22", "preview", "2204.20261005.0"),
+		Entry("exact version is preserved when state matches", "2204.20260803.0", "supported", "2204.20260803.0"),
+	)
+
+	It("resolves preview kubernetes and flatcar versions when versionState is preview", func() {
+		d := newValidTestDeployer()
+		d.kubernetesVersion = "1.36"
+		d.nodeImageName = "flatcar"
+		d.nodeImageVersion = ""
+		d.versionState = "preview"
+		d.skeClient = &fakeSKEClient{providerOptions: multiVersionProviderOptionsFixture()}
+
+		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
+		Expect(d.kubernetesVersion).To(Equal("1.36.6"))
+		Expect(d.nodeImageVersion).To(Equal("4757.2.1-containerd2.2.9"))
+	})
+
 	DescribeTable("rejects unsupported options",
 		func(mutate func(*Deployer), wantErrContains string) {
 			d := newValidTestDeployer()
@@ -24,10 +91,13 @@ var _ = Describe("validateProviderOptions", func() {
 			Expect(d.validateProviderOptions(context.Background())).To(MatchError(ContainSubstring(wantErrContains)))
 		},
 		Entry("unsupported kubernetes version", func(d *Deployer) { d.kubernetesVersion = "9.9.9" }, "unsupported --kubernetes-version"),
+		Entry("unsupported kubernetes minor version", func(d *Deployer) { d.kubernetesVersion = "1.99" }, "unsupported --kubernetes-version"),
 		Entry("unsupported availability zone", func(d *Deployer) { d.availabilityZone = "eu99-9" }, "unsupported --availability-zone"),
 		Entry("unsupported machine type", func(d *Deployer) { d.machineType = "x9.9" }, "unsupported --machine-type"),
 		Entry("unsupported node image name", func(d *Deployer) { d.nodeImageName = "fedora" }, "unsupported node image"),
 		Entry("unsupported node image version", func(d *Deployer) { d.nodeImageVersion = "v99" }, "unsupported node image"),
+		Entry("unsupported ubuntu major version", func(d *Deployer) { d.nodeImageName = "ubuntu"; d.nodeImageVersion = "20" }, "unsupported node image"),
+		Entry("mismatched kubernetes version state", func(d *Deployer) { d.versionState = "preview" }, "unsupported --kubernetes-version"),
 		Entry("unsupported volume type", func(d *Deployer) { d.volumeType = "nvme" }, "unsupported --volume-type"),
 	)
 

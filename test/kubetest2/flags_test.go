@@ -21,6 +21,12 @@ var _ = Describe("validate", func() {
 		Expect(newValidTestDeployer().validate()).To(Succeed())
 	})
 
+	It("allows an empty node image version", func() {
+		d := newValidTestDeployer()
+		d.nodeImageVersion = ""
+		Expect(d.validate()).To(Succeed())
+	})
+
 	It("accepts minimal configuration when not running up", func() {
 		d := newTestDeployer()
 		d.options = fakeOptions{runID: "run-123", runDir: d.options.RunDir(), shouldUp: false}
@@ -45,7 +51,6 @@ var _ = Describe("validate", func() {
 		Entry("missing availability zone", func(d *Deployer) { d.availabilityZone = "" }, "--availability-zone is required"),
 		Entry("missing machine type", func(d *Deployer) { d.machineType = "" }, "--machine-type is required"),
 		Entry("missing node image name", func(d *Deployer) { d.nodeImageName = "" }, "--node-image-name is required"),
-		Entry("missing node image version", func(d *Deployer) { d.nodeImageVersion = "" }, "--node-image-version is required"),
 		Entry("empty nodepool name", func(d *Deployer) { d.nodepoolName = "" }, "--nodepool-name must not be empty"),
 		Entry("nodepool name too long", func(d *Deployer) { d.nodepoolName = "this-name-is-way-too-long" }, "--nodepool-name must be 15 characters or fewer"),
 		Entry("zero node count", func(d *Deployer) { d.nodeCount = 0 }, "--node-count must be greater than 0"),
