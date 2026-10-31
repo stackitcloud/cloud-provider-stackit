@@ -17,9 +17,8 @@ The cloud controller manager provisions STACKIT load balancers for Kubernetes se
 
 ## Limitations
 
-- `externalTrafficPolicy=local` is not supported.
+- `externalTrafficPolicy=local` is not supported when kube-proxy /healthz checks are not enabled. 
 - `sessionAffinity` is not supported.
-- Health checks are not implemented. If a node becomes unhealthy, then it is removed from the targets via the CCM.
 - The load balancer service currently adds security rules to each target.
   In the case of the CCM, the targets are the Kubernetes nodes.
   Experiments have shown that SKE will leave the assignment untouched, even during a maintenance.
