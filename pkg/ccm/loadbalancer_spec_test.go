@@ -1146,6 +1146,49 @@ var _ = Describe("lbSpecFromService", func() {
 		})
 	})
 
+	Context("Access Logs", func() {
+		It("should enable access logs when annotation is true", func() {
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/access-logs": "true",
+					},
+				},
+			}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Options.AccessLogs).To(PointTo(BeTrue()))
+		})
+
+		It("should disable access logs when annotation is false", func() {
+			spec, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/access-logs": "false",
+					},
+				},
+			}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Options.AccessLogs).To(PointTo(BeFalse()))
+		})
+
+		It("should disable access logs when annotation is omitted", func() {
+			spec, _, err := lbSpecFromService(&corev1.Service{}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Options.AccessLogs).To(PointTo(BeFalse()))
+		})
+
+		It("should error on invalid value for access-logs", func() {
+			_, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"lb.stackit.cloud/access-logs": "foo",
+					},
+				},
+			}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).To(MatchError(ContainSubstring("invalid bool")))
+		})
+	})
+
 	It("should attach the load balancer to the specified network for both listeners and targets", func() {
 		spec, _, err := lbSpecFromService(&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1875,6 +1918,50 @@ var _ = DescribeTable("compareLBwithSpec",
 					UseSourceIpAddress: new(true),
 				},
 			}},
+		},
+	}),
+	Entry("When accessLogs is enabled and matches", &compareLBwithSpecTest{
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+				AccessLogs:         new(true),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+				AccessLogs:         new(true),
+			},
+		},
+	}),
+	Entry("When accessLogs is nil on LB and false in spec", &compareLBwithSpecTest{
+		wantFulfilled: true,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+				AccessLogs:         new(false),
+			},
+		},
+	}),
+	Entry("When accessLogs differs", &compareLBwithSpecTest{
+		wantFulfilled: false,
+		lb: &loadbalancer.LoadBalancer{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+				AccessLogs:         new(false),
+			},
+		},
+		spec: &loadbalancer.CreateLoadBalancerPayload{
+			Options: &loadbalancer.LoadBalancerOptions{
+				PrivateNetworkOnly: new(true),
+				AccessLogs:         new(true),
+			},
 		},
 	}),
 )
