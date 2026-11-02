@@ -54,6 +54,9 @@ const (
 	// The annotation can neither be changed nor be added or removed after service creation.
 	// This annotation is currently not supported by STACKIT and only works in very specific circumstances.
 	listenerNetworkAnnotation = "lb.stackit.cloud/listener-network"
+	// accessLogsAnnotation defines whether per-request access logs should be enabled on the load balancer.
+	// Default is false (i.e. disabled).
+	accessLogsAnnotation = "lb.stackit.cloud/access-logs"
 )
 
 const (
@@ -488,6 +491,17 @@ func lbSpecFromService(
 		useSourceIP = parsed
 	}
 
+	// Parse access logs from annotation.
+	accessLogs := false
+	if val, found := service.Annotations[accessLogsAnnotation]; found {
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid bool value for annotation %s: %w", accessLogsAnnotation, err)
+		}
+		accessLogs = parsed
+	}
+	lb.Options.AccessLogs = new(accessLogs)
+
 	targets := []loadbalancer.Target{}
 	for i := range nodes {
 		node := nodes[i]
@@ -801,6 +815,10 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 		cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessControl).AllowedSourceRanges,
 		cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessControl).AllowedSourceRanges,
 	) {
+		fulfills = false
+	}
+
+	if cmp.UnpackPtr(cmp.UnpackPtr(lb.Options).AccessLogs) != cmp.UnpackPtr(cmp.UnpackPtr(spec.Options).AccessLogs) {
 		fulfills = false
 	}
 
