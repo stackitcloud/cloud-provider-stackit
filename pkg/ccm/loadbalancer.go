@@ -299,6 +299,7 @@ func (l *LoadBalancer) EnsureLoadBalancerDeleted(
 			Networks:        lb.Networks,
 			Options: &loadbalancer.LoadBalancerOptions{
 				AccessControl:      lb.Options.AccessControl,
+				AccessLogs:         lb.Options.AccessLogs,
 				EphemeralAddress:   lb.Options.EphemeralAddress,
 				Observability:      nil,
 				PrivateNetworkOnly: lb.Options.PrivateNetworkOnly,
