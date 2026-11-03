@@ -558,7 +558,11 @@ func lbSpecFromService(
 
 		var activeHealthCheck *loadbalancer.ActiveHealthCheck
 		if opts.UseActiveHealthChecks() {
-			activeHealthCheck = activeHealthCheckForService(service)
+			var err error
+			activeHealthCheck, err = activeHealthCheckForService(service)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 
 		targetPools = append(targetPools, loadbalancer.TargetPool{
@@ -594,9 +598,12 @@ func lbSpecFromService(
 	return lb, nil, nil
 }
 
-func activeHealthCheckForService(service *corev1.Service) *loadbalancer.ActiveHealthCheck {
+func activeHealthCheckForService(service *corev1.Service) (*loadbalancer.ActiveHealthCheck, error) {
 	port := kubeProxyHealthCheckPort
-	if service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal && service.Spec.HealthCheckNodePort > 0 {
+	if service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal {
+		if service.Spec.HealthCheckNodePort <= 0 {
+			return nil, fmt.Errorf("service %s/%s has externalTrafficPolicy=Local but HealthCheckNodePort is not yet allocated", service.Namespace, service.Name)
+		}
 		port = service.Spec.HealthCheckNodePort
 	}
 
@@ -611,7 +618,7 @@ func activeHealthCheckForService(service *corev1.Service) *loadbalancer.ActiveHe
 			OkStatuses: []string{"200"},
 		},
 		IntervalJitter: new(defaultIntervalJitter),
-	}
+	}, nil
 }
 
 func checkUnsupportedAnnotations(service *corev1.Service) *Event {
