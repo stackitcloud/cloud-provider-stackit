@@ -642,6 +642,25 @@ var _ = Describe("lbSpecFromService", func() {
 			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks).NotTo(BeNil())
 			Expect(spec.TargetPools[0].ActiveHealthCheck.HttpHealthChecks.Path).To(PointTo(Equal("/healthz")))
 		})
+
+		It("returns an error for externalTrafficPolicy Local when HealthCheckNodePort is unassigned", func() {
+			_, _, err := lbSpecFromService(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"lb.stackit.cloud/external-address": externalAddress,
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports:                 []corev1.ServicePort{http},
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					HealthCheckNodePort:   0,
+				},
+			}, []*corev1.Node{}, lbOpts, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("externalTrafficPolicy=Local but HealthCheckNodePort is not yet allocated"))
+		})
 	})
 
 	DescribeTable("unsupported annotations",
