@@ -1,8 +1,18 @@
 package kubetest2
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -63,6 +73,144 @@ var _ = Describe("Up", func() {
 		kubeconfigBytes, err := os.ReadFile(d.kubeconfigPath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(kubeconfigBytes)).To(Equal("apiVersion: v1\n"))
+	})
+
+	It("acquires test package with resolved kubernetes version when ShouldTest is true", func() {
+		d := newTestDeployer()
+		configureValidUpInputs(d)
+		d.kubernetesVersion = "1.36"
+		d.nodeImageName = "flatcar"
+		d.nodeImageVersion = ""
+		d.options = fakeOptions{
+			runID:      "run-123",
+			runDir:     d.options.RunDir(),
+			shouldUp:   true,
+			shouldTest: true,
+		}
+
+		cachedKey := `{"credentials":{"privateKey":"cached"}}`
+		Expect(os.WriteFile(d.serviceAccountKeyPath, []byte(cachedKey), 0o600)).To(Succeed())
+
+		d.projectClient = &fakeProjectClient{
+			listProjectsResult: []resourcemanager.Project{
+				*projectFixture(d.projectName(), "project-123", "container-123", d.managedProjectLabels()),
+			},
+		}
+		serviceAccountEmail := d.serviceAccountName() + "@sa.stackit.cloud"
+		d.serviceAccountClient = &fakeServiceAccountClient{
+			listResult: []serviceaccount.ServiceAccount{
+				*serviceAccountFixture(serviceAccountEmail),
+			},
+		}
+		d.authorizationClient = &fakeAuthorizationClient{
+			listMembersResult: []authorization.Member{
+				*authorization.NewMember(childProjectSKERole, serviceAccountEmail),
+				*authorization.NewMember(childProjectStorageRole, serviceAccountEmail),
+			},
+		}
+		d.serviceEnablementClient = &fakeServiceEnablementClient{getStatusResult: serviceenablement.NewServiceStatus()}
+
+		fakeSKE := &fakeSKEClient{
+			providerOptions:      multiVersionProviderOptionsFixture(),
+			createOrUpdateResult: ske.NewClusterWithDefaults(),
+			waitReadyResult:      ske.NewClusterWithDefaults(),
+			kubeconfigResult: func() *ske.Kubeconfig {
+				cfg := ske.NewKubeconfig()
+				cfg.SetKubeconfig("apiVersion: v1\n")
+				return cfg
+			}(),
+		}
+		d.skeClientFactory = func(_, _, _ string) (skeClient, error) {
+			return fakeSKE, nil
+		}
+
+		var acquiredVersion, acquiredRunDir string
+		d.testPackageAcquirer = func(_ context.Context, version, runDir string) error {
+			acquiredVersion = version
+			acquiredRunDir = runDir
+			return nil
+		}
+
+		Expect(d.Up()).To(Succeed())
+		Expect(acquiredVersion).To(Equal("1.36.5"))
+		Expect(acquiredRunDir).To(Equal(d.options.RunDir()))
+	})
+})
+
+var _ = Describe("acquireTestPackageFromURL", func() {
+	It("downloads and extracts e2e.test, ginkgo, and kubectl into runDir", func() {
+		var tarBuf bytes.Buffer
+		gzw := gzip.NewWriter(&tarBuf)
+		tw := tar.NewWriter(gzw)
+		for name, body := range map[string]string{
+			"kubernetes/test/bin/e2e.test": "e2e-binary",
+			"kubernetes/test/bin/ginkgo":   "ginkgo-binary",
+		} {
+			Expect(tw.WriteHeader(&tar.Header{
+				Name: name,
+				Mode: 0o755,
+				Size: int64(len(body)),
+			})).To(Succeed())
+			_, err := tw.Write([]byte(body))
+			Expect(err).NotTo(HaveOccurred())
+		}
+		Expect(tw.Close()).To(Succeed())
+		Expect(gzw.Close()).To(Succeed())
+
+		tarBytes := tarBuf.Bytes()
+		tarSum := sha256.Sum256(tarBytes)
+		tarSHA := hex.EncodeToString(tarSum[:])
+
+		kubectlBytes := []byte("kubectl-binary")
+		kubectlSum := sha256.Sum256(kubectlBytes)
+		kubectlSHA := hex.EncodeToString(kubectlSum[:])
+
+		tarPath := fmt.Sprintf("/release/v1.36.5/kubernetes-test-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+		kubectlPath := fmt.Sprintf("/release/v1.36.5/bin/%s/%s/kubectl", runtime.GOOS, runtime.GOARCH)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case tarPath:
+				_, _ = w.Write(tarBytes)
+			case tarPath + ".sha256":
+				_, _ = w.Write([]byte(tarSHA))
+			case kubectlPath:
+				_, _ = w.Write(kubectlBytes)
+			case kubectlPath + ".sha256":
+				_, _ = w.Write([]byte(kubectlSHA))
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		DeferCleanup(srv.Close)
+
+		runDir := GinkgoT().TempDir()
+		cacheDir := GinkgoT().TempDir()
+		Expect(acquireTestPackageFromURL(context.Background(), srv.URL, "1.36.5", runDir, cacheDir)).To(Succeed())
+
+		for name, want := range map[string]string{
+			"e2e.test": "e2e-binary",
+			"ginkgo":   "ginkgo-binary",
+			"kubectl":  "kubectl-binary",
+		} {
+			got, err := os.ReadFile(filepath.Join(runDir, name))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(got)).To(Equal(want))
+		}
+	})
+
+	It("fails when sha256 verification fails", func() {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if filepath.Ext(r.URL.Path) == ".sha256" {
+				_, _ = w.Write([]byte("deadbeef"))
+				return
+			}
+			_, _ = w.Write([]byte("corrupt-payload"))
+		}))
+		DeferCleanup(srv.Close)
+
+		err := acquireTestPackageFromURL(context.Background(), srv.URL, "1.36.5", GinkgoT().TempDir(), GinkgoT().TempDir())
+		Expect(err).To(MatchError(ContainSubstring("sha256 mismatch")))
 	})
 })
 

@@ -25,17 +25,18 @@ func TestKubetest2(t *testing.T) {
 const validServiceAccountKey = `{"credentials":{"iss":"owner@example.com"}}`
 
 type fakeOptions struct {
-	runID    string
-	runDir   string
-	shouldUp bool
-	metadata map[string]string
+	runID      string
+	runDir     string
+	shouldUp   bool
+	shouldTest bool
+	metadata   map[string]string
 }
 
 func (o fakeOptions) HelpRequested() bool         { return false }
 func (o fakeOptions) ShouldBuild() bool           { return false }
 func (o fakeOptions) ShouldUp() bool              { return o.shouldUp }
 func (o fakeOptions) ShouldDown() bool            { return !o.shouldUp }
-func (o fakeOptions) ShouldTest() bool            { return false }
+func (o fakeOptions) ShouldTest() bool            { return o.shouldTest }
 func (o fakeOptions) SkipTestJUnitReport() bool   { return false }
 func (o fakeOptions) RunID() string               { return o.runID }
 func (o fakeOptions) RunDir() string              { return o.runDir }
@@ -289,6 +290,9 @@ func newTestDeployer() *Deployer {
 		csiApplier: func(_ context.Context, _, _ string) error {
 			return nil
 		},
+		testPackageAcquirer: func(_ context.Context, _, _ string) error {
+			return nil
+		},
 	}
 }
 
@@ -312,6 +316,7 @@ func setEnvVar(key, value string) {
 func providerOptionsFixture() *ske.ProviderOptions {
 	kubernetesVersion := ske.NewKubernetesVersion()
 	kubernetesVersion.SetVersion("1.31.0")
+	kubernetesVersion.SetState("supported")
 
 	availabilityZone := ske.NewAvailabilityZone()
 	availabilityZone.SetName(defaultAvailabilityZone)
@@ -321,6 +326,7 @@ func providerOptionsFixture() *ske.ProviderOptions {
 
 	imageVersion := ske.NewMachineImageVersion()
 	imageVersion.SetVersion("v1")
+	imageVersion.SetState("supported")
 
 	machineImage := ske.NewMachineImage()
 	machineImage.SetName("ubuntu")
@@ -336,6 +342,54 @@ func providerOptionsFixture() *ske.ProviderOptions {
 	providerOptions.SetMachineImages([]ske.MachineImage{*machineImage})
 	providerOptions.SetVolumeTypes([]ske.VolumeType{*volumeType})
 	return providerOptions
+}
+
+func newKubernetesVersionFixture(version, state string) ske.KubernetesVersion {
+	kv := ske.NewKubernetesVersion()
+	kv.SetVersion(version)
+	kv.SetState(state)
+	return *kv
+}
+
+func newMachineImageVersionFixture(version, state string) ske.MachineImageVersion {
+	mv := ske.NewMachineImageVersion()
+	mv.SetVersion(version)
+	mv.SetState(state)
+	return *mv
+}
+
+func multiVersionProviderOptionsFixture() *ske.ProviderOptions {
+	opts := providerOptionsFixture()
+	opts.SetKubernetesVersions([]ske.KubernetesVersion{
+		newKubernetesVersionFixture("1.35.7", "supported"),
+		newKubernetesVersionFixture("1.36.4", "supported"),
+		newKubernetesVersionFixture("1.36.5", "supported"),
+		newKubernetesVersionFixture("1.36.6", "preview"),
+		newKubernetesVersionFixture("1.36.9", "deprecated"),
+	})
+
+	flatcar := ske.NewMachineImage()
+	flatcar.SetName("flatcar")
+	flatcar.SetVersions([]ske.MachineImageVersion{
+		newMachineImageVersionFixture("4593.2.2", "deprecated"),
+		newMachineImageVersionFixture("4593.2.4-containerd2.1.9", "supported"),
+		newMachineImageVersionFixture("4593.2.5-containerd2.1.9", "supported"),
+		newMachineImageVersionFixture("4757.2.1-containerd2.2.9", "preview"),
+	})
+
+	ubuntu := ske.NewMachineImage()
+	ubuntu.SetName("ubuntu")
+	ubuntu.SetVersions([]ske.MachineImageVersion{
+		newMachineImageVersionFixture("2204.20260629.0", "deprecated"),
+		newMachineImageVersionFixture("2204.20260803.0", "supported"),
+		newMachineImageVersionFixture("2204.20260826.0", "supported"),
+		newMachineImageVersionFixture("2204.20261005.0", "preview"),
+		newMachineImageVersionFixture("2404.20260901.0", "supported"),
+		newMachineImageVersionFixture("2604.20260921.0", "supported"),
+	})
+
+	opts.SetMachineImages([]ske.MachineImage{*flatcar, *ubuntu})
+	return opts
 }
 
 func healthyClusterFixture() *ske.Cluster {

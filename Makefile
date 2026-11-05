@@ -177,7 +177,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_S
 	--csi-image-tag "$(VERSION)-kubetest2" \
 	--metadata "csi-version=$(VERSION)-kubetest2,k8s-version=v$(E2E_K8S_VERSION)" \
 	-- \
-	--test-package-version="v$(E2E_K8S_VERSION)" \
+	--use-built-binaries=true \
 	--focus-regex="External.Storage" \
 	--skip-regex="\[Feature:|\[Disruptive\]|\[Serial\]" \
 	--ginkgo-args="-v" \

@@ -36,6 +36,7 @@ var _ = Describe("loadEnvironment", func() {
 		"STACKIT_SERVICE_ENABLEMENT_ENDPOINT",
 		"STACKIT_SKE_ENDPOINT",
 		"STACKIT_IAAS_ENDPOINT",
+		"STACKIT_VERSION_STATE",
 	}
 
 	DescribeTable("validates required environment variables",
@@ -60,6 +61,7 @@ var _ = Describe("loadEnvironment", func() {
 			Expect(d.projectID).To(BeEmpty())
 			Expect(d.kubeconfigPath).To(Equal(filepath.Join(runDir, "kubeconfig")))
 			Expect(d.serviceAccountKeyPath).To(Equal(filepath.Join(runDir, "service-account-key.json")))
+			Expect(d.versionState).To(Equal(defaultVersionState))
 		},
 		Entry("missing all auth", map[string]string{
 			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
@@ -82,6 +84,31 @@ var _ = Describe("loadEnvironment", func() {
 			"STACKIT_SERVICE_ACCOUNT_EMAIL": "owner@example.com",
 			"STACKIT_PARENT_CONTAINER_ID":   "parent-1",
 		}, ""),
+		Entry("invalid version state", map[string]string{
+			"STACKIT_SERVICE_ACCOUNT":     validServiceAccountKey,
+			"STACKIT_PARENT_CONTAINER_ID": "parent-1",
+			"STACKIT_VERSION_STATE":       "invalid",
+		}, "invalid STACKIT_VERSION_STATE"),
+	)
+
+	DescribeTable("parses STACKIT_VERSION_STATE",
+		func(raw, want string) {
+			for _, key := range envVarKeys {
+				setEnvVar(key, "")
+			}
+			setEnvVar("STACKIT_SERVICE_ACCOUNT", validServiceAccountKey)
+			setEnvVar("STACKIT_PARENT_CONTAINER_ID", "parent-1")
+			setEnvVar("STACKIT_VERSION_STATE", raw)
+
+			runDir := GinkgoT().TempDir()
+			d := &Deployer{options: fakeOptions{runID: "run-123", runDir: runDir}}
+			Expect(d.loadEnvironment()).To(Succeed())
+			Expect(d.versionState).To(Equal(want))
+		},
+		Entry("defaults when empty", "", "supported"),
+		Entry("supported", "supported", "supported"),
+		Entry("preview uppercase", "PREVIEW", "preview"),
+		Entry("deprecated trimmed", "  deprecated ", "deprecated"),
 	)
 
 	It("reads optional endpoints with service account", func() {
