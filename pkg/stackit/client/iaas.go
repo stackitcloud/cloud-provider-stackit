@@ -12,7 +12,6 @@ import (
 	iaasalpha "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2alpha1api"
 	iaas "github.com/stackitcloud/stackit-sdk-go/services/iaas/v2api"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
 )
 
 type iaasClient struct {
@@ -42,7 +41,7 @@ type IaaSClient interface {
 
 	CreateVolume(ctx context.Context, payload iaas.CreateVolumePayload) (*iaas.Volume, error)
 	DeleteVolume(ctx context.Context, volumeID string) error
-	AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error)
+	AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) error
 	DetachVolume(ctx context.Context, serverID, volumeID string) error
 	GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error)
 	GetVolumesByName(ctx context.Context, volName string) ([]iaas.Volume, error)
@@ -61,6 +60,7 @@ type IaaSClient interface {
 const (
 	VolumeAvailableStatus = "AVAILABLE"
 	VolumeAttachedStatus  = "ATTACHED"
+	VolumeInUseStatus     = "IN_USE"
 	VolumeErrorStatus     = "ERROR"
 	diskAttachInitDelay   = 1 * time.Second
 	diskAttachFactor      = 1.2
@@ -130,6 +130,9 @@ func WithArea(orgID, areaID string) Option {
 		o.areaID = areaID
 	}
 }
+
+// volumeUsableStatuses are the volume statuses that mark an attachment as usable on the node.
+var volumeUsableStatuses = []string{VolumeAttachedStatus, VolumeInUseStatus}
 
 func NewIaaSClient(region, projectID string, sdkOptions []sdkconfig.ConfigurationOption, clientOpts ...Option) (IaaSClient, error) {
 	apiClient, err := iaas.NewAPIClient(sdkOptions...)
@@ -407,28 +410,16 @@ func (i *iaasClient) DeleteVolume(ctx context.Context, volumeID string) error {
 	return err
 }
 
-func (i *iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) (string, error) {
-	volume, err := i.GetVolume(ctx, volumeID)
-	if err != nil {
-		return "", err
-	}
-
-	if volume.ServerId != nil && serverID == *volume.ServerId {
-		klog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, serverID)
-		return *volume.Id, nil
-	}
-
-	_, err = execute(ctx, func(ctx context.Context) (any, error) {
+// AttachVolume attaches a volume to a server. It performs no pre-checks: IaaS
+// validates the request and returns the corresponding error from the create API.
+func (i *iaasClient) AttachVolume(ctx context.Context, serverID, volumeID string, payload iaas.AddVolumeToServerPayload) error {
+	_, err := execute(ctx, func(ctx context.Context) (any, error) {
 		return i.Client.
 			AddVolumeToServer(ctx, i.projectID, i.region, serverID, volumeID).
 			AddVolumeToServerPayload(payload).
 			Execute()
 	})
-	if err != nil {
-		return "", err
-	}
-
-	return volume.GetId(), nil
+	return err
 }
 
 func (i *iaasClient) GetVolume(ctx context.Context, volumeID string) (*iaas.Volume, error) {
@@ -532,13 +523,19 @@ func (i *iaasClient) WaitDiskAttached(ctx context.Context, instanceID, volumeID 
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		attached, err := i.diskIsAttached(ctx, instanceID, volumeID)
-		if err != nil && !stackiterrors.IsNotFound(err) {
-			// if this is a race condition indicate the volume is deleted
-			// during sleep phase, ignore the error and return attach=false
-			return false, err
+		volume, err := i.GetVolume(ctx, volumeID)
+		if err != nil {
+			// A volume deleted during the sleep phase must not abort the loop as a
+			// hard error; ignore the not-found and keep polling until the timeout.
+			return false, stackiterrors.IgnoreNotFound(err)
 		}
-		return attached, nil
+		if serverID := volume.GetServerId(); serverID != "" && serverID != instanceID {
+			return false, fmt.Errorf("volume %s is attached to server %s, not %s", volumeID, serverID, instanceID)
+		}
+		if slices.Contains(volumeErrorStates[:], volume.GetStatus()) {
+			return false, fmt.Errorf("volume %s is in error state %s", volumeID, volume.GetStatus())
+		}
+		return volume.GetServerId() == instanceID && slices.Contains(volumeUsableStatuses, volume.GetStatus()), nil
 	})
 
 	if wait.Interrupted(err) {
@@ -556,11 +553,11 @@ func (i *iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID 
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		attached, err := i.diskIsAttached(ctx, instanceID, volumeID)
+		volume, err := i.GetVolume(ctx, volumeID)
 		if err != nil {
 			return false, err
 		}
-		return !attached, nil
+		return volume.GetServerId() != instanceID, nil
 	})
 
 	if wait.Interrupted(err) {
@@ -570,50 +567,17 @@ func (i *iaasClient) WaitDiskDetached(ctx context.Context, instanceID, volumeID 
 	return err
 }
 
+// DetachVolume detaches a volume from a server. It performs no pre-checks: IaaS
+// handles the state validation and returns not-found when the attachment is gone.
 func (i *iaasClient) DetachVolume(ctx context.Context, serverID, volumeID string) error {
-	volume, err := i.GetVolume(ctx, volumeID)
-	if err != nil {
-		return err
-	}
-
-	if *volume.Status == VolumeAvailableStatus {
-		klog.V(2).Infof("Volume: %s has been detached from compute: %s ", *volume.Id, serverID)
-		return nil
-	}
-
-	if *volume.Status != VolumeAttachedStatus {
-		return fmt.Errorf("can not detach volume %s, its status is %s", *volume.Name, *volume.Status)
-	}
-
-	if volume.ServerId != nil && *volume.ServerId == serverID {
-		_, err := execute(ctx, func(ctx context.Context) (any, error) {
-			err := i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
-			if err != nil {
-				return nil, fmt.Errorf("failed to detach volume %s from compute %s : %w", *volume.Name, serverID, err)
-			}
-			return nil, nil
-		})
+	_, err := execute(ctx, func(ctx context.Context) (any, error) {
+		err := i.Client.RemoveVolumeFromServer(ctx, i.projectID, i.region, serverID, volumeID).Execute()
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("failed to detach volume %s from compute %s : %w", volumeID, serverID, err)
 		}
-
-		klog.V(2).Infof("Successfully detached volume: %s from compute: %s", *volume.Id, serverID)
-	}
-
-	return nil
-}
-
-// diskIsAttached queries if a volume is attached to a compute instance
-func (i *iaasClient) diskIsAttached(ctx context.Context, instanceID, volumeID string) (bool, error) {
-	volume, err := i.GetVolume(ctx, volumeID)
-	if err != nil {
-		return false, err
-	}
-
-	if volume.ServerId != nil && *volume.ServerId == instanceID {
-		return true, nil
-	}
-	return false, nil
+		return nil, nil
+	})
+	return err
 }
 
 // diskIsUsed returns true whether a disk is attached to any node
