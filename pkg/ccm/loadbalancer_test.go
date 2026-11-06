@@ -752,6 +752,7 @@ var _ = Describe("LoadBalancer", func() {
 
 			mockClient.EXPECT().GetLoadBalancer(gomock.Any(), gomock.Any()).Return(&loadbalancer.LoadBalancer{
 				Options: &loadbalancer.LoadBalancerOptions{
+					AccessLogs: new(true),
 					Observability: &loadbalancer.LoadbalancerOptionObservability{
 						Metrics: &loadbalancer.LoadbalancerOptionMetrics{
 							CredentialsRef: new(sampleCredentialsRef),
@@ -765,7 +766,7 @@ var _ = Describe("LoadBalancer", func() {
 			}, nil)
 			gomock.InOrder(
 				mockClient.EXPECT().UpdateLoadBalancer(gomock.Any(), name, gomock.All(
-					hasNoObservabilityConfigured(), externalAddressSet("8.8.4.4"),
+					hasNoObservabilityConfigured(), externalAddressSet("8.8.4.4"), accessLogsEnabled(true),
 				)).MinTimes(1).Return(&loadbalancer.LoadBalancer{}, nil),
 				mockClient.EXPECT().DeleteCredentials(gomock.Any(), sampleCredentialsRef).MinTimes(1).Return(nil),
 				mockClient.EXPECT().ListCredentials(gomock.Any()).Return(&loadbalancer.ListCredentialsResponse{
@@ -1082,6 +1083,14 @@ func privateNetworkOnly(enabled bool) gomock.Matcher {
 	return gomock.Cond(func(x any) bool {
 		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
 		return lb.Options != nil && lb.Options.PrivateNetworkOnly != nil && *lb.Options.PrivateNetworkOnly == enabled
+	})
+}
+
+// accessLogsEnabled ensures that the given UpdateLoadBalancerPayload has the accessLogs option set to enabled.
+func accessLogsEnabled(enabled bool) gomock.Matcher {
+	return gomock.Cond(func(x any) bool {
+		lb := x.(*loadbalancer.UpdateLoadBalancerPayload)
+		return lb.Options != nil && lb.Options.AccessLogs != nil && *lb.Options.AccessLogs == enabled
 	})
 }
 
