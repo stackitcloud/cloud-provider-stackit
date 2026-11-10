@@ -12,6 +12,7 @@ import (
 func bindFlags(fs *pflag.FlagSet, d *Deployer) {
 	fs.StringVar(&d.region, "region", defaultRegion, "STACKIT region for the SKE cluster")
 	fs.StringVar(&d.kubernetesVersion, "kubernetes-version", "", "Kubernetes version for the SKE cluster")
+	fs.BoolVar(&d.useLatestKubernetesVersion, "use-latest-kubernetes-version", false, "Use the latest Kubernetes version from SKE provider options")
 	fs.StringVar(&d.availabilityZone, "availability-zone", defaultAvailabilityZone, "Availability zone for the SKE nodepool")
 	fs.StringVar(&d.machineType, "machine-type", "", "Machine type for the SKE nodepool")
 	fs.StringVar(&d.nodeImageName, "node-image-name", "", "Node image name for the SKE nodepool")
@@ -39,10 +40,11 @@ func (d *Deployer) validate() error {
 	}
 
 	klog.Infof(
-		"Validating deployer configuration: run_id=%q region=%q kubernetes_version=%q availability_zone=%q machine_type=%q node_image_name=%q node_image_version=%q node_count=%d nodepool_name=%q volume_size=%d volume_type=%q kubeconfig_expiration_seconds=%d csi_image_name=%q csi_image_tag=%q",
+		"Validating deployer configuration: run_id=%q region=%q kubernetes_version=%q use_latest_kubernetes_version=%t availability_zone=%q machine_type=%q node_image_name=%q node_image_version=%q node_count=%d nodepool_name=%q volume_size=%d volume_type=%q kubeconfig_expiration_seconds=%d csi_image_name=%q csi_image_tag=%q",
 		d.options.RunID(),
 		d.region,
 		d.kubernetesVersion,
+		d.useLatestKubernetesVersion,
 		d.availabilityZone,
 		d.machineType,
 		d.nodeImageName,
@@ -57,12 +59,14 @@ func (d *Deployer) validate() error {
 	)
 
 	requiredFlags := map[string]string{
-		"--kubernetes-version": d.kubernetesVersion,
-		"--availability-zone":  d.availabilityZone,
-		"--machine-type":       d.machineType,
-		"--node-image-name":    d.nodeImageName,
-		"--csi-image-name":     d.csiImageName,
-		"--csi-image-tag":      d.csiImageTag,
+		"--availability-zone": d.availabilityZone,
+		"--machine-type":      d.machineType,
+		"--node-image-name":   d.nodeImageName,
+		"--csi-image-name":    d.csiImageName,
+		"--csi-image-tag":     d.csiImageTag,
+	}
+	if !d.useLatestKubernetesVersion {
+		requiredFlags["--kubernetes-version"] = d.kubernetesVersion
 	}
 
 	for flagName, value := range requiredFlags {

@@ -30,19 +30,20 @@ const (
 type Deployer struct {
 	options types.Options
 
-	region                 string
-	kubernetesVersion      string
-	kubernetesVersionState string
-	availabilityZone       string
-	machineType            string
-	nodeImageName          string
-	nodeImageVersion       string
-	nodeImageVersionState  string
-	nodeCount              int32
-	nodepoolName           string
-	volumeSizeGiB          int32
-	volumeType             string
-	kubeconfigExpiresIn    int64
+	region                     string
+	kubernetesVersion          string
+	useLatestKubernetesVersion bool
+	kubernetesVersionState     string
+	availabilityZone           string
+	machineType                string
+	nodeImageName              string
+	nodeImageVersion           string
+	nodeImageVersionState      string
+	nodeCount                  int32
+	nodepoolName               string
+	volumeSizeGiB              int32
+	volumeType                 string
+	kubeconfigExpiresIn        int64
 
 	csiImageName string
 	csiImageTag  string
