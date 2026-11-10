@@ -16,10 +16,11 @@ var _ = Describe("validateProviderOptions", func() {
 		Expect(d.validateProviderOptions(context.Background())).To(Succeed())
 	})
 
-	DescribeTable("resolves machine image versions",
-		func(kubernetesVersion, kubernetesVersionState, wantVersion string) {
+	DescribeTable("resolves kubernetes versions",
+		func(kubernetesVersion string, useLatestKubernetesVersion bool, kubernetesVersionState, wantVersion string) {
 			d := newValidTestDeployer()
 			d.kubernetesVersion = kubernetesVersion
+			d.useLatestKubernetesVersion = useLatestKubernetesVersion
 			d.nodeImageName = "flatcar"
 			d.nodeImageVersion = ""
 			d.kubernetesVersionState = kubernetesVersionState
@@ -43,9 +44,12 @@ var _ = Describe("validateProviderOptions", func() {
 			Expect(d.kubernetesVersion).To(Equal(wantVersion))
 			Expect(d.nodeImageVersion).To(Equal("4593.2.2"))
 		},
-		Entry("resolves minor kubernetes version to latest supported patch version", "1.36", versionStateSupported, "1.36.5"),
-		Entry("resolves minor preview kubernetes version to latest supported patch version", "1.36", versionStatePreview, "1.36.6"),
-		Entry("exact version is used", "1.36.4", versionStateSupported, "1.36.4"),
+		Entry("resolves minor kubernetes version to latest supported patch version", "1.36", false, versionStateSupported, "1.36.5"),
+		Entry("resolves minor preview kubernetes version to latest supported patch version", "1.36", false, versionStatePreview, "1.36.6"),
+		Entry("exact version is used", "1.36.4", false, versionStateSupported, "1.36.4"),
+		Entry("uses latest supported kubernetes version when flag is set", "", true, versionStateSupported, "1.36.5"),
+		Entry("uses latest preview kubernetes version when flag is set", "", true, versionStatePreview, "1.36.6"),
+		Entry("use-latest-kubernetes-version overrules explicit kubernetes-version", "1.35.7", true, versionStateSupported, "1.36.5"),
 	)
 
 	DescribeTable("resolves machine image versions",
@@ -114,6 +118,10 @@ var _ = Describe("validateProviderOptions", func() {
 		Entry("unsupported node image version", func(d *Deployer) { d.nodeImageVersion = "v99" }, "unsupported node image"),
 		Entry("unsupported ubuntu major version", func(d *Deployer) { d.nodeImageName = "ubuntu"; d.nodeImageVersion = "2004" }, "unsupported node image"),
 		Entry("mismatched kubernetes version state", func(d *Deployer) { d.kubernetesVersionState = versionStatePreview }, "unsupported --kubernetes-version"),
+		Entry("mismatched latest kubernetes version state", func(d *Deployer) {
+			d.useLatestKubernetesVersion = true
+			d.kubernetesVersionState = versionStatePreview
+		}, "unsupported --kubernetes-version"),
 		Entry("mismatched node image version state", func(d *Deployer) { d.nodeImageVersionState = versionStatePreview }, "unsupported node image"),
 		Entry("unsupported volume type", func(d *Deployer) { d.volumeType = "nvme" }, "unsupported --volume-type"),
 	)

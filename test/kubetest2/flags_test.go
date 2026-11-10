@@ -27,6 +27,13 @@ var _ = Describe("validate", func() {
 		Expect(d.validate()).To(Succeed())
 	})
 
+	It("allows an empty kubernetes version when use-latest-kubernetes-version is set", func() {
+		d := newValidTestDeployer()
+		d.kubernetesVersion = ""
+		d.useLatestKubernetesVersion = true
+		Expect(d.validate()).To(Succeed())
+	})
+
 	It("accepts minimal configuration when not running up", func() {
 		d := newTestDeployer()
 		d.options = fakeOptions{runID: "run-123", runDir: d.options.RunDir(), shouldUp: false}
