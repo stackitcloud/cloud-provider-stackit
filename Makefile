@@ -13,7 +13,7 @@ LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
 E2E_PARALLEL_NODES ?= 4
-E2E_K8S_VERSION ?= $(patsubst v%,%,$(KUBERNETES_TEST_VERSION))
+E2E_K8S_VERSION ?= $(basename $(patsubst v%,%,$(KUBERNETES_TEST_VERSION)))
 E2E_USE_LATEST_K8S_VERSION ?= false
 
 .PHONY: all
