@@ -279,15 +279,13 @@ func (c *fakeSKEClient) CreateKubeconfig(_ context.Context, projectID, _, _ stri
 func newTestDeployer() *Deployer {
 	runDir := GinkgoT().TempDir()
 	return &Deployer{
-		options:                fakeOptions{runID: "run-123", runDir: runDir},
-		region:                 defaultRegion,
-		kubernetesVersionState: defaultVersionState,
-		nodeImageVersionState:  defaultVersionState,
-		parentContainerID:      "parent-123",
-		projectMemberEmail:     "[EMAIL_REDACTED]",
-		kubeconfigPath:         filepath.Join(runDir, "kubeconfig"),
-		serviceAccountKeyPath:  filepath.Join(runDir, "service-account-key.json"),
-		skeClientFactory:       newSKEClient,
+		options:               fakeOptions{runID: "run-123", runDir: runDir},
+		region:                defaultRegion,
+		parentContainerID:     "parent-123",
+		projectMemberEmail:    "owner@example.com",
+		kubeconfigPath:        filepath.Join(runDir, "kubeconfig"),
+		serviceAccountKeyPath: filepath.Join(runDir, "service-account-key.json"),
+		skeClientFactory:      newSKEClient,
 		csiApplier: func(_ context.Context, _, _ string) error {
 			return nil
 		},

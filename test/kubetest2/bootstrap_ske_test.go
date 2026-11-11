@@ -9,6 +9,11 @@ import (
 	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 )
 
+const (
+	versionStatePreview    = "preview"
+	versionStateDeprecated = "deprecated"
+)
+
 var _ = Describe("validateProviderOptions", func() {
 	It("accepts supported options", func() {
 		d := newValidTestDeployer()
@@ -17,13 +22,12 @@ var _ = Describe("validateProviderOptions", func() {
 	})
 
 	DescribeTable("resolves kubernetes versions",
-		func(kubernetesVersion string, useLatestKubernetesVersion bool, kubernetesVersionState, wantVersion string) {
+		func(kubernetesVersion string, useLatestKubernetesVersion bool, wantVersion string) {
 			d := newValidTestDeployer()
 			d.kubernetesVersion = kubernetesVersion
 			d.useLatestKubernetesVersion = useLatestKubernetesVersion
 			d.nodeImageName = "flatcar"
 			d.nodeImageVersion = ""
-			d.kubernetesVersionState = kubernetesVersionState
 			opts := providerOptionsFixture()
 			flatcar := ske.NewMachineImage()
 			flatcar.SetName("flatcar")
@@ -44,21 +48,18 @@ var _ = Describe("validateProviderOptions", func() {
 			Expect(d.kubernetesVersion).To(Equal(wantVersion))
 			Expect(d.nodeImageVersion).To(Equal("4593.2.2"))
 		},
-		Entry("resolves minor kubernetes version to latest supported patch version", "1.36", false, versionStateSupported, "1.36.5"),
-		Entry("resolves minor preview kubernetes version to latest supported patch version", "1.36", false, versionStatePreview, "1.36.6"),
-		Entry("exact version is used", "1.36.4", false, versionStateSupported, "1.36.4"),
-		Entry("uses latest supported kubernetes version when flag is set", "", true, versionStateSupported, "1.36.5"),
-		Entry("uses latest preview kubernetes version when flag is set", "", true, versionStatePreview, "1.36.6"),
-		Entry("use-latest-kubernetes-version overrules explicit kubernetes-version", "1.35.7", true, versionStateSupported, "1.36.5"),
+		Entry("resolves minor kubernetes version to latest supported patch version", "1.36", false, "1.36.5"),
+		Entry("exact version is used", "1.36.4", false, "1.36.4"),
+		Entry("uses latest supported kubernetes version when flag is set", "", true, "1.36.5"),
+		Entry("use-latest-kubernetes-version overrules explicit kubernetes-version", "1.35.7", true, "1.36.5"),
 	)
 
 	DescribeTable("resolves machine image versions",
-		func(imageName, imageVersion, imageVersionState, wantVersion string) {
+		func(imageName, imageVersion, wantVersion string) {
 			d := newValidTestDeployer()
 			d.kubernetesVersion = "1.36"
 			d.nodeImageName = imageName
 			d.nodeImageVersion = imageVersion
-			d.nodeImageVersionState = imageVersionState
 
 			opts := providerOptionsFixture()
 			opts.SetKubernetesVersions([]ske.KubernetesVersion{
@@ -71,8 +72,9 @@ var _ = Describe("validateProviderOptions", func() {
 				newMachineImageVersionFixture("4593.2.2", versionStateDeprecated),
 				newMachineImageVersionFixture("4593.2.4-containerd2.1.9", versionStateSupported),
 				newMachineImageVersionFixture("4593.2.5-containerd2.1.9", versionStateSupported),
-				newMachineImageVersionFixture("4757.2.1-containerd2.2.9", versionStatePreview),
-				newMachineImageVersionFixture("4757.2.1-containerd2.2.10", versionStatePreview),
+				newMachineImageVersionFixture("4757.2.1-containerd2.2.9", versionStateSupported),
+				newMachineImageVersionFixture("4757.2.1-containerd2.2.10", versionStateSupported),
+				newMachineImageVersionFixture("4900.1.0-containerd2.3.0", versionStatePreview),
 			})
 
 			ubuntu := ske.NewMachineImage()
@@ -93,14 +95,13 @@ var _ = Describe("validateProviderOptions", func() {
 			Expect(d.validateProviderOptions(context.Background())).To(Succeed())
 			Expect(d.nodeImageVersion).To(Equal(wantVersion))
 		},
-		Entry("omitted version picks latest supported across all majors", "ubuntu", "", versionStateSupported, "2604.20260921.0"),
-		Entry("major 2204 picks latest supported 2204", "ubuntu", "2204", versionStateSupported, "2204.20260826.0"),
-		Entry("major 2404 picks latest supported 2404", "ubuntu", "2404", versionStateSupported, "2404.20260901.0"),
-		Entry("major 2604 picks latest supported 2604", "ubuntu", "2604", versionStateSupported, "2604.20260921.0"),
-		Entry("major 2204 with preview state picks latest preview 2204", "ubuntu", "2204", versionStatePreview, "2204.20261005.0"),
-		Entry("exact version is preserved when state matches", "ubuntu", "2204.20260803.0", versionStateSupported, "2204.20260803.0"),
-		Entry("flatcar major 4593 picks latest supported 4593", "flatcar", "4593", versionStateSupported, "4593.2.5-containerd2.1.9"),
-		Entry("flatcar with latest contained version in preview", "flatcar", "", versionStatePreview, "4757.2.1-containerd2.2.10"),
+		Entry("omitted version picks latest supported across all majors", "ubuntu", "", "2604.20260921.0"),
+		Entry("major 2204 picks latest supported 2204", "ubuntu", "2204", "2204.20260826.0"),
+		Entry("major 2404 picks latest supported 2404", "ubuntu", "2404", "2404.20260901.0"),
+		Entry("major 2604 picks latest supported 2604", "ubuntu", "2604", "2604.20260921.0"),
+		Entry("exact version is preserved when state is supported", "ubuntu", "2204.20260803.0", "2204.20260803.0"),
+		Entry("flatcar major 4593 picks latest supported 4593", "flatcar", "4593", "4593.2.5-containerd2.1.9"),
+		Entry("flatcar omitted version picks latest supported containerd version", "flatcar", "", "4757.2.1-containerd2.2.10"),
 	)
 
 	DescribeTable("rejects unsupported options",
@@ -117,12 +118,31 @@ var _ = Describe("validateProviderOptions", func() {
 		Entry("unsupported node image name", func(d *Deployer) { d.nodeImageName = "fedora" }, "unsupported node image"),
 		Entry("unsupported node image version", func(d *Deployer) { d.nodeImageVersion = "v99" }, "unsupported node image"),
 		Entry("unsupported ubuntu major version", func(d *Deployer) { d.nodeImageName = "ubuntu"; d.nodeImageVersion = "2004" }, "unsupported node image"),
-		Entry("mismatched kubernetes version state", func(d *Deployer) { d.kubernetesVersionState = versionStatePreview }, "unsupported --kubernetes-version"),
-		Entry("mismatched latest kubernetes version state", func(d *Deployer) {
-			d.useLatestKubernetesVersion = true
-			d.kubernetesVersionState = versionStatePreview
+		Entry("non-supported kubernetes version state", func(d *Deployer) {
+			opts := providerOptionsFixture()
+			opts.SetKubernetesVersions([]ske.KubernetesVersion{
+				newKubernetesVersionFixture("1.31.0", versionStatePreview),
+			})
+			d.skeClient = &fakeSKEClient{providerOptions: opts}
 		}, "unsupported --kubernetes-version"),
-		Entry("mismatched node image version state", func(d *Deployer) { d.nodeImageVersionState = versionStatePreview }, "unsupported node image"),
+		Entry("non-supported latest kubernetes version state", func(d *Deployer) {
+			opts := providerOptionsFixture()
+			opts.SetKubernetesVersions([]ske.KubernetesVersion{
+				newKubernetesVersionFixture("1.31.0", versionStatePreview),
+			})
+			d.skeClient = &fakeSKEClient{providerOptions: opts}
+			d.useLatestKubernetesVersion = true
+		}, "unsupported --kubernetes-version"),
+		Entry("non-supported node image version state", func(d *Deployer) {
+			opts := providerOptionsFixture()
+			ubuntu := ske.NewMachineImage()
+			ubuntu.SetName("ubuntu")
+			ubuntu.SetVersions([]ske.MachineImageVersion{
+				newMachineImageVersionFixture("v1", versionStateDeprecated),
+			})
+			opts.SetMachineImages([]ske.MachineImage{*ubuntu})
+			d.skeClient = &fakeSKEClient{providerOptions: opts}
+		}, "unsupported node image"),
 		Entry("unsupported volume type", func(d *Deployer) { d.volumeType = "nvme" }, "unsupported --volume-type"),
 	)
 

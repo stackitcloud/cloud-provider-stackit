@@ -63,12 +63,11 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 		return fmt.Errorf("list SKE provider options returned nil response")
 	}
 
-	resolvedKubernetesVersion, err := resolveKubernetesVersion(options, d.kubernetesVersion, d.kubernetesVersionState, d.useLatestKubernetesVersion)
+	resolvedKubernetesVersion, err := resolveKubernetesVersion(options, d.kubernetesVersion, d.useLatestKubernetesVersion)
 	if err != nil {
 		return incorrectUsagef(
-			"unsupported --kubernetes-version %q (state=%q) for region %q: %v",
+			"unsupported --kubernetes-version %q for region %q: %v",
 			d.kubernetesVersion,
-			d.kubernetesVersionState,
 			d.region,
 			err,
 		)
@@ -81,13 +80,12 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 	if !containsMachineType(options, d.machineType) {
 		return incorrectUsagef("unsupported --machine-type %q for region %q", d.machineType, d.region)
 	}
-	resolvedImageVersion, err := resolveMachineImageVersion(options, d.nodeImageName, d.nodeImageVersion, d.nodeImageVersionState)
+	resolvedImageVersion, err := resolveMachineImageVersion(options, d.nodeImageName, d.nodeImageVersion)
 	if err != nil {
 		return incorrectUsagef(
-			"unsupported node image %q version %q (state=%q) for region %q: %v",
+			"unsupported node image %q version %q for region %q: %v",
 			d.nodeImageName,
 			d.nodeImageVersion,
-			d.nodeImageVersionState,
 			d.region,
 			err,
 		)
@@ -99,13 +97,11 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 	}
 
 	klog.Infof(
-		"SKE provider option validation succeeded for region=%q: kubernetes_version=%q (state=%q) node_image=%q/%q (state=%q)",
+		"SKE provider option validation succeeded for region=%q: kubernetes_version=%q node_image=%q/%q",
 		d.region,
 		d.kubernetesVersion,
-		d.kubernetesVersionState,
 		d.nodeImageName,
 		d.nodeImageVersion,
-		d.nodeImageVersionState,
 	)
 
 	return nil
@@ -148,39 +144,36 @@ func (d *Deployer) clusterPayload() *ske.CreateOrUpdateClusterPayload {
 	return payload
 }
 
-func matchesVersionState(candidateState, desiredState string) bool {
+func isSupportedVersionState(candidateState string) bool {
 	candidateState = strings.TrimSpace(candidateState)
-	if candidateState == "" {
-		return strings.EqualFold(desiredState, defaultVersionState)
-	}
-	return strings.EqualFold(candidateState, desiredState)
+	return candidateState == "" || strings.EqualFold(candidateState, versionStateSupported)
 }
 
-func resolveKubernetesVersion(options *ske.ProviderOptions, kubernetesVersion, state string, useLatest bool) (string, error) {
+func resolveKubernetesVersion(options *ske.ProviderOptions, kubernetesVersion string, useLatest bool) (string, error) {
 	versions := options.GetKubernetesVersions()
 	var requestedVersion *semver.Version
 	if !useLatest {
-		exactVersion, parsedVersion, err := parseRequestedKubernetesVersion(versions, kubernetesVersion, state)
+		exactVersion, parsedVersion, err := parseRequestedKubernetesVersion(versions, kubernetesVersion)
 		if err != nil || exactVersion != "" {
 			return exactVersion, err
 		}
 		requestedVersion = parsedVersion
 	}
 
-	return findBestKubernetesVersion(versions, requestedVersion, state)
+	return findBestKubernetesVersion(versions, requestedVersion)
 }
 
-func parseRequestedKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion, state string) (string, *semver.Version, error) {
+func parseRequestedKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion string) (string, *semver.Version, error) {
 	kubernetesVersion = strings.TrimPrefix(strings.TrimSpace(kubernetesVersion), "v")
 	if kubernetesVersion == "" {
 		return "", nil, fmt.Errorf("kubernetes version must not be empty")
 	}
 
-	if exactVersion, ok := findExactKubernetesVersion(versions, kubernetesVersion, state); ok {
+	if exactVersion, ok := findExactKubernetesVersion(versions, kubernetesVersion); ok {
 		return exactVersion, nil, nil
 	}
 	if strings.Count(kubernetesVersion, ".") != 1 {
-		return "", nil, fmt.Errorf("exact kubernetes version %q with state %q not found", kubernetesVersion, state)
+		return "", nil, fmt.Errorf("exact kubernetes version %q with state %q not found", kubernetesVersion, versionStateSupported)
 	}
 	requestedVersion, err := semver.NewVersion(kubernetesVersion)
 	if err != nil {
@@ -192,10 +185,10 @@ func parseRequestedKubernetesVersion(versions []ske.KubernetesVersion, kubernete
 	return "", requestedVersion, nil
 }
 
-func findBestKubernetesVersion(versions []ske.KubernetesVersion, requestedVersion *semver.Version, state string) (string, error) {
+func findBestKubernetesVersion(versions []ske.KubernetesVersion, requestedVersion *semver.Version) (string, error) {
 	var bestVersion *semver.Version
 	for _, item := range versions {
-		if !matchesVersionState(item.GetState(), state) {
+		if !isSupportedVersionState(item.GetState()) {
 			continue
 		}
 		candidateVersion, err := semver.NewVersion(item.GetVersion())
@@ -211,16 +204,16 @@ func findBestKubernetesVersion(versions []ske.KubernetesVersion, requestedVersio
 	}
 	if bestVersion == nil {
 		if requestedVersion != nil {
-			return "", fmt.Errorf("no kubernetes version matching %d.%d with state %q found", requestedVersion.Major(), requestedVersion.Minor(), state)
+			return "", fmt.Errorf("no kubernetes version matching %d.%d with state %q found", requestedVersion.Major(), requestedVersion.Minor(), versionStateSupported)
 		}
-		return "", fmt.Errorf("no kubernetes version with state %q found", state)
+		return "", fmt.Errorf("no kubernetes version with state %q found", versionStateSupported)
 	}
 	return bestVersion.Original(), nil
 }
 
-func findExactKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion, state string) (string, bool) {
+func findExactKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion string) (string, bool) {
 	for _, item := range versions {
-		if !matchesVersionState(item.GetState(), state) {
+		if !isSupportedVersionState(item.GetState()) {
 			continue
 		}
 		if item.GetVersion() == kubernetesVersion {
@@ -248,35 +241,35 @@ func containsMachineType(options *ske.ProviderOptions, machineType string) bool 
 	return false
 }
 
-func resolveMachineImageVersion(options *ske.ProviderOptions, imageName, imageVersion, state string) (string, error) {
+func resolveMachineImageVersion(options *ske.ProviderOptions, imageName, imageVersion string) (string, error) {
 	imageVersion = strings.TrimSpace(imageVersion)
 	for _, image := range options.GetMachineImages() {
 		if image.GetName() == imageName {
-			return resolveSingleMachineImageVersion(image, imageVersion, state)
+			return resolveSingleMachineImageVersion(image, imageVersion)
 		}
 	}
 	return "", fmt.Errorf("machine image %q not found", imageName)
 }
 
-func resolveSingleMachineImageVersion(image ske.MachineImage, imageVersion, state string) (string, error) {
+func resolveSingleMachineImageVersion(image ske.MachineImage, imageVersion string) (string, error) {
 	var requestedVersion *semver.Version
 	if imageVersion != "" {
-		exactVersion, parsedVersion, err := parseRequestedMachineImageVersion(image, imageVersion, state)
+		exactVersion, parsedVersion, err := parseRequestedMachineImageVersion(image, imageVersion)
 		if err != nil || exactVersion != "" {
 			return exactVersion, err
 		}
 		requestedVersion = parsedVersion
 	}
 
-	return findBestMachineImageVersion(image, requestedVersion, state)
+	return findBestMachineImageVersion(image, requestedVersion)
 }
 
-func parseRequestedMachineImageVersion(image ske.MachineImage, imageVersion, state string) (string, *semver.Version, error) {
-	if exactVersion, ok := findExactMachineImageVersion(image.GetVersions(), imageVersion, state); ok {
+func parseRequestedMachineImageVersion(image ske.MachineImage, imageVersion string) (string, *semver.Version, error) {
+	if exactVersion, ok := findExactMachineImageVersion(image.GetVersions(), imageVersion); ok {
 		return exactVersion, nil, nil
 	}
 	if strings.Contains(imageVersion, ".") {
-		return "", nil, fmt.Errorf("exact version %q with state %q not found for image %q", imageVersion, state, image.GetName())
+		return "", nil, fmt.Errorf("exact version %q with state %q not found for image %q", imageVersion, versionStateSupported, image.GetName())
 	}
 	requestedVersion, err := semver.NewVersion(imageVersion)
 	if err != nil {
@@ -288,19 +281,19 @@ func parseRequestedMachineImageVersion(image ske.MachineImage, imageVersion, sta
 	return "", requestedVersion, nil
 }
 
-func findExactMachineImageVersion(versions []ske.MachineImageVersion, imageVersion, state string) (string, bool) {
+func findExactMachineImageVersion(versions []ske.MachineImageVersion, imageVersion string) (string, bool) {
 	for _, version := range versions {
-		if matchesVersionState(version.GetState(), state) && version.GetVersion() == imageVersion {
+		if isSupportedVersionState(version.GetState()) && version.GetVersion() == imageVersion {
 			return version.GetVersion(), true
 		}
 	}
 	return "", false
 }
 
-func findBestMachineImageVersion(image ske.MachineImage, requestedVersion *semver.Version, state string) (string, error) {
+func findBestMachineImageVersion(image ske.MachineImage, requestedVersion *semver.Version) (string, error) {
 	var bestVersion *semver.Version
 	for _, version := range image.GetVersions() {
-		if !matchesVersionState(version.GetState(), state) {
+		if !isSupportedVersionState(version.GetState()) {
 			continue
 		}
 		candidateVersion, err := semver.NewVersion(version.GetVersion())
@@ -316,9 +309,9 @@ func findBestMachineImageVersion(image ske.MachineImage, requestedVersion *semve
 	}
 	if bestVersion == nil {
 		if requestedVersion != nil {
-			return "", fmt.Errorf("no version matching major %d with state %q found for image %q", requestedVersion.Major(), state, image.GetName())
+			return "", fmt.Errorf("no version matching major %d with state %q found for image %q", requestedVersion.Major(), versionStateSupported, image.GetName())
 		}
-		return "", fmt.Errorf("no version with state %q found for image %q", state, image.GetName())
+		return "", fmt.Errorf("no version with state %q found for image %q", versionStateSupported, image.GetName())
 	}
 	return bestVersion.Original(), nil
 }

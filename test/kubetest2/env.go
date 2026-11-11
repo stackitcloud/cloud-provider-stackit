@@ -43,26 +43,14 @@ func (d *Deployer) loadEnvironment() error {
 	d.serviceEnablementEndpoint = strings.TrimSpace(os.Getenv("STACKIT_SERVICE_ENABLEMENT_ENDPOINT"))
 	d.skeEndpoint = strings.TrimSpace(os.Getenv("STACKIT_SKE_ENDPOINT"))
 	d.iaasEndpoint = strings.TrimSpace(os.Getenv("STACKIT_IAAS_ENDPOINT"))
-	kubernetesVersionState, err := parseVersionState(os.Getenv("STACKIT_KUBERNETES_VERSION_STATE"))
-	if err != nil {
-		return incorrectUsagef("invalid STACKIT_KUBERNETES_VERSION_STATE: %v", err)
-	}
-	d.kubernetesVersionState = kubernetesVersionState
-	nodeImageVersionState, err := parseVersionState(os.Getenv("STACKIT_NODE_IMAGE_VERSION_STATE"))
-	if err != nil {
-		return incorrectUsagef("invalid STACKIT_NODE_IMAGE_VERSION_STATE: %v", err)
-	}
-	d.nodeImageVersionState = nodeImageVersionState
 	d.kubeconfigPath = filepath.Join(d.options.RunDir(), "kubeconfig")
 	d.serviceAccountKeyPath = filepath.Join(d.options.RunDir(), "service-account-key.json")
 
 	klog.Infof(
-		"Loaded STACKIT environment: parent_container_id=%q project_member_email=%q service_account_bytes=%d kubernetes_version_state=%q node_image_version_state=%q kubeconfig_path=%q service_account_key_path=%q",
+		"Loaded STACKIT environment: parent_container_id=%q project_member_email=%q service_account_bytes=%d kubeconfig_path=%q service_account_key_path=%q",
 		d.parentContainerID,
 		d.projectMemberEmail,
 		len(d.serviceAccount),
-		d.kubernetesVersionState,
-		d.nodeImageVersionState,
 		d.kubeconfigPath,
 		d.serviceAccountKeyPath,
 	)
@@ -94,23 +82,4 @@ func extractServiceAccountEmail(serviceAccountKey string) (string, error) {
 		return "", fmt.Errorf("service account key has no email in credentials.iss")
 	}
 	return email, nil
-}
-
-func parseVersionState(raw string) (string, error) {
-	state := strings.ToLower(strings.TrimSpace(raw))
-	if state == "" {
-		return defaultVersionState, nil
-	}
-	switch state {
-	case versionStateSupported, versionStatePreview, versionStateDeprecated:
-		return state, nil
-	default:
-		return "", fmt.Errorf(
-			"must be one of %s, %s, %s (got %q)",
-			versionStateSupported,
-			versionStatePreview,
-			versionStateDeprecated,
-			raw,
-		)
-	}
 }
