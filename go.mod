@@ -21,7 +21,7 @@ require (
 	github.com/stackitcloud/stackit-sdk-go/services/resourcemanager v0.28.0
 	github.com/stackitcloud/stackit-sdk-go/services/serviceaccount v0.22.0
 	github.com/stackitcloud/stackit-sdk-go/services/serviceenablement v1.8.0
-	github.com/stackitcloud/stackit-sdk-go/services/ske v1.22.0
+	github.com/stackitcloud/stackit-sdk-go/services/ske v1.23.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
