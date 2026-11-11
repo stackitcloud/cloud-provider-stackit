@@ -13,6 +13,7 @@ LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
 E2E_PARALLEL_NODES ?= 4
+# Removes the v prefix and removes the patch part of the semver. Example v1.37.2 = 1.37
 E2E_K8S_VERSION ?= $(basename $(patsubst v%,%,$(KUBERNETES_TEST_VERSION)))
 E2E_USE_LATEST_K8S_VERSION ?= false
 
