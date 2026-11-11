@@ -12,13 +12,10 @@ import (
 const (
 	Name = "stackit"
 
-	versionStateSupported  = "supported"
-	versionStatePreview    = "preview"
-	versionStateDeprecated = "deprecated"
+	versionStateSupported = "supported"
 
 	defaultRegion                     = "eu01"
 	defaultAvailabilityZone           = "eu01-1"
-	defaultVersionState               = versionStateSupported
 	defaultNodeCount            int32 = 2
 	defaultNodepoolName               = "default"
 	defaultVolumeSizeGiB        int32 = 100
@@ -33,12 +30,10 @@ type Deployer struct {
 	region                     string
 	kubernetesVersion          string
 	useLatestKubernetesVersion bool
-	kubernetesVersionState     string
 	availabilityZone           string
 	machineType                string
 	nodeImageName              string
 	nodeImageVersion           string
-	nodeImageVersionState      string
 	nodeCount                  int32
 	nodepoolName               string
 	volumeSizeGiB              int32
@@ -80,17 +75,15 @@ var _ types.DeployerWithVersion = &Deployer{}
 
 func New(opts types.Options) (types.Deployer, *pflag.FlagSet) {
 	d := &Deployer{
-		options:                opts,
-		region:                 defaultRegion,
-		kubernetesVersionState: defaultVersionState,
-		availabilityZone:       defaultAvailabilityZone,
-		nodeImageVersionState:  defaultVersionState,
-		nodeCount:              defaultNodeCount,
-		nodepoolName:           defaultNodepoolName,
-		volumeSizeGiB:          defaultVolumeSizeGiB,
-		kubeconfigExpiresIn:    defaultKubeconfigExpiration,
-		skeClientFactory:       newSKEClient,
-		csiApplier:             applyCSIManifestsNative,
+		options:             opts,
+		region:              defaultRegion,
+		availabilityZone:    defaultAvailabilityZone,
+		nodeCount:           defaultNodeCount,
+		nodepoolName:        defaultNodepoolName,
+		volumeSizeGiB:       defaultVolumeSizeGiB,
+		kubeconfigExpiresIn: defaultKubeconfigExpiration,
+		skeClientFactory:    newSKEClient,
+		csiApplier:          applyCSIManifestsNative,
 	}
 
 	fs := pflag.NewFlagSet(Name, pflag.ContinueOnError)
