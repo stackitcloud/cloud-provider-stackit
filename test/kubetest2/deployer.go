@@ -12,7 +12,8 @@ import (
 const (
 	Name = "stackit"
 
-	versionStateSupported = "supported"
+	versionStateSupported  = "supported"
+	versionStateDeprecated = "deprecated"
 
 	defaultRegion                     = "eu01"
 	defaultAvailabilityZone           = "eu01-1"
