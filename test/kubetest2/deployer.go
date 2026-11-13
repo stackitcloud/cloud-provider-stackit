@@ -12,6 +12,9 @@ import (
 const (
 	Name = "stackit"
 
+	versionStateSupported  = "supported"
+	versionStateDeprecated = "deprecated"
+
 	defaultRegion                     = "eu01"
 	defaultAvailabilityZone           = "eu01-1"
 	defaultNodeCount            int32 = 2
@@ -25,17 +28,18 @@ const (
 type Deployer struct {
 	options types.Options
 
-	region              string
-	kubernetesVersion   string
-	availabilityZone    string
-	machineType         string
-	nodeImageName       string
-	nodeImageVersion    string
-	nodeCount           int32
-	nodepoolName        string
-	volumeSizeGiB       int32
-	volumeType          string
-	kubeconfigExpiresIn int64
+	region                     string
+	kubernetesVersion          string
+	useLatestKubernetesVersion bool
+	availabilityZone           string
+	machineType                string
+	nodeImageName              string
+	nodeImageVersion           string
+	nodeCount                  int32
+	nodepoolName               string
+	volumeSizeGiB              int32
+	volumeType                 string
+	kubeconfigExpiresIn        int64
 
 	csiImageName string
 	csiImageTag  string

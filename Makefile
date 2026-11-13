@@ -13,6 +13,9 @@ LDFLAGS ?= -s -w
 
 E2E_RUN_ID ?= $(or $(PROW_JOB_ID),local-test-e2e)
 E2E_PARALLEL_NODES ?= 4
+# Removes the v prefix and removes the patch part of the semver. Example v1.37.2 = 1.37
+E2E_K8S_VERSION ?= $(basename $(patsubst v%,%,$(KUBERNETES_TEST_VERSION)))
+E2E_USE_LATEST_K8S_VERSION ?= false
 
 .PHONY: all
 all: verify
@@ -166,6 +169,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_S
 	--rundir "$(CURDIR)/_rundir" \
 	--region "eu01" \
 	--kubernetes-version "$(E2E_K8S_VERSION)" \
+	--use-latest-kubernetes-version="$(E2E_USE_LATEST_K8S_VERSION)" \
 	--availability-zone "eu01-1" \
 	--machine-type "$(E2E_MACHINE_TYPE)" \
 	--node-image-name "$(E2E_IMAGE_NAME)" \
@@ -176,7 +180,7 @@ test-e2e: image-stackit-csi-plugin-test $(KUBETEST2_TESTER_GINKGO) $(KUBETEST2_S
 	--csi-image-name "$(REGISTRY)/$(REPO)/stackit-csi-plugin-dev" \
 	--csi-image-tag "$(VERSION)-kubetest2" \
 	-- \
-	--test-package-version="v$(E2E_K8S_VERSION)" \
+	--test-package-version="$(KUBERNETES_TEST_VERSION)" \
 	--focus-regex="External.Storage" \
 	--skip-regex="\[Feature:|\[Disruptive\]|\[Serial\]" \
 	--ginkgo-args="-v" \
