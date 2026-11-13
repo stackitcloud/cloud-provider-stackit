@@ -312,6 +312,7 @@ func setEnvVar(key, value string) {
 func providerOptionsFixture() *ske.ProviderOptions {
 	kubernetesVersion := ske.NewKubernetesVersion()
 	kubernetesVersion.SetVersion("1.31.0")
+	kubernetesVersion.SetState(versionStateSupported)
 
 	availabilityZone := ske.NewAvailabilityZone()
 	availabilityZone.SetName(defaultAvailabilityZone)
@@ -321,6 +322,7 @@ func providerOptionsFixture() *ske.ProviderOptions {
 
 	imageVersion := ske.NewMachineImageVersion()
 	imageVersion.SetVersion("v1")
+	imageVersion.SetState(versionStateSupported)
 
 	machineImage := ske.NewMachineImage()
 	machineImage.SetName("ubuntu")
@@ -336,6 +338,20 @@ func providerOptionsFixture() *ske.ProviderOptions {
 	providerOptions.SetMachineImages([]ske.MachineImage{*machineImage})
 	providerOptions.SetVolumeTypes([]ske.VolumeType{*volumeType})
 	return providerOptions
+}
+
+func newKubernetesVersionFixture(version, state string) ske.KubernetesVersion {
+	kv := ske.NewKubernetesVersion()
+	kv.SetVersion(version)
+	kv.SetState(state)
+	return *kv
+}
+
+func newMachineImageVersionFixture(version, state string) ske.MachineImageVersion {
+	mv := ske.NewMachineImageVersion()
+	mv.SetVersion(version)
+	mv.SetState(state)
+	return *mv
 }
 
 func healthyClusterFixture() *ske.Cluster {
