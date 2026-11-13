@@ -3,6 +3,7 @@ module github.com/stackitcloud/cloud-provider-stackit
 go 1.26.1
 
 require (
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/container-storage-interface/spec v1.13.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
@@ -45,8 +46,7 @@ replace k8s.io/cloud-provider => github.com/stackitcloud/cloud-provider v0.36.0-
 
 require (
 	cel.dev/expr v0.25.3 // indirect
-	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/Azure/go-ansiterm v0.0.0-20260917205352-e937bb47801a // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
