@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	ske "github.com/stackitcloud/stackit-sdk-go/services/ske/v2api"
 	"k8s.io/klog/v2"
 )
@@ -62,28 +63,46 @@ func (d *Deployer) validateProviderOptions(ctx context.Context) error {
 		return fmt.Errorf("list SKE provider options returned nil response")
 	}
 
-	if !containsKubernetesVersion(options, d.kubernetesVersion) {
-		return incorrectUsagef("unsupported --kubernetes-version %q for region %q", d.kubernetesVersion, d.region)
+	resolvedKubernetesVersion, err := resolveKubernetesVersion(options, d.kubernetesVersion, d.useLatestKubernetesVersion)
+	if err != nil {
+		return incorrectUsagef(
+			"unsupported --kubernetes-version %q for region %q: %v",
+			d.kubernetesVersion,
+			d.region,
+			err,
+		)
 	}
+	d.kubernetesVersion = resolvedKubernetesVersion
+
 	if !containsAvailabilityZone(options, d.availabilityZone) {
 		return incorrectUsagef("unsupported --availability-zone %q for region %q", d.availabilityZone, d.region)
 	}
 	if !containsMachineType(options, d.machineType) {
 		return incorrectUsagef("unsupported --machine-type %q for region %q", d.machineType, d.region)
 	}
-	if !containsMachineImage(options, d.nodeImageName, d.nodeImageVersion) {
+	resolvedImageVersion, err := resolveMachineImageVersion(options, d.nodeImageName, d.nodeImageVersion)
+	if err != nil {
 		return incorrectUsagef(
-			"unsupported node image %q version %q for region %q",
+			"unsupported node image %q version %q for region %q: %v",
 			d.nodeImageName,
 			d.nodeImageVersion,
 			d.region,
+			err,
 		)
 	}
+	d.nodeImageVersion = resolvedImageVersion
+
 	if d.volumeType != "" && !containsVolumeType(options, d.volumeType) {
 		return incorrectUsagef("unsupported --volume-type %q for region %q", d.volumeType, d.region)
 	}
 
-	klog.Infof("SKE provider option validation succeeded for region=%q", d.region)
+	klog.Infof(
+		"SKE provider option validation succeeded for region=%q: kubernetes_version=%q node_image=%q/%q",
+		d.region,
+		d.kubernetesVersion,
+		d.nodeImageName,
+		d.nodeImageVersion,
+	)
 
 	return nil
 }
@@ -125,13 +144,76 @@ func (d *Deployer) clusterPayload() *ske.CreateOrUpdateClusterPayload {
 	return payload
 }
 
-func containsKubernetesVersion(options *ske.ProviderOptions, version string) bool {
-	for _, item := range options.GetKubernetesVersions() {
-		if item.GetVersion() == version {
-			return true
+func matchesVersionState(candidateState, desiredState string) bool {
+	return strings.EqualFold(strings.TrimSpace(candidateState), desiredState)
+}
+
+func resolveKubernetesVersion(options *ske.ProviderOptions, kubernetesVersion string, useLatest bool) (string, error) {
+	versions := options.GetKubernetesVersions()
+	var requestedVersion *semver.Version
+	if !useLatest {
+		exactVersion, parsedVersion, err := parseRequestedKubernetesVersion(versions, kubernetesVersion)
+		if err != nil || exactVersion != "" {
+			return exactVersion, err
+		}
+		requestedVersion = parsedVersion
+	}
+
+	return findBestKubernetesVersion(versions, requestedVersion)
+}
+
+func parseRequestedKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion string) (string, *semver.Version, error) {
+	kubernetesVersion = strings.TrimPrefix(strings.TrimSpace(kubernetesVersion), "v")
+	if kubernetesVersion == "" {
+		return "", nil, fmt.Errorf("kubernetes version must not be empty")
+	}
+
+	if exactVersion, ok := findExactKubernetesVersion(versions, kubernetesVersion); ok {
+		return exactVersion, nil, nil
+	}
+	if strings.Count(kubernetesVersion, ".") != 1 {
+		return "", nil, fmt.Errorf("exact kubernetes version %q not found", kubernetesVersion)
+	}
+	requestedVersion, err := semver.NewVersion(kubernetesVersion)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse kubernetes version %q: %w", kubernetesVersion, err)
+	}
+	if requestedVersion.Prerelease() != "" || requestedVersion.Metadata() != "" {
+		return "", nil, fmt.Errorf("kubernetes minor version %q must not contain prerelease or metadata", kubernetesVersion)
+	}
+	return "", requestedVersion, nil
+}
+
+func findBestKubernetesVersion(versions []ske.KubernetesVersion, requestedVersion *semver.Version) (string, error) {
+	var bestVersion *semver.Version
+	for _, item := range versions {
+		candidateVersion, err := semver.NewVersion(item.GetVersion())
+		if err != nil {
+			continue
+		}
+		if requestedVersion != nil && (candidateVersion.Major() != requestedVersion.Major() || candidateVersion.Minor() != requestedVersion.Minor()) {
+			continue
+		}
+		if bestVersion == nil || candidateVersion.GreaterThan(bestVersion) {
+			bestVersion = candidateVersion
 		}
 	}
-	return false
+	if bestVersion == nil {
+		if requestedVersion != nil {
+			return "", fmt.Errorf("no kubernetes version matching %d.%d found", requestedVersion.Major(), requestedVersion.Minor())
+		}
+		return "", fmt.Errorf("no kubernetes version found")
+	}
+	return bestVersion.Original(), nil
+}
+
+func findExactKubernetesVersion(versions []ske.KubernetesVersion, kubernetesVersion string) (string, bool) {
+	for _, item := range versions {
+		if item.GetVersion() == kubernetesVersion {
+			return item.GetVersion(), true
+		}
+	}
+	return "", false
 }
 
 func containsAvailabilityZone(options *ske.ProviderOptions, zone string) bool {
@@ -152,18 +234,137 @@ func containsMachineType(options *ske.ProviderOptions, machineType string) bool 
 	return false
 }
 
-func containsMachineImage(options *ske.ProviderOptions, imageName, imageVersion string) bool {
+func resolveMachineImageVersion(options *ske.ProviderOptions, imageName, imageVersion string) (string, error) {
+	imageVersion = strings.TrimSpace(imageVersion)
 	for _, image := range options.GetMachineImages() {
-		if image.GetName() != imageName {
-			continue
+		if image.GetName() == imageName {
+			return resolveSingleMachineImageVersion(image, imageVersion)
 		}
-		for _, version := range image.GetVersions() {
-			if version.GetVersion() == imageVersion {
-				return true
+	}
+	return "", fmt.Errorf("machine image %q not found", imageName)
+}
+
+func resolveSingleMachineImageVersion(image ske.MachineImage, imageVersion string) (string, error) {
+	var requestedVersion *semver.Version
+	if imageVersion != "" {
+		exactVersion, parsedVersion, err := parseRequestedMachineImageVersion(image, imageVersion)
+		if err != nil || exactVersion != "" {
+			return exactVersion, err
+		}
+		requestedVersion = parsedVersion
+	}
+
+	return findBestMachineImageVersion(image, requestedVersion)
+}
+
+func parseRequestedMachineImageVersion(image ske.MachineImage, imageVersion string) (string, *semver.Version, error) {
+	if exactVersion, ok := findExactMachineImageVersion(image.GetVersions(), imageVersion); ok {
+		return exactVersion, nil, nil
+	}
+	if strings.Contains(imageVersion, ".") {
+		return "", nil, fmt.Errorf(
+			"exact version %q with state %q or %q not found for image %q",
+			imageVersion,
+			versionStateSupported,
+			versionStateDeprecated,
+			image.GetName(),
+		)
+	}
+	requestedVersion, err := semver.NewVersion(imageVersion)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse image version %q: %w", imageVersion, err)
+	}
+	if requestedVersion.Prerelease() != "" || requestedVersion.Metadata() != "" {
+		return "", nil, fmt.Errorf("image major version %q must not contain prerelease or metadata", imageVersion)
+	}
+	return "", requestedVersion, nil
+}
+
+func findExactMachineImageVersion(versions []ske.MachineImageVersion, imageVersion string) (string, bool) {
+	for _, state := range []string{versionStateSupported, versionStateDeprecated} {
+		for _, version := range versions {
+			if matchesVersionState(version.GetState(), state) && version.GetVersion() == imageVersion {
+				return version.GetVersion(), true
 			}
 		}
 	}
-	return false
+	return "", false
+}
+
+func findBestMachineImageVersion(image ske.MachineImage, requestedVersion *semver.Version) (string, error) {
+	for _, state := range []string{versionStateSupported, versionStateDeprecated} {
+		if bestVersion := findBestMachineImageVersionWithState(image.GetVersions(), requestedVersion, state); bestVersion != nil {
+			return bestVersion.Original(), nil
+		}
+	}
+	if requestedVersion != nil {
+		return "", fmt.Errorf(
+			"no version matching major %d with state %q or %q found for image %q",
+			requestedVersion.Major(),
+			versionStateSupported,
+			versionStateDeprecated,
+			image.GetName(),
+		)
+	}
+	return "", fmt.Errorf(
+		"no version with state %q or %q found for image %q",
+		versionStateSupported,
+		versionStateDeprecated,
+		image.GetName(),
+	)
+}
+
+func findBestMachineImageVersionWithState(versions []ske.MachineImageVersion, requestedVersion *semver.Version, state string) *semver.Version {
+	var bestVersion *semver.Version
+	for _, version := range versions {
+		if !matchesVersionState(version.GetState(), state) {
+			continue
+		}
+		candidateVersion, err := semver.NewVersion(version.GetVersion())
+		if err != nil {
+			continue
+		}
+		if requestedVersion != nil && candidateVersion.Major() != requestedVersion.Major() {
+			continue
+		}
+		if bestVersion == nil || compareMachineImageVersions(candidateVersion, bestVersion) > 0 {
+			bestVersion = candidateVersion
+		}
+	}
+	return bestVersion
+}
+
+// compareMachineImageVersions compares two machine image versions.
+// By default in SemVer, a suffix like "-containerd2.1.9" is treated as a pre-release
+// and would rank lower than the same base version without a suffix (e.g. "4593.2.5").
+// During the Flatcar transition, SKE offers both legacy unsuffixed images and
+// "-containerd<version>" images; we explicitly prefer "-containerd" flavors over
+// unsuffixed ones for the same base version and compare the embedded containerd
+// version using SemVer when both images carry the suffix.
+func compareMachineImageVersions(versionA, versionB *semver.Version) int {
+	baseVersionA := semver.New(versionA.Major(), versionA.Minor(), versionA.Patch(), "", "")
+	baseVersionB := semver.New(versionB.Major(), versionB.Minor(), versionB.Patch(), "", "")
+	if comparison := baseVersionA.Compare(baseVersionB); comparison != 0 {
+		return comparison
+	}
+
+	containerdVersionA, hasContainerdA := strings.CutPrefix(versionA.Prerelease(), "containerd")
+	containerdVersionB, hasContainerdB := strings.CutPrefix(versionB.Prerelease(), "containerd")
+	if hasContainerdA != hasContainerdB {
+		if hasContainerdA {
+			return 1
+		}
+		return -1
+	}
+	if hasContainerdA && hasContainerdB {
+		parsedContainerdA, errA := semver.NewVersion(containerdVersionA)
+		parsedContainerdB, errB := semver.NewVersion(containerdVersionB)
+		if errA == nil && errB == nil {
+			return parsedContainerdA.Compare(parsedContainerdB)
+		}
+	}
+
+	return versionA.Compare(versionB)
 }
 
 func containsVolumeType(options *ske.ProviderOptions, volumeType string) bool {
