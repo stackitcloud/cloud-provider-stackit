@@ -68,6 +68,16 @@ const (
 	// This is defined by the CCM and might differ from the default of STACKIT load balancers.
 	// For backwards compatibility this is the same as in SKE yawol.
 	defaultUDPIdleTimeout = 2 * time.Minute
+
+	kubeProxyHealthCheckPort   = int32(10256)
+	healthCheckPath            = "/healthz"
+	defaultHealthCheckInterval = "5s"
+	defaultHealthCheckTimeout  = "5s"
+	defaultIntervalJitter      = "0.5s"
+	// Consecutive successful probes required.
+	defaultHealthCheckHealthyThreshold = int32(2)
+	// Consecutive failed probes required.
+	defaultHealthCheckUnhealthyThreshold = int32(2)
 )
 
 const (
@@ -208,10 +218,8 @@ var appoximateFlavorsMap = map[string]string{
 	"22b37153-8817-4c85-9805-92426b2f903c": p10, // t2i.1
 }
 
-var (
-	// invalidTargetDisplayNameCharsRegexp matches any character that is NOT alphanumeric or a hyphen
-	invalidTargetDisplayNameCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9-]`)
-)
+// invalidTargetDisplayNameCharsRegexp matches any character that is NOT alphanumeric or a hyphen
+var invalidTargetDisplayNameCharsRegexp = regexp.MustCompile(`[^a-zA-Z0-9-]`)
 
 // proxyProtocolEnableForPort determines whether portNumber should use the TCP proxy protocol (instead of TCP).
 func proxyProtocolEnableForPort(tcpProxyProtocolEnabled bool, tcpProxyProtocolPortFilter []uint16, portNumber int32) bool {
@@ -562,6 +570,15 @@ func lbSpecFromService(
 			Udp:         udpOptions,
 		})
 
+		var activeHealthCheck *loadbalancer.ActiveHealthCheck
+		if opts.UseActiveHealthChecks() {
+			var err error
+			activeHealthCheck, err = activeHealthCheckForService(service)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
 		targetPools = append(targetPools, loadbalancer.TargetPool{
 			Name:       &name,
 			TargetPort: new(port.NodePort),
@@ -569,6 +586,7 @@ func lbSpecFromService(
 			SessionPersistence: &loadbalancer.SessionPersistence{
 				UseSourceIpAddress: new(useSourceIP),
 			},
+			ActiveHealthCheck: activeHealthCheck,
 		})
 	}
 	lb.Listeners = listeners
@@ -592,6 +610,29 @@ func lbSpecFromService(
 		return lb, events, nil
 	}
 	return lb, nil, nil
+}
+
+func activeHealthCheckForService(service *corev1.Service) (*loadbalancer.ActiveHealthCheck, error) {
+	port := kubeProxyHealthCheckPort
+	if service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyLocal {
+		if service.Spec.HealthCheckNodePort <= 0 {
+			return nil, fmt.Errorf("service %s/%s has externalTrafficPolicy=Local but HealthCheckNodePort is not yet allocated", service.Namespace, service.Name)
+		}
+		port = service.Spec.HealthCheckNodePort
+	}
+
+	return &loadbalancer.ActiveHealthCheck{
+		AltPort:            new(port),
+		Interval:           new(defaultHealthCheckInterval),
+		Timeout:            new(defaultHealthCheckTimeout),
+		HealthyThreshold:   new(defaultHealthCheckHealthyThreshold),
+		UnhealthyThreshold: new(defaultHealthCheckUnhealthyThreshold),
+		HttpHealthChecks: &loadbalancer.HttpHealthChecks{
+			Path:       new(healthCheckPath),
+			OkStatuses: []string{"200"},
+		},
+		IntervalJitter: new(defaultIntervalJitter),
+	}, nil
 }
 
 func checkUnsupportedAnnotations(service *corev1.Service) *Event {
@@ -771,6 +812,9 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 				fulfills = false
 			}
 			if !cmp.PtrValEqualFn(x.ActiveHealthCheck, y.ActiveHealthCheck, func(a, b loadbalancer.ActiveHealthCheck) bool {
+				if !cmp.PtrValEqual(a.AltPort, b.AltPort) {
+					return false
+				}
 				if !cmp.PtrValEqual(a.HealthyThreshold, b.HealthyThreshold) {
 					return false
 				}
@@ -784,6 +828,11 @@ func compareLBwithSpec(lb *loadbalancer.LoadBalancer, spec *loadbalancer.CreateL
 					return false
 				}
 				if !cmp.PtrValEqual(a.UnhealthyThreshold, b.UnhealthyThreshold) {
+					return false
+				}
+				if !cmp.PtrValEqualFn(a.HttpHealthChecks, b.HttpHealthChecks, func(h1, h2 loadbalancer.HttpHealthChecks) bool {
+					return cmp.PtrValEqual(h1.Path, h2.Path) && cmp.SliceEqual(h1.OkStatuses, h2.OkStatuses)
+				}) {
 					return false
 				}
 				return true

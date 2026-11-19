@@ -36,6 +36,16 @@ type InstanceOpts struct {
 type LoadBalancerOpts struct {
 	NetworkID   string            `yaml:"networkId"`
 	ExtraLabels map[string]string `yaml:"extraLabels"`
+	// Configures kube-proxy health checks on load balancer target pools.
+	// Active health checks are enabled by default if unspecified.
+	HealthCheck *HealthCheck `yaml:"healthCheck,omitempty"`
+}
+
+func (o LoadBalancerOpts) UseActiveHealthChecks() bool {
+	if o.HealthCheck == nil || o.HealthCheck.UseKubeProxy == nil {
+		return true
+	}
+	return *o.HealthCheck.UseKubeProxy
 }
 
 type RouteOpts struct {
@@ -50,4 +60,9 @@ type CSIConfig struct {
 
 type BlockStorageOpts struct {
 	RescanOnResize bool `yaml:"rescanOnResize"`
+}
+
+type HealthCheck struct {
+	// Enables active health checks.
+	UseKubeProxy *bool `yaml:"useKubeProxy,omitempty"`
 }
