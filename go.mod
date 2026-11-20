@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/container-storage-interface/spec v1.13.0
+	github.com/container-storage-interface/spec v1.14.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-lib-utils v0.25.0
