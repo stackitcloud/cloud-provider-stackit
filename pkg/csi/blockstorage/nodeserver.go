@@ -275,15 +275,13 @@ func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) (stagingTar
 // If the initial mount fails, it rescans the device and retries the mount operation.
 func (ns *nodeServer) formatAndMountRetry(devicePath, stagingTarget, fsType string, options []string) error {
 	m := ns.Mount
-	var err error
+	var formatOptions []string
 	if fsType == util.FSTypeXfs {
 		// With newer xfsProgs version newer features are enabled by default. This forces mkfs.xfs to use flags compatible
 		// with the linux LTS 5.10 kernel
-		formatOptions := []string{"-n", "parent=0", "-i", "exchange=0,nrext64=0"}
-		err = m.Mounter().FormatAndMountSensitiveWithFormatOptions(devicePath, stagingTarget, fsType, options, nil, formatOptions)
-	} else {
-		err = m.Mounter().FormatAndMount(devicePath, stagingTarget, fsType, options)
+		formatOptions = []string{"-m", "metadir=0", "-n", "parent=0", "-i", "exchange=0,nrext64=0"}
 	}
+	err := m.Mounter().FormatAndMountSensitiveWithFormatOptions(devicePath, stagingTarget, fsType, options, nil, formatOptions)
 	if err != nil {
 		klog.Infof("Initial format and mount failed: %v. Attempting rescan.", err)
 		// Attempting rescan if the initial mount fails
@@ -293,7 +291,7 @@ func (ns *nodeServer) formatAndMountRetry(devicePath, stagingTarget, fsType stri
 			return err
 		}
 		klog.Infof("Rescan succeeded, retrying format and mount")
-		err = m.Mounter().FormatAndMount(devicePath, stagingTarget, fsType, options)
+		err = m.Mounter().FormatAndMountSensitiveWithFormatOptions(devicePath, stagingTarget, fsType, options, nil, formatOptions)
 	}
 	return err
 }
