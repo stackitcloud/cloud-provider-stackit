@@ -16,9 +16,9 @@ contents:
   - umount=~2.42.4
   - udev=~262.2
   - util-linux-misc=~2.42.4 # contains fsck
-  - xfsprogs=~7.2.1
-  - xfsprogs-core=~7.2.1
-  - xfsprogs-extra=~7.2.1 # contains xfs_io
+  - xfsprogs=~7.3.0
+  - xfsprogs-core=~7.3.0
+  - xfsprogs-extra=~7.3.0 # contains xfs_io
   - findmnt=~2.42.4
 
 accounts:
